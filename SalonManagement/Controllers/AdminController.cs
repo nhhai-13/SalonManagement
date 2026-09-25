@@ -1,0 +1,25 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace SalonManagement.Controllers;
+
+public class AdminController : Controller
+{
+    [HttpGet("admin/login")]
+    public IActionResult Login() => View();
+
+    [HttpGet("admin")]
+    public IActionResult Index() => View();
+
+    [HttpGet("admin/business-hours")]
+    public IActionResult BusinessHours() => View();
+}
+
+[Authorize]
+[ApiController]
+[Route("api/admin")]
+public class AdminApiController : ControllerBase
+{
+    [HttpGet("session")]
+    public IActionResult Session() => Ok(new { authenticated = true, email = User.FindFirst("email")?.Value });
+}

@@ -4,7 +4,7 @@ using SalonManagement.Models;
 
 namespace SalonManagement.Data
 {
-    public class ApplicationDbContext : IdentityDbContext
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)
@@ -27,9 +27,31 @@ namespace SalonManagement.Data
 
         public DbSet<Payment> Payments => Set<Payment>();
 
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+        public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            builder.Entity<RefreshToken>(entity =>
+            {
+                entity.HasKey(token => token.RefreshTokenId);
+                entity.Property(token => token.TokenHash).HasMaxLength(64);
+                entity.HasIndex(token => token.TokenHash).IsUnique();
+                entity.HasOne(token => token.User)
+                    .WithMany(user => user.RefreshTokens)
+                    .HasForeignKey(token => token.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<BusinessHour>(entity =>
+            {
+                entity.HasKey(hours => hours.BusinessHourId);
+                entity.Property(hours => hours.TimeZoneId).HasMaxLength(64);
+                entity.HasIndex(hours => hours.DayOfWeek).IsUnique();
+            });
 
             builder.Entity<Customer>(entity =>
             {
