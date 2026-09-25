@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SalonManagement.Data;
 
@@ -11,9 +12,11 @@ using SalonManagement.Data;
 namespace SalonManagement.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260925080204_AddAuthenticationSessions")]
+    partial class AddAuthenticationSessions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -304,39 +307,6 @@ namespace SalonManagement.Data.Migrations
                     b.ToTable("AppointmentServices");
                 });
 
-            modelBuilder.Entity("SalonManagement.Models.BusinessHour", b =>
-                {
-                    b.Property<int>("BusinessHourId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BusinessHourId"));
-
-                    b.Property<TimeOnly?>("ClosesAt")
-                        .HasColumnType("time");
-
-                    b.Property<int>("DayOfWeek")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsClosed")
-                        .HasColumnType("bit");
-
-                    b.Property<TimeOnly?>("OpensAt")
-                        .HasColumnType("time");
-
-                    b.Property<string>("TimeZoneId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.HasKey("BusinessHourId");
-
-                    b.HasIndex("DayOfWeek")
-                        .IsUnique();
-
-                    b.ToTable("BusinessHours");
-                });
-
             modelBuilder.Entity("SalonManagement.Models.Customer", b =>
                 {
                     b.Property<int>("CustomerId")
@@ -532,9 +502,6 @@ namespace SalonManagement.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int?>("ServiceGroupId")
-                        .HasColumnType("int");
-
                     b.Property<string>("ServiceName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -545,30 +512,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasKey("ServiceId");
 
-                    b.HasIndex("ServiceGroupId");
-
                     b.ToTable("Services");
-                });
-
-            modelBuilder.Entity("SalonManagement.Models.ServiceGroup", b =>
-                {
-                    b.Property<int>("ServiceGroupId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ServiceGroupId"));
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("int");
-
-                    b.Property<string>("GroupName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("ServiceGroupId");
-
-                    b.ToTable("ServiceGroups");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Stylist", b =>
@@ -774,16 +718,6 @@ namespace SalonManagement.Data.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("SalonManagement.Models.Service", b =>
-                {
-                    b.HasOne("SalonManagement.Models.ServiceGroup", "ServiceGroup")
-                        .WithMany("Services")
-                        .HasForeignKey("ServiceGroupId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ServiceGroup");
-                });
-
             modelBuilder.Entity("SalonManagement.Models.WorkSchedule", b =>
                 {
                     b.HasOne("SalonManagement.Models.Stylist", "Stylist")
@@ -820,11 +754,6 @@ namespace SalonManagement.Data.Migrations
             modelBuilder.Entity("SalonManagement.Models.Service", b =>
                 {
                     b.Navigation("AppointmentServices");
-                });
-
-            modelBuilder.Entity("SalonManagement.Models.ServiceGroup", b =>
-                {
-                    b.Navigation("Services");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Stylist", b =>
