@@ -9,6 +9,5 @@ public class RefreshToken
     public DateTime? RevokedAtUtc { get; set; }
     public required string UserId { get; set; }
     public ApplicationUser User { get; set; } = null!;
-
     public bool IsValid(DateTime utcNow) => RevokedAtUtc is null && ExpiresAtUtc > utcNow;
 }

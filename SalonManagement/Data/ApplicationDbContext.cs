@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Models;
 
@@ -10,6 +10,8 @@ namespace SalonManagement.Data
             : base(options)
         {
         }
+
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
         public DbSet<Customer> Customers => Set<Customer>();
 
@@ -38,12 +40,14 @@ namespace SalonManagement.Data
             builder.Entity<RefreshToken>(entity =>
             {
                 entity.HasKey(token => token.RefreshTokenId);
-                entity.Property(token => token.TokenHash).HasMaxLength(64);
-                entity.HasIndex(token => token.TokenHash).IsUnique();
+                entity.Property(token => token.TokenHash).HasMaxLength(128).IsRequired();
+                entity.Property(token => token.UserId).IsRequired();
                 entity.HasOne(token => token.User)
                     .WithMany(user => user.RefreshTokens)
                     .HasForeignKey(token => token.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(token => token.UserId);
+                entity.HasIndex(token => token.TokenHash).IsUnique();
             });
 
             builder.Entity<BusinessHour>(entity =>
