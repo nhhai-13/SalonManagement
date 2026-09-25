@@ -19,6 +19,8 @@ namespace SalonManagement.Data
 
         public DbSet<Service> Services => Set<Service>();
 
+        public DbSet<ServiceGroup> ServiceGroups => Set<ServiceGroup>();
+
         public DbSet<WorkSchedule> WorkSchedules => Set<WorkSchedule>();
 
         public DbSet<Appointment> Appointments => Set<Appointment>();
@@ -29,21 +31,30 @@ namespace SalonManagement.Data
 
         public DbSet<Payment> Payments => Set<Payment>();
 
+        public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
 
             builder.Entity<RefreshToken>(entity =>
             {
-                entity.HasKey(rt => rt.RefreshTokenId);
-                entity.Property(rt => rt.TokenHash).HasMaxLength(128).IsRequired();
-                entity.Property(rt => rt.UserId).IsRequired();
-                entity.HasOne(rt => rt.User)
-                    .WithMany(u => u.RefreshTokens)
-                    .HasForeignKey(rt => rt.UserId)
+                entity.HasKey(token => token.RefreshTokenId);
+                entity.Property(token => token.TokenHash).HasMaxLength(128).IsRequired();
+                entity.Property(token => token.UserId).IsRequired();
+                entity.HasOne(token => token.User)
+                    .WithMany(user => user.RefreshTokens)
+                    .HasForeignKey(token => token.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
-                entity.HasIndex(rt => rt.UserId);
-                entity.HasIndex(rt => rt.TokenHash).IsUnique();
+                entity.HasIndex(token => token.UserId);
+                entity.HasIndex(token => token.TokenHash).IsUnique();
+            });
+
+            builder.Entity<BusinessHour>(entity =>
+            {
+                entity.HasKey(hours => hours.BusinessHourId);
+                entity.Property(hours => hours.TimeZoneId).HasMaxLength(64);
+                entity.HasIndex(hours => hours.DayOfWeek).IsUnique();
             });
 
             builder.Entity<Customer>(entity =>
@@ -65,11 +76,22 @@ namespace SalonManagement.Data
                 entity.Property(stylist => stylist.Specialty).HasMaxLength(200);
             });
 
+            builder.Entity<ServiceGroup>(entity =>
+            {
+                entity.HasKey(g => g.ServiceGroupId);
+                entity.Property(g => g.GroupName).HasMaxLength(100).IsRequired();
+            });
+
             builder.Entity<Service>(entity =>
             {
                 entity.HasKey(service => service.ServiceId);
                 entity.Property(service => service.ServiceName).HasMaxLength(150);
                 entity.Property(service => service.Price).HasPrecision(18, 2);
+
+                entity.HasOne(s => s.ServiceGroup)
+                    .WithMany(g => g.Services)
+                    .HasForeignKey(s => s.ServiceGroupId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<WorkSchedule>(entity =>
@@ -101,7 +123,12 @@ namespace SalonManagement.Data
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(appointment =>
-                    new { appointment.StylistId, appointment.AppointmentDate, appointment.StartTime });
+                    new
+                    {
+                        appointment.StylistId,
+                        appointment.AppointmentDate,
+                        appointment.StartTime
+                    });
             });
 
             builder.Entity<AppointmentService>(entity =>
@@ -118,7 +145,13 @@ namespace SalonManagement.Data
                     .HasForeignKey(item => item.ServiceId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                entity.HasIndex(item => new { item.AppointmentId, item.ServiceId }).IsUnique();
+                entity.HasIndex(item =>
+                    new
+                    {
+                        item.AppointmentId,
+                        item.ServiceId
+                    })
+                    .IsUnique();
             });
 
             builder.Entity<Invoice>(entity =>
@@ -149,3 +182,4 @@ namespace SalonManagement.Data
         }
     }
 }
+

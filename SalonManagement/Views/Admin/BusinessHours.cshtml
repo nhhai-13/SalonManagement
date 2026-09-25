@@ -1,0 +1,19 @@
+@{
+    ViewData["Title"] = "Giờ hoạt động";
+}
+
+<div id="hours-page" class="d-none">
+    <h1 class="h3">Giờ hoạt động</h1>
+    <p class="text-muted">Múi giờ cố định: Asia/Ho_Chi_Minh</p>
+    <form id="hours-form">
+        <div id="hours-list"></div>
+        <div id="hours-result" class="alert d-none" role="alert"></div>
+        <button class="btn btn-primary" type="submit">Lưu cấu hình</button>
+    </form>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script src="~/js/business-hours.js" asp-append-version="true"></script>
+    <script>BusinessHoursPage.initialize();</script>
+}

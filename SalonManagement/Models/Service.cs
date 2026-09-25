@@ -18,6 +18,9 @@
 
         public DateTime? UpdatedAt { get; set; }
 
+        public int? ServiceGroupId { get; set; }
+        public ServiceGroup? ServiceGroup { get; set; }
+
         public ICollection<AppointmentService> AppointmentServices { get; set; }
             = new List<AppointmentService>();
     }

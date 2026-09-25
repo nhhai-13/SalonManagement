@@ -12,15 +12,15 @@ using SalonManagement.Data;
 namespace SalonManagement.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260925171938_AddApplicationUserAndRefreshTokens")]
-    partial class AddApplicationUserAndRefreshTokens
+    [Migration("20260925080841_AddBusinessHours")]
+    partial class AddBusinessHours
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.23")
+                .HasAnnotation("ProductVersion", "8.0.30")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -307,6 +307,39 @@ namespace SalonManagement.Data.Migrations
                     b.ToTable("AppointmentServices");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.BusinessHour", b =>
+                {
+                    b.Property<int>("BusinessHourId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BusinessHourId"));
+
+                    b.Property<TimeOnly?>("ClosesAt")
+                        .HasColumnType("time");
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsClosed")
+                        .HasColumnType("bit");
+
+                    b.Property<TimeOnly?>("OpensAt")
+                        .HasColumnType("time");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("BusinessHourId");
+
+                    b.HasIndex("DayOfWeek")
+                        .IsUnique();
+
+                    b.ToTable("BusinessHours");
+                });
+
             modelBuilder.Entity("SalonManagement.Models.Customer", b =>
                 {
                     b.Property<int>("CustomerId")
@@ -461,8 +494,8 @@ namespace SalonManagement.Data.Migrations
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("UserId")
                         .IsRequired()
