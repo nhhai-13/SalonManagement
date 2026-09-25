@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SalonManagement.Controllers;
 using SalonManagement.Data;
 using SalonManagement.Models;
+using Xunit;
 
 namespace SalonManagement.Tests;
 

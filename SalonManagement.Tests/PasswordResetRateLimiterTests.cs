@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SalonManagement.Services;
 
 namespace SalonManagement.Tests;

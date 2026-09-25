@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SalonManagement.Models.ViewModels;
 
 namespace SalonManagement.Tests;

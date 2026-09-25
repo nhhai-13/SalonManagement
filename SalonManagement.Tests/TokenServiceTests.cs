@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using SalonManagement.Models;
 using SalonManagement.Services;
+using Xunit;
 
 namespace SalonManagement.Tests;
 
