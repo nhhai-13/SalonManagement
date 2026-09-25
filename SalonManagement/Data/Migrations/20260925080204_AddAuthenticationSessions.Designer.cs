@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SalonManagement.Data;
 
@@ -11,9 +12,11 @@ using SalonManagement.Data;
 namespace SalonManagement.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260925080204_AddAuthenticationSessions")]
+    partial class AddAuthenticationSessions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -302,39 +305,6 @@ namespace SalonManagement.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("AppointmentServices");
-                });
-
-            modelBuilder.Entity("SalonManagement.Models.BusinessHour", b =>
-                {
-                    b.Property<int>("BusinessHourId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BusinessHourId"));
-
-                    b.Property<TimeOnly?>("ClosesAt")
-                        .HasColumnType("time");
-
-                    b.Property<int>("DayOfWeek")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsClosed")
-                        .HasColumnType("bit");
-
-                    b.Property<TimeOnly?>("OpensAt")
-                        .HasColumnType("time");
-
-                    b.Property<string>("TimeZoneId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.HasKey("BusinessHourId");
-
-                    b.HasIndex("DayOfWeek")
-                        .IsUnique();
-
-                    b.ToTable("BusinessHours");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Customer", b =>

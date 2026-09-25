@@ -1,0 +1,14 @@
+@{
+    ViewData["Title"] = "Khu vực quản trị";
+}
+
+<div id="admin-content" class="d-none">
+    <h1>Khu vực quản trị</h1>
+    <p>Phiên đăng nhập của bạn đang hoạt động.</p>
+    <button id="logout" class="btn btn-outline-danger">Đăng xuất</button>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>SalonAuth.requireSession();</script>
+}

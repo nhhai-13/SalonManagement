@@ -31,3 +31,7 @@ appsettings.Local.json
 # Operating system files
 .DS_Store
 Thumbs.db
+**/.keys/
+**/*.db
+**/*.db-shm
+**/*.db-wal
