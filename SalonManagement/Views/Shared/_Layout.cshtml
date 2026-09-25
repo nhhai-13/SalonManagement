@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿```html
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -12,25 +13,58 @@
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">SalonManagement</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                    SalonManagement
+                </a>
+
+                <button class="navbar-toggler"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target=".navbar-collapse"
+                        aria-controls="navbarSupportedContent"
+                        aria-expanded="false"
+                        aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
+
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
+
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                            <a class="nav-link text-dark"
+                               asp-area=""
+                               asp-controller="Home"
+                               asp-action="Index">
+                                Home
+                            </a>
                         </li>
+
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+                            <a class="nav-link text-dark"
+                               asp-area=""
+                               asp-controller="Home"
+                               asp-action="Privacy">
+                                Privacy
+                            </a>
                         </li>
+
+                        <!-- Menu Dịch vụ -->
+                        <li class="nav-item">
+                            <a class="nav-link text-dark"
+                               asp-controller="Services"
+                               asp-action="Index">
+                                Dịch vụ
+                            </a>
+                        </li>
+
                     </ul>
+
                     <partial name="_LoginPartial" />
                 </div>
             </div>
         </nav>
     </header>
+
     <div class="container">
         <main role="main" class="pb-3">
             @RenderBody()
@@ -39,12 +73,34 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; 2026 - SalonManagement - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+            &copy; 2026 - SalonManagement -
+            <a asp-area="" asp-controller="Home" asp-action="Privacy">
+                Privacy
+            </a>
         </div>
     </footer>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
+```
+
+Sau khi lưu file, menu trên thanh điều hướng sẽ có:
+
+**Home | Privacy | Dịch vụ**
+
+Khi bấm **Dịch vụ**, Razor sẽ gọi:
+
+```text
+ServicesController
+        ↓
+Index()
+        ↓
+Views/Services/Index.cshtml
+```
+
+Vì vậy bạn cần có `ServicesController` và `Views/Services/Index.cshtml` thì nút **Dịch vụ** mới mở được trang tương ứng.

@@ -1,0 +1,95 @@
+﻿@model IEnumerable<SalonManagement.Models.Service>
+@{
+    ViewData["Title"] = "Danh sách dịch vụ";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>Quản lý dịch vụ</h1>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> + Thêm dịch vụ
+        </a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Tên dịch vụ</th>
+                        <th>Nhóm</th>
+                        <th>Thời lượng</th>
+                        <th>Giá</th>
+                        <th>Trạng thái</th>
+                        <th style="width: 250px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                Chưa có dịch vụ nào. Bấm "+ Thêm dịch vụ" để bắt đầu.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td><strong>@item.ServiceName</strong></td>
+                                <td>@(item.ServiceGroup?.GroupName ?? "—")</td>
+                                <td>@item.DurationMinutes phút</td>
+                                <td>@item.Price.ToString("N0") đ</td>
+                                <td>
+                                    @if (item.IsActive)
+                                    {
+                                        <span class="badge bg-success">Đang bán</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Ngừng bán</span>
+                                    }
+                                </td>
+                                <td>
+                                    <a asp-action="Edit" asp-route-id="@item.ServiceId"
+                                       class="btn btn-sm btn-warning">Sửa</a>
+
+                                    <form asp-action="ToggleStatus" asp-route-id="@item.ServiceId"
+                                          method="post" style="display:inline">
+                                        <button type="submit" class="btn btn-sm btn-info">
+                                            @(item.IsActive ? "Ngừng bán" : "Mở bán")
+                                        </button>
+                                    </form>
+
+                                    <form asp-action="Delete" asp-route-id="@item.ServiceId"
+                                          method="post" style="display:inline"
+                                          onsubmit="return confirm('Bạn chắc chắn muốn xoá dịch vụ này?');">
+                                        <button type="submit" class="btn btn-sm btn-danger">Xoá</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
