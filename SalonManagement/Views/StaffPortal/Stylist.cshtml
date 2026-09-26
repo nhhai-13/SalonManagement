@@ -1,0 +1,25 @@
+@{
+    ViewData["Title"] = "Không gian thợ";
+}
+
+<div id="stylist-content" class="d-none py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <span class="text-uppercase text-muted small fw-semibold">Không gian làm việc</span>
+            <h1 class="h2 mb-1">Thợ làm tóc</h1>
+            <p class="text-muted mb-0">Xin chào <strong data-session-email></strong></p>
+        </div>
+        <button id="logout" class="btn btn-outline-danger" type="button">Đăng xuất</button>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body"><i class="bi bi-calendar3 fs-3 text-primary"></i><h2 class="h5 mt-3">Lịch làm việc</h2><p class="text-muted mb-0">Xem ca làm và lịch phục vụ được phân công.</p></div></div></div>
+        <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body"><i class="bi bi-scissors fs-3 text-primary"></i><h2 class="h5 mt-3">Lịch hẹn của tôi</h2><p class="text-muted mb-0">Theo dõi các khách hàng cần phục vụ trong ngày.</p></div></div></div>
+        <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body"><i class="bi bi-clock-history fs-3 text-primary"></i><h2 class="h5 mt-3">Lịch sử phục vụ</h2><p class="text-muted mb-0">Xem lại các dịch vụ đã hoàn thành.</p></div></div></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>SalonAuth.requireSession({ endpoint: "/api/portal/stylist/session", contentId: "stylist-content" });</script>
+}

@@ -44,7 +44,7 @@ html { scroll-behavior: smooth; }
 .button-small { min-height: 42px; padding-inline: 19px; }
 .home-menu-toggle { display: none; border: 0; color: #5f3d2d; background: transparent; font-size: 28px; }
 .hero { position: relative; min-height: 700px; overflow: hidden; }
-.hero-media { position: absolute; inset: 0; background: url('/images/lumiere-hero.png') center/cover no-repeat; }
+.hero-media { position: absolute; inset: 0; background: url('/images/luminol-hero.png') center/cover no-repeat; }
 .hero-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(35,25,20,.82) 0%, rgba(47,33,26,.57) 37%, rgba(47,33,26,.05) 68%); }
 .hero-content { position: relative; display: flex; min-height: 700px; flex-direction: column; align-items: flex-start; justify-content: center; color: #fff; }
 .home-eyebrow { color: #b98955; font-size: 10px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
@@ -88,7 +88,7 @@ html { scroll-behavior: smooth; }
 .experience-section { padding: 110px 0; background: #efe7dc; }
 .experience-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: clamp(60px, 8vw, 120px); }
 .experience-visual { position: relative; min-height: 570px; }
-.experience-photo { position: absolute; inset: 0 45px 0 0; background: linear-gradient(145deg, rgba(65,43,31,.06), rgba(65,43,31,.25)), url('/images/lumiere-hero.png') 65% center/cover; filter: saturate(.75); }
+.experience-photo { position: absolute; inset: 0 45px 0 0; background: linear-gradient(145deg, rgba(65,43,31,.06), rgba(65,43,31,.25)), url('/images/luminol-hero.png') 65% center/cover; filter: saturate(.75); }
 .experience-badge { position: absolute; right: 0; bottom: 45px; display: flex; width: 155px; height: 155px; flex-direction: column; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: #704a37; font-size: 11px; text-align: center; }
 .experience-badge strong { font: 600 42px "Playfair Display", serif; }
 .experience-copy > p { margin: 26px 0; color: #746860; line-height: 1.8; }

@@ -42,13 +42,40 @@ public class AdminController : Controller
         return View("Register");
     }
 
-    [Authorize(Roles = UserRoles.Admin)]
     [HttpGet("admin")]
     public IActionResult Index() => View();
 
-    [Authorize(Roles = UserRoles.Admin)]
     [HttpGet("admin/business-hours")]
     public IActionResult BusinessHours() => View();
+}
+
+public class StaffPortalController : Controller
+{
+    [HttpGet("reception")]
+    public IActionResult Reception() => View();
+
+    [HttpGet("stylist")]
+    public IActionResult Stylist() => View();
+}
+
+[ApiController]
+[Route("api/portal")]
+public class StaffPortalApiController : ControllerBase
+{
+    [Authorize(Roles = UserRoles.Receptionist)]
+    [HttpGet("reception/session")]
+    public IActionResult ReceptionSession() => Session(UserRoles.Receptionist);
+
+    [Authorize(Roles = UserRoles.Stylist)]
+    [HttpGet("stylist/session")]
+    public IActionResult StylistSession() => Session(UserRoles.Stylist);
+
+    private IActionResult Session(string role) => Ok(new
+    {
+        authenticated = true,
+        email = User.FindFirst("email")?.Value,
+        role
+    });
 }
 
 [Authorize(Roles = UserRoles.Admin)]

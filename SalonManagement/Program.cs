@@ -32,14 +32,8 @@ var connectionString =
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (builder.Configuration["DatabaseProvider"] == "Sqlite")
-    {
-        options.UseSqlite(connectionString);
-    }
-    else
-    {
-        options.UseSqlServer(connectionString);
-    }
+    options.UseSqlServer(connectionString, sqlServerOptions =>
+        sqlServerOptions.EnableRetryOnFailure());
 });
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -203,19 +197,16 @@ builder.Services.AddControllersWithViews();
 var app = builder.Build();
 
 // =====================================
-// SQLITE DATABASE INITIALIZATION
+// DATABASE MIGRATION
 // =====================================
 
-if (builder.Configuration["DatabaseProvider"] == "Sqlite")
+await using (var scope = app.Services.CreateAsyncScope())
 {
-    await using var scope =
-        app.Services.CreateAsyncScope();
-
     var dbContext =
         scope.ServiceProvider
             .GetRequiredService<ApplicationDbContext>();
 
-    await dbContext.Database.EnsureCreatedAsync();
+    await dbContext.Database.MigrateAsync();
 }
 
 // =====================================

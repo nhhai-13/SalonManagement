@@ -1,0 +1,25 @@
+@{
+    ViewData["Title"] = "Không gian lễ tân";
+}
+
+<div id="reception-content" class="d-none py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <span class="text-uppercase text-muted small fw-semibold">Không gian làm việc</span>
+            <h1 class="h2 mb-1">Lễ tân</h1>
+            <p class="text-muted mb-0">Xin chào <strong data-session-email></strong></p>
+        </div>
+        <button id="logout" class="btn btn-outline-danger" type="button">Đăng xuất</button>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body"><i class="bi bi-calendar-check fs-3 text-primary"></i><h2 class="h5 mt-3">Lịch hẹn</h2><p class="text-muted mb-0">Theo dõi và sắp xếp lịch hẹn của khách hàng.</p></div></div></div>
+        <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body"><i class="bi bi-person-plus fs-3 text-primary"></i><h2 class="h5 mt-3">Tiếp nhận khách</h2><p class="text-muted mb-0">Hỗ trợ khách đến salon và cập nhật trạng thái phục vụ.</p></div></div></div>
+        <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body"><i class="bi bi-people fs-3 text-primary"></i><h2 class="h5 mt-3">Khách hàng</h2><p class="text-muted mb-0">Tra cứu thông tin và lịch sử đặt lịch.</p></div></div></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>SalonAuth.requireSession({ endpoint: "/api/portal/reception/session", contentId: "reception-content" });</script>
+}
