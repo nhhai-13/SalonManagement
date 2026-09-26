@@ -1,0 +1,26 @@
+@{
+    ViewData["Title"] = "Đăng nhập quản trị";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <h1 class="h3 mb-4">Đăng nhập quản trị</h1>
+        <form id="login-form">
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input id="email" type="email" class="form-control" autocomplete="username" required />
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Mật khẩu</label>
+                <input id="password" type="password" class="form-control" autocomplete="current-password" required />
+            </div>
+            <div id="login-error" class="alert alert-danger d-none" role="alert"></div>
+            <button class="btn btn-primary w-100" type="submit">Đăng nhập</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>SalonAuth.bindLoginForm();</script>
+}
