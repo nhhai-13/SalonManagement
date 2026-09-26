@@ -6,7 +6,25 @@ namespace SalonManagement.Controllers;
 public class AdminController : Controller
 {
     [HttpGet("admin/login")]
-    public IActionResult Login() => View();
+    public IActionResult Login()
+    {
+        ViewData["Portal"] = "admin";
+        return View();
+    }
+
+    [HttpGet("reception/login")]
+    public IActionResult ReceptionLogin()
+    {
+        ViewData["Portal"] = "reception";
+        return View("Login");
+    }
+
+    [HttpGet("stylist/login")]
+    public IActionResult StylistLogin()
+    {
+        ViewData["Portal"] = "stylist";
+        return View("Login");
+    }
 
     [HttpGet("admin")]
     public IActionResult Index() => View();

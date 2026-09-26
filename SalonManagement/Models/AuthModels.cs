@@ -4,7 +4,8 @@ namespace SalonManagement.Models;
 
 public sealed record LoginRequest(
     [Required, EmailAddress] string Email,
-    [Required] string Password);
+    [Required] string Password,
+    string? Portal = null);
 
 public sealed record RefreshRequest([Required] string RefreshToken);
 
