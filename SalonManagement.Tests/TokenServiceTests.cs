@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using SalonManagement.Models;
 using SalonManagement.Services;
 using Xunit;
@@ -21,11 +23,15 @@ public class TokenServiceTests
         }).Build();
         var service = new TokenService(configuration, new FixedTimeProvider(now));
 
-        var access = service.CreateAccessToken(new ApplicationUser { Id = "1", Email = "admin@example.com" });
+        var access = service.CreateAccessToken(
+            new ApplicationUser { Id = "1", Email = "admin@example.com" },
+            ["Admin"]);
 
         Assert.Equal(now.UtcDateTime.AddMinutes(30), access.ExpiresAtUtc);
         Assert.Equal(now.UtcDateTime.AddDays(7), service.GetRefreshTokenExpiry());
         Assert.NotEqual(service.CreateRefreshToken(), service.CreateRefreshToken());
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(access.Token);
+        Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.Role && claim.Value == "Admin");
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
