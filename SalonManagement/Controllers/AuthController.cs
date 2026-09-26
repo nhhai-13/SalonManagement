@@ -16,6 +16,7 @@ public class AuthController(
     TimeProvider timeProvider) : ControllerBase
 {
     private const string InvalidCredentialsMessage = "Email hoặc mật khẩu không chính xác.";
+    private const string LockedAccountMessage = "Tài khoản đã bị khóa tạm thời do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.";
 
     [HttpPost("login")]
     public async Task<ActionResult<TokenResponse>> Login(LoginRequest request)
@@ -26,24 +27,45 @@ public class AuthController(
             return Unauthorized(new { message = InvalidCredentialsMessage });
         }
 
+        if (await userManager.IsLockedOutAsync(user))
+        {
+            return Unauthorized(new { message = LockedAccountMessage });
+        }
+
         var passwordResult = await userManager.CheckPasswordAsync(user, request.Password);
         if (!passwordResult)
         {
             if (user.IsActive)
             {
                 await userManager.AccessFailedAsync(user);
+                if (await userManager.IsLockedOutAsync(user))
+                {
+                    return Unauthorized(new { message = LockedAccountMessage });
+                }
             }
             return Unauthorized(new { message = InvalidCredentialsMessage });
         }
 
         if (await userManager.IsLockedOutAsync(user))
         {
-            return Unauthorized(new { message = InvalidCredentialsMessage });
+            return Unauthorized(new { message = LockedAccountMessage });
         }
 
         if (!user.IsActive)
         {
             return Unauthorized(new { message = "Tài khoản đã ngưng hoạt động. Vui lòng liên hệ quản trị viên." });
+        }
+
+        var requiredRoles = request.Portal?.ToLowerInvariant() switch
+        {
+            "admin" => new[] { "Admin", "Owner" },
+            "reception" => new[] { "Receptionist" },
+            "stylist" => new[] { "Stylist" },
+            _ => Array.Empty<string>()
+        };
+        if (requiredRoles.Length > 0 && !await HasAnyRole(user, requiredRoles))
+        {
+            return Unauthorized(new { message = "Tài khoản không có quyền truy cập khu vực này." });
         }
 
         await userManager.ResetAccessFailedCountAsync(user);
@@ -94,5 +116,14 @@ public class AuthController(
         });
         await dbContext.SaveChangesAsync();
         return new TokenResponse(accessToken, accessExpiry, refreshToken, refreshExpiry);
+    }
+
+    private async Task<bool> HasAnyRole(ApplicationUser user, IEnumerable<string> roles)
+    {
+        foreach (var role in roles)
+        {
+            if (await userManager.IsInRoleAsync(user, role)) return true;
+        }
+        return false;
     }
 }
