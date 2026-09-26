@@ -95,6 +95,11 @@
                 </button>
             </form>
 
+            @if (portal is "reception" or "stylist")
+            {
+                <p class="support-note">Chưa có tài khoản? <a href="/@portal/register">Tự đăng ký</a> hoặc liên hệ quản trị viên.</p>
+            }
+
             <nav class="portal-switcher" aria-label="Chọn khu vực đăng nhập">
                 <span>Đăng nhập với vai trò khác</span>
                 <div>

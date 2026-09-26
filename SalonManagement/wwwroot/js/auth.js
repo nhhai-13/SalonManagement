@@ -165,11 +165,79 @@ window.SalonAuth = (() => {
                 }
             });
         },
+        bindRegisterForm() {
+            const form = document.getElementById("register-form");
+            const email = document.getElementById("email");
+            const password = document.getElementById("password");
+            const confirmPassword = document.getElementById("confirm-password");
+            const submit = document.getElementById("register-submit");
+            const error = document.getElementById("register-error");
+            const errorMessage = error.querySelector("span") || error;
+
+            form.addEventListener("submit", async event => {
+                event.preventDefault();
+                error.classList.add("d-none");
+                const fields = [email, password, confirmPassword];
+                fields.forEach(input => input.closest(".field-group")?.classList.remove("invalid"));
+                let valid = fields.every(input => input.checkValidity());
+                if (password.value !== confirmPassword.value) {
+                    confirmPassword.closest(".field-group")?.classList.add("invalid");
+                    valid = false;
+                }
+                fields.filter(input => !input.checkValidity()).forEach(input => input.closest(".field-group")?.classList.add("invalid"));
+                if (!valid) return;
+
+                submit.disabled = true;
+                submit.classList.add("loading");
+                submit.querySelector(".button-label").textContent = "Đang tạo...";
+                try {
+                    const response = await fetch("/api/auth/register", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: email.value.trim(), password: password.value, role: form.dataset.role })
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        errorMessage.textContent = result.message || "Không thể tạo tài khoản.";
+                        error.classList.remove("d-none");
+                        return;
+                    }
+                    location.replace(`${form.dataset.login}?message=${encodeURIComponent(result.message)}`);
+                } catch {
+                    errorMessage.textContent = "Không thể kết nối đến hệ thống. Vui lòng thử lại.";
+                    error.classList.remove("d-none");
+                } finally {
+                    submit.disabled = false;
+                    submit.classList.remove("loading");
+                    submit.querySelector(".button-label").textContent = "Tạo tài khoản";
+                }
+            });
+        },
+        bindStaffAccountForm() {
+            const form = document.getElementById("staff-account-form");
+            if (!form) return;
+            const message = document.getElementById("staff-account-message");
+            form.addEventListener("submit", async event => {
+                event.preventDefault();
+                message.className = "alert d-none";
+                if (!form.checkValidity()) return form.reportValidity();
+                const response = await authenticatedFetch("/api/admin/staff-accounts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(Object.fromEntries(new FormData(form)))
+                });
+                const result = await response.json().catch(() => ({}));
+                message.textContent = result.message || (response.ok ? "Đã tạo tài khoản." : "Không thể tạo tài khoản.");
+                message.className = `alert ${response.ok ? "alert-success" : "alert-danger"}`;
+                if (response.ok) form.reset();
+            });
+        },
         async requireSession() {
             const response = await authenticatedFetch("/api/admin/session");
             if (!response.ok) return redirectToLogin("Phiên đăng nhập đã hết hạn.");
             scheduleRefresh();
             document.getElementById("admin-content").classList.remove("d-none");
+            this.bindStaffAccountForm();
             document.getElementById("logout").addEventListener("click", async () => {
                 const refreshToken = activeStorage().getItem(refreshKey);
                 if (refreshToken) {

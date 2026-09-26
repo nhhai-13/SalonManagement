@@ -18,6 +18,42 @@ public class AuthController(
     private const string InvalidCredentialsMessage = "Email hoặc mật khẩu không chính xác.";
     private const string LockedAccountMessage = "Tài khoản đã bị khóa tạm thời do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.";
 
+    [HttpPost("register")]
+    public async Task<IActionResult> Register(RegisterStaffRequest request)
+    {
+        var role = NormalizeStaffRole(request.Role);
+        if (role is null)
+        {
+            return BadRequest(new { message = "Chỉ lễ tân và thợ được phép tự đăng ký tài khoản." });
+        }
+
+        if (await userManager.FindByEmailAsync(request.Email.Trim()) is not null)
+        {
+            return Conflict(new { message = "Email này đã được sử dụng." });
+        }
+
+        var user = new ApplicationUser
+        {
+            UserName = request.Email.Trim(),
+            Email = request.Email.Trim(),
+            IsActive = true
+        };
+        var result = await userManager.CreateAsync(user, request.Password);
+        if (!result.Succeeded)
+        {
+            return BadRequest(new { message = FormatIdentityErrors(result) });
+        }
+
+        var roleResult = await userManager.AddToRoleAsync(user, role);
+        if (!roleResult.Succeeded)
+        {
+            await userManager.DeleteAsync(user);
+            return BadRequest(new { message = "Không thể gán vai trò cho tài khoản. Vui lòng thử lại." });
+        }
+
+        return Created(string.Empty, new { message = "Đăng ký thành công. Bạn có thể đăng nhập ngay.", role });
+    }
+
     [HttpPost("login")]
     public async Task<ActionResult<TokenResponse>> Login(LoginRequest request)
     {
@@ -104,7 +140,8 @@ public class AuthController(
 
     private async Task<TokenResponse> IssueTokens(ApplicationUser user)
     {
-        var (accessToken, accessExpiry) = tokenService.CreateAccessToken(user);
+        var roles = await userManager.GetRolesAsync(user);
+        var (accessToken, accessExpiry) = tokenService.CreateAccessToken(user, roles);
         var refreshToken = tokenService.CreateRefreshToken();
         var refreshExpiry = tokenService.GetRefreshTokenExpiry();
         dbContext.RefreshTokens.Add(new RefreshToken
@@ -126,4 +163,21 @@ public class AuthController(
         }
         return false;
     }
+
+    public static string? NormalizeStaffRole(string? role) => role?.Trim().ToLowerInvariant() switch
+    {
+        "reception" or "receptionist" => "Receptionist",
+        "stylist" => "Stylist",
+        _ => null
+    };
+
+    internal static string FormatIdentityErrors(IdentityResult result) => string.Join(" ",
+        result.Errors.Select(error => error.Code switch
+        {
+            "PasswordTooShort" => "Mật khẩu phải có ít nhất 8 ký tự.",
+            "PasswordRequiresDigit" => "Mật khẩu phải có ít nhất một chữ số.",
+            "PasswordRequiresLower" => "Mật khẩu phải có ít nhất một chữ thường.",
+            "DuplicateUserName" or "DuplicateEmail" => "Email này đã được sử dụng.",
+            _ => error.Description
+        }));
 }

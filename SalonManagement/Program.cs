@@ -109,7 +109,6 @@ builder.Services.AddAuthentication(options =>
     var jwt = builder.Configuration.GetSection("Jwt");
 
     options.MapInboundClaims = false;
-
     options.TokenValidationParameters =
         new TokenValidationParameters
         {
@@ -125,9 +124,9 @@ builder.Services.AddAuthentication(options =>
                 new SymmetricSecurityKey(
                     Encoding.UTF8.GetBytes(jwt["Key"]!)),
 
+            RoleClaimType = ClaimTypes.Role,
             ClockSkew = TimeSpan.Zero
         };
-
     options.Events = new JwtBearerEvents
     {
         OnTokenValidated = async context =>
