@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SalonManagement/SalonManagement.csproj" />
+  <Project Path="SalonManagement.Tests/SalonManagement.Tests.csproj" />
+</Solution>

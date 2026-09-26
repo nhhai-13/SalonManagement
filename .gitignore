@@ -1,0 +1,37 @@
+# Visual Studio and user-specific files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# .NET build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+
+# Test and coverage output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Local databases and logs
+*.mdf
+*.ldf
+*.db
+*.log
+
+# Local secrets and environment overrides
+.env
+.env.*
+secrets.json
+appsettings.Local.json
+
+# Operating system files
+.DS_Store
+Thumbs.db
+**/.keys/
+**/*.db
+**/*.db-shm
+**/*.db-wal

@@ -1,0 +1,46 @@
+@model SalonManagement.Models.ViewModels.HomeViewModel
+@{
+    ViewData["Title"] = "Chăm sóc vẻ đẹp của bạn";
+    var fallbackServices = new[]
+    {
+        ("Cắt & tạo kiểu", "Kiểu tóc được thiết kế riêng theo gương mặt và phong cách của bạn.", "bi-scissors", "Từ 180.000đ"),
+        ("Uốn & nhuộm", "Màu sắc thời thượng, kỹ thuật dịu nhẹ và giữ tóc bóng khỏe.", "bi-stars", "Từ 650.000đ"),
+        ("Gội đầu thư giãn", "Thư giãn sâu với quy trình massage và chăm sóc da đầu.", "bi-droplet", "Từ 120.000đ")
+    };
+}
+
+<header class="home-header" id="top">
+    <div class="home-container nav-wrap">
+        <a class="home-brand" href="#top" aria-label="Lumière - Trang chủ"><span class="brand-monogram">L</span><span><strong>Lumière</strong><small>Salon &amp; Spa</small></span></a>
+        <button class="home-menu-toggle" type="button" aria-label="Mở menu" aria-expanded="false"><i class="bi bi-list"></i></button>
+        <nav class="home-nav" aria-label="Điều hướng chính"><a class="active" href="#top">Trang chủ</a><a href="#services">Dịch vụ</a><a href="#team">Chuyên viên</a><a href="#about">Về Lumière</a><a href="#contact">Liên hệ</a></nav>
+        <div class="nav-actions"><a class="nav-login" href="/admin/login">Đăng nhập</a><a class="button button-primary button-small" href="#booking">Đặt lịch</a></div>
+    </div>
+</header>
+
+<main class="home-page">
+    <section class="hero">
+        <div class="hero-media" role="img" aria-label="Khách hàng được chăm sóc tóc tại Lumière Salon"></div><div class="hero-overlay"></div>
+        <div class="home-container hero-content"><span class="home-eyebrow">Lumière Salon &amp; Spa</span><h1>Vẻ đẹp của bạn,<br/><em>cảm hứng của chúng tôi.</em></h1><p>Trải nghiệm chăm sóc tóc tinh tế trong một không gian thư giãn, nơi mỗi dịch vụ được thiết kế dành riêng cho bạn.</p><div class="hero-actions"><a class="button button-primary" href="#booking">Đặt lịch ngay <i class="bi bi-arrow-right"></i></a><a class="button button-ghost" href="#services">Khám phá dịch vụ</a></div><div class="hero-trust"><span><strong>4.9/5</strong><small><i class="bi bi-star-fill"></i> hơn 1.200 đánh giá</small></span><span><strong>8+</strong><small>năm tận tâm phục vụ</small></span></div></div>
+    </section>
+
+    <section class="booking-strip" id="booking"><div class="home-container booking-card"><div class="booking-copy"><span class="home-eyebrow">Đặt lịch trong 30 giây</span><h2>Sẵn sàng cho diện mạo mới?</h2><p>Để lại số điện thoại, chúng tôi sẽ giúp bạn chọn dịch vụ và khung giờ phù hợp.</p></div><form id="quick-booking-form" class="booking-form" novalidate><label><span>Số điện thoại</span><span class="booking-input"><i class="bi bi-telephone"></i><input id="booking-phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="Nhập số điện thoại" pattern="0[0-9]{9}" required /></span></label><label><span>Dịch vụ quan tâm</span><span class="booking-input"><i class="bi bi-stars"></i><select id="booking-service"><option value="">Chọn dịch vụ</option>@foreach (var service in Model.Services){<option value="@service.ServiceId">@service.ServiceName</option>}<option value="consult">Tư vấn giúp tôi</option></select></span></label><button class="button button-primary" type="submit">Đặt lịch ngay</button><p id="booking-message" class="booking-message" role="status"></p></form></div></section>
+
+    <section class="home-section" id="services"><div class="home-container"><div class="section-heading"><div><span class="home-eyebrow">Dịch vụ nổi bật</span><h2>Chăm sóc trọn vẹn,<br/>tỏa sáng theo cách riêng</h2></div><p>Từ những thay đổi tinh tế đến một diện mạo hoàn toàn mới, đội ngũ Lumière luôn lắng nghe để mang đến lựa chọn phù hợp nhất.</p></div><div class="service-grid">
+        @if (Model.Services.Count > 0) { var icons = new[] { "bi-scissors", "bi-stars", "bi-droplet", "bi-flower1", "bi-brush", "bi-gem" }; @for (var i = 0; i < Model.Services.Count; i++) { var service = Model.Services[i]; <article class="service-card"><span class="service-icon"><i class="bi @icons[i % icons.Length]"></i></span><div><h3>@service.ServiceName</h3><p>@(string.IsNullOrWhiteSpace(service.Description) ? "Quy trình chuyên nghiệp, sản phẩm tuyển chọn và trải nghiệm thư giãn." : service.Description)</p><div class="service-meta"><strong>@service.Price.ToString("N0")đ</strong><span>@service.DurationMinutes phút</span></div></div><a href="#booking" aria-label="Đặt dịch vụ @service.ServiceName"><i class="bi bi-arrow-up-right"></i></a></article> } }
+        else { @foreach (var item in fallbackServices) { <article class="service-card"><span class="service-icon"><i class="bi @item.Item3"></i></span><div><h3>@item.Item1</h3><p>@item.Item2</p><div class="service-meta"><strong>@item.Item4</strong><span>Tư vấn miễn phí</span></div></div><a href="#booking" aria-label="Đặt @item.Item1"><i class="bi bi-arrow-up-right"></i></a></article> } }
+    </div></div></section>
+
+    <section class="experience-section" id="about"><div class="home-container experience-grid"><div class="experience-visual"><div class="experience-photo"></div><span class="experience-badge"><strong>8+</strong> năm kiến tạo vẻ đẹp</span></div><div class="experience-copy"><span class="home-eyebrow">Trải nghiệm Lumière</span><h2>Chậm lại một chút,<br/>để đẹp hơn mỗi ngày.</h2><p>Lumière không chỉ tạo nên một kiểu tóc đẹp. Chúng tôi dành thời gian lắng nghe, tư vấn và chăm sóc để mỗi lần ghé thăm đều là một khoảng nghỉ thật sự dành cho bạn.</p><ul><li><i class="bi bi-check2"></i><span><strong>Tư vấn cá nhân hóa</strong><small>Dựa trên gương mặt, chất tóc và phong cách sống.</small></span></li><li><i class="bi bi-check2"></i><span><strong>Sản phẩm tuyển chọn</strong><small>Ưu tiên chất lượng, an toàn và sức khỏe mái tóc.</small></span></li><li><i class="bi bi-check2"></i><span><strong>Chuyên viên tận tâm</strong><small>Được đào tạo bài bản và cập nhật xu hướng liên tục.</small></span></li></ul><a class="text-link" href="#team">Gặp gỡ đội ngũ <i class="bi bi-arrow-right"></i></a></div></div></section>
+
+    <section class="home-section team-section" id="team"><div class="home-container"><div class="section-heading compact"><div><span class="home-eyebrow">Đội ngũ chuyên viên</span><h2>Đôi tay tài hoa,<br/>sự chăm sóc tận tâm</h2></div><a class="text-link" href="#booking">Chọn chuyên viên <i class="bi bi-arrow-right"></i></a></div><div class="team-grid">
+        @if (Model.Stylists.Count > 0) { @foreach (var stylist in Model.Stylists) { <article class="team-card"><div class="team-avatar"><i class="bi bi-person"></i></div><h3>@stylist.FullName</h3><p>@(stylist.Specialty ?? "Chuyên viên tạo mẫu tóc")</p><small>@(stylist.ExperienceYears.HasValue ? $"{stylist.ExperienceYears} năm kinh nghiệm" : "Tận tâm với từng khách hàng")</small></article> } }
+        else { <article class="team-card"><div class="team-avatar"><span>AN</span></div><h3>Minh An</h3><p>Hair Designer</p><small>8 năm kinh nghiệm</small></article><article class="team-card"><div class="team-avatar"><span>TH</span></div><h3>Thu Hà</h3><p>Color Specialist</p><small>6 năm kinh nghiệm</small></article><article class="team-card"><div class="team-avatar"><span>KL</span></div><h3>Khánh Linh</h3><p>Hair &amp; Scalp Expert</p><small>5 năm kinh nghiệm</small></article> }
+    </div></div></section>
+
+    <section class="testimonial-section"><div class="home-container testimonial"><i class="bi bi-quote"></i><div class="stars">★★★★★</div><blockquote>“Không gian rất thư giãn, chuyên viên tư vấn kỹ và thực sự hiểu mình muốn gì. Mình bước ra với một mái tóc đẹp nhưng vẫn rất là chính mình.”</blockquote><p><strong>Ngọc Mai</strong><span>Khách hàng thân thiết</span></p></div></section>
+    <section class="contact-section" id="contact"><div class="home-container contact-grid"><div><span class="home-eyebrow">Ghé thăm Lumière</span><h2>Một khoảng thời gian<br/>dành riêng cho bạn.</h2><p>Hãy đặt lịch trước để chúng tôi chuẩn bị trải nghiệm tốt nhất cho bạn.</p></div><div class="contact-details"><p><i class="bi bi-geo-alt"></i><span><small>Địa chỉ</small><strong>123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh</strong></span></p><p><i class="bi bi-clock"></i><span><small>Giờ mở cửa</small><strong>Thứ Hai – Chủ Nhật: 09:00 – 21:00</strong></span></p><p><i class="bi bi-telephone"></i><span><small>Hotline</small><strong>1900 6868</strong></span></p></div></div></section>
+</main>
+
+<footer class="home-footer"><div class="home-container footer-grid"><a class="home-brand light" href="#top"><span class="brand-monogram">L</span><span><strong>Lumière</strong><small>Salon &amp; Spa</small></span></a><p>Vẻ đẹp được tạo nên từ sự thấu hiểu và những trải nghiệm tinh tế.</p><div><a href="#services">Dịch vụ</a><a href="#booking">Đặt lịch</a><a href="/reception/login">Cổng nhân viên</a></div><span>© @DateTime.Now.Year Lumière Salon &amp; Spa</span></div></footer>
+<div class="floating-actions"><a href="tel:19006868" aria-label="Gọi hotline"><i class="bi bi-telephone-fill"></i></a><button type="button" id="back-to-top" aria-label="Lên đầu trang"><i class="bi bi-arrow-up"></i></button></div>

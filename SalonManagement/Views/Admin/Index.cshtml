@@ -1,0 +1,27 @@
+@{
+    ViewData["Title"] = "Khu vực quản trị";
+}
+
+<div id="admin-content" class="d-none">
+    <h1>Khu vực quản trị</h1>
+    <p>Phiên đăng nhập của bạn đang hoạt động.</p>
+    <section class="card shadow-sm my-4" style="max-width: 680px">
+        <div class="card-body">
+            <h2 class="h4">Cấp tài khoản nhân viên</h2>
+            <p class="text-muted">Tạo tài khoản cho lễ tân hoặc thợ. Nhân viên cũng có thể tự đăng ký tại trang đăng nhập tương ứng.</p>
+            <div id="staff-account-message" class="alert d-none" role="alert"></div>
+            <form id="staff-account-form" class="row g-3">
+                <div class="col-md-6"><label class="form-label" for="staff-email">Email</label><input class="form-control" id="staff-email" name="email" type="email" required /></div>
+                <div class="col-md-6"><label class="form-label" for="staff-role">Vai trò</label><select class="form-select" id="staff-role" name="role" required><option value="Receptionist">Lễ tân</option><option value="Stylist">Thợ</option></select></div>
+                <div class="col-12"><label class="form-label" for="staff-password">Mật khẩu ban đầu</label><input class="form-control" id="staff-password" name="password" type="password" minlength="8" required /><div class="form-text">Ít nhất 8 ký tự, gồm chữ thường và chữ số.</div></div>
+                <div class="col-12"><button class="btn btn-primary" type="submit">Tạo tài khoản</button></div>
+            </form>
+        </div>
+    </section>
+    <button id="logout" class="btn btn-outline-danger">Đăng xuất</button>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>SalonAuth.requireSession();</script>
+}
