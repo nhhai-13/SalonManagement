@@ -8,6 +8,7 @@ using SalonManagement.Data;
 using SalonManagement.Models;
 using SalonManagement.Services;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,8 +17,11 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+var connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException(
+        "Connection string 'DefaultConnection' not found.");
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     if (builder.Configuration["DatabaseProvider"] == "Sqlite")
@@ -29,79 +33,170 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlServer(connectionString);
     }
 });
+
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 {
     options.SignIn.RequireConfirmedAccount = false;
+
     options.Password.RequiredLength = 8;
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = false;
     options.Password.RequireNonAlphanumeric = false;
+
     options.Lockout.AllowedForNewUsers = true;
     options.Lockout.MaxFailedAccessAttempts = 5;
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.DefaultLockoutTimeSpan =
+        TimeSpan.FromMinutes(15);
 })
-    .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>()
-    .AddDefaultTokenProviders();
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
 
-builder.Services.Configure<DataProtectionTokenProviderOptions>(options =>
-    options.TokenLifespan = TimeSpan.FromMinutes(30));
+builder.Services.Configure<DataProtectionTokenProviderOptions>(
+    options =>
+    {
+        options.TokenLifespan = TimeSpan.FromMinutes(30);
+    });
 
 if (builder.Environment.IsDevelopment())
 {
-    builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, ".keys")))
+    builder.Services
+        .AddDataProtection()
+        .PersistKeysToFileSystem(
+            new DirectoryInfo(
+                Path.Combine(
+                    builder.Environment.ContentRootPath,
+                    ".keys")))
         .SetApplicationName("SalonManagement.Development");
 }
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-}).AddJwtBearer(options =>
-{
-    var jwt = builder.Configuration.GetSection("Jwt");
-    options.MapInboundClaims = false;
-    options.TokenValidationParameters = new TokenValidationParameters
+
+builder.Services
+    .AddAuthentication(options =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwt["Issuer"],
-        ValidAudience = jwt["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!)),
-        ClockSkew = TimeSpan.Zero
-    };
-    options.Events = new JwtBearerEvents
+        options.DefaultAuthenticateScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+
+        options.DefaultChallengeScheme =
+            JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
     {
-        OnTokenValidated = async context =>
-        {
-            var userId = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
-            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
-            var user = userId is null ? null : await userManager.FindByIdAsync(userId);
-            if (user is null || !user.IsActive)
+        var jwt = builder.Configuration.GetSection("Jwt");
+
+        options.MapInboundClaims = false;
+
+        options.TokenValidationParameters =
+            new TokenValidationParameters
             {
-                context.Fail("Account is inactive.");
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+
+                ValidIssuer = jwt["Issuer"],
+                ValidAudience = jwt["Audience"],
+
+                IssuerSigningKey =
+                    new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(jwt["Key"]!)),
+
+                ClockSkew = TimeSpan.Zero
+            };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userId =
+                    context.Principal?.FindFirstValue(
+                        JwtRegisteredClaimNames.Sub);
+
+                var userManager =
+                    context.HttpContext.RequestServices
+                        .GetRequiredService<
+                            UserManager<ApplicationUser>>();
+
+                var user = userId is null
+                    ? null
+                    : await userManager.FindByIdAsync(userId);
+
+                if (user is null || !user.IsActive)
+                {
+                    context.Fail("Account is inactive.");
+                }
+            },
+
+            // Chưa đăng nhập hoặc token không hợp lệ
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+
+                context.Response.StatusCode =
+                    StatusCodes.Status401Unauthorized;
+
+                context.Response.ContentType =
+                    "application/json; charset=utf-8";
+
+                var response = new
+                {
+                    status = 401,
+                    message =
+                        "Bạn cần đăng nhập để thực hiện chức năng này."
+                };
+
+                await context.Response.WriteAsync(
+                    JsonSerializer.Serialize(response));
+            },
+
+            // Đã đăng nhập nhưng không đúng role
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode =
+                    StatusCodes.Status403Forbidden;
+
+                context.Response.ContentType =
+                    "application/json; charset=utf-8";
+
+                var response = new
+                {
+                    status = 403,
+                    message =
+                        "Bạn không có quyền thực hiện chức năng này."
+                };
+
+                await context.Response.WriteAsync(
+                    JsonSerializer.Serialize(response));
             }
-        }
-    };
-});
+        };
+    });
+
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ITokenService, TokenService>();
+
 builder.Services.AddMemoryCache();
+
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddSingleton<IPasswordResetRateLimiter, PasswordResetRateLimiter>();
+
+builder.Services.AddSingleton<
+    IPasswordResetRateLimiter,
+    PasswordResetRateLimiter>();
+
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
 if (builder.Configuration["DatabaseProvider"] == "Sqlite")
 {
-    await using var scope = app.Services.CreateAsyncScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await using var scope =
+        app.Services.CreateAsyncScope();
+
+    var dbContext =
+        scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+
     await dbContext.Database.EnsureCreatedAsync();
 }
 
@@ -122,8 +217,12 @@ app.UseStaticFiles();
 app.Use(async (context, next) =>
 {
     if (HttpMethods.IsGet(context.Request.Method) &&
-        (context.Request.Path.Equals("/Identity/Account/Login", StringComparison.OrdinalIgnoreCase) ||
-         context.Request.Path.Equals("/Identity/Account/Register", StringComparison.OrdinalIgnoreCase)))
+        (context.Request.Path.Equals(
+             "/Identity/Account/Login",
+             StringComparison.OrdinalIgnoreCase) ||
+         context.Request.Path.Equals(
+             "/Identity/Account/Register",
+             StringComparison.OrdinalIgnoreCase)))
     {
         context.Response.Redirect("/admin/login");
         return;
@@ -133,19 +232,25 @@ app.Use(async (context, next) =>
 });
 
 app.UseRouting();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+    pattern:
+        "{controller=Home}/{action=Index}/{id?}");
+
 app.MapRazorPages();
 
-// ── Seed Roles ────────────────────────────────────────────────────────────────
+// Seed Roles
 using (var scope = app.Services.CreateScope())
 {
-    var roleManager = scope.ServiceProvider
-        .GetRequiredService<RoleManager<IdentityRole>>();
+    var roleManager =
+        scope.ServiceProvider
+            .GetRequiredService<
+                RoleManager<IdentityRole>>();
+
     await RoleSeeder.SeedRolesAsync(roleManager);
 }
 
