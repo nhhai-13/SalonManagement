@@ -42,14 +42,16 @@ public class AdminController : Controller
         return View("Register");
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpGet("admin")]
     public IActionResult Index() => View();
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpGet("admin/business-hours")]
     public IActionResult BusinessHours() => View();
 }
 
-[Authorize(Roles = "Admin,Owner")]
+[Authorize(Roles = UserRoles.Admin)]
 [ApiController]
 [Route("api/admin")]
 public class AdminApiController(UserManager<ApplicationUser> userManager) : ControllerBase

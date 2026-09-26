@@ -8,6 +8,7 @@ using SalonManagement.Data;
 using SalonManagement.Models;
 using SalonManagement.Services;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -148,6 +149,27 @@ builder.Services.AddAuthentication(options =>
             {
                 context.Fail("Account is inactive.");
             }
+        },
+        OnChallenge = async context =>
+        {
+            context.HandleResponse();
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.ContentType = "application/json; charset=utf-8";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new
+            {
+                status = 401,
+                message = "Bạn cần đăng nhập để thực hiện chức năng này."
+            }));
+        },
+        OnForbidden = async context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "application/json; charset=utf-8";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new
+            {
+                status = 403,
+                message = "Bạn không có quyền thực hiện chức năng này."
+            }));
         }
     };
 });
