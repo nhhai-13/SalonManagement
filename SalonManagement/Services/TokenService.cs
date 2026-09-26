@@ -9,7 +9,7 @@ namespace SalonManagement.Services;
 
 public interface ITokenService
 {
-    (string Token, DateTime ExpiresAtUtc) CreateAccessToken(ApplicationUser user);
+    (string Token, DateTime ExpiresAtUtc) CreateAccessToken(ApplicationUser user, IEnumerable<string>? roles = null);
     string CreateRefreshToken();
     string HashRefreshToken(string token);
     DateTime GetRefreshTokenExpiry();
@@ -19,17 +19,18 @@ public sealed class TokenService(IConfiguration configuration, TimeProvider time
 {
     private readonly IConfigurationSection _jwt = configuration.GetSection("Jwt");
 
-    public (string Token, DateTime ExpiresAtUtc) CreateAccessToken(ApplicationUser user)
+    public (string Token, DateTime ExpiresAtUtc) CreateAccessToken(ApplicationUser user, IEnumerable<string>? roles = null)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var expires = now.AddMinutes(_jwt.GetValue<int>("AccessTokenMinutes", 30));
         var key = _jwt["Key"] ?? throw new InvalidOperationException("Jwt:Key is not configured.");
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+        claims.AddRange((roles ?? []).Select(role => new Claim(ClaimTypes.Role, role)));
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
             SecurityAlgorithms.HmacSha256);

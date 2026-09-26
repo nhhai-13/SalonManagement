@@ -1,15 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - SalonManagement</title>
+    <title>@ViewData["Title"] - Lumière Salon &amp; Spa</title>
+    <meta name="description" content="Lumière Salon & Spa - Không gian chăm sóc tóc cao cấp, đặt lịch nhanh chóng và thuận tiện." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/SalonManagement.styles.css" asp-append-version="true" />
 </head>
 <body>
+    @{ var isHome = ViewContext.RouteData.Values["controller"]?.ToString() == "Home" && ViewContext.RouteData.Values["action"]?.ToString() == "Index"; }
+    @if (!isHome)
+    {
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
@@ -64,13 +71,16 @@
             </div>
         </nav>
     </header>
+    }
 
-    <div class="container">
+    <div class="@(isHome ? "" : "container")">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
     </div>
 
+    @if (!isHome)
+    {
     <footer class="border-top footer text-muted">
         <div class="container">
             &copy; 2026 - SalonManagement -
@@ -79,6 +89,7 @@
             </a>
         </div>
     </footer>
+    }
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
