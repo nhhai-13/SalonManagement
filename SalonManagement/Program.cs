@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpContextAccessor();
 // =====================================
 // LOGGING
 // =====================================
@@ -32,14 +33,8 @@ var connectionString =
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (builder.Configuration["DatabaseProvider"] == "Sqlite")
-    {
-        options.UseSqlite(connectionString);
-    }
-    else
-    {
-        options.UseSqlServer(connectionString);
-    }
+    options.UseSqlServer(connectionString, sqlServerOptions =>
+        sqlServerOptions.EnableRetryOnFailure());
 });
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -97,14 +92,7 @@ if (builder.Environment.IsDevelopment())
 // JWT AUTHENTICATION
 // =====================================
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme =
-        JwtBearerDefaults.AuthenticationScheme;
-
-    options.DefaultChallengeScheme =
-        JwtBearerDefaults.AuthenticationScheme;
-})
+builder.Services.AddAuthentication()
 .AddJwtBearer(options =>
 {
     var jwt = builder.Configuration.GetSection("Jwt");
@@ -229,19 +217,16 @@ builder.Services.AddControllersWithViews();
 var app = builder.Build();
 
 // =====================================
-// SQLITE DATABASE INITIALIZATION
+// DATABASE MIGRATION
 // =====================================
 
-if (builder.Configuration["DatabaseProvider"] == "Sqlite")
+await using (var scope = app.Services.CreateAsyncScope())
 {
-    await using var scope =
-        app.Services.CreateAsyncScope();
-
     var dbContext =
         scope.ServiceProvider
             .GetRequiredService<ApplicationDbContext>();
 
-    await dbContext.Database.EnsureCreatedAsync();
+    await dbContext.Database.MigrateAsync();
 }
 
 // =====================================

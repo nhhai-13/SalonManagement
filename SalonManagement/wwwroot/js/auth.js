@@ -232,13 +232,19 @@ window.SalonAuth = (() => {
                 if (response.ok) form.reset();
             });
         },
-        async requireSession() {
-            const response = await authenticatedFetch("/api/admin/session");
+        async requireSession(options = {}) {
+            const endpoint = options.endpoint || "/api/admin/session";
+            const contentId = options.contentId || "admin-content";
+            const response = await authenticatedFetch(endpoint);
             if (!response.ok) return redirectToLogin("Phiên đăng nhập đã hết hạn.");
             scheduleRefresh();
-            document.getElementById("admin-content").classList.remove("d-none");
+            const session = await response.json().catch(() => ({}));
+            document.getElementById(contentId)?.classList.remove("d-none");
+            document.querySelectorAll("[data-session-email]").forEach(element => {
+                element.textContent = session.email || "";
+            });
             this.bindStaffAccountForm();
-            document.getElementById("logout").addEventListener("click", async () => {
+            document.getElementById("logout")?.addEventListener("click", async () => {
                 const refreshToken = activeStorage().getItem(refreshKey);
                 if (refreshToken) {
                     await fetch("/api/auth/logout", {

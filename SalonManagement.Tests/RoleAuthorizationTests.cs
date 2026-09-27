@@ -7,6 +7,35 @@ namespace SalonManagement.Tests;
 
 public class RoleAuthorizationTests
 {
+    [Theory]
+    [InlineData(nameof(AdminController.Index))]
+    [InlineData(nameof(AdminController.BusinessHours))]
+    public void AdminPageShells_ShouldAllowJwtClientToLoad(string actionName)
+    {
+        var action = typeof(AdminController).GetMethod(actionName);
+        var attribute = action!
+            .GetCustomAttributes(typeof(AuthorizeAttribute), true)
+            .Cast<AuthorizeAttribute>()
+            .FirstOrDefault();
+
+        Assert.Null(attribute);
+    }
+
+    [Theory]
+    [InlineData(nameof(StaffPortalApiController.ReceptionSession), UserRoles.Receptionist)]
+    [InlineData(nameof(StaffPortalApiController.StylistSession), UserRoles.Stylist)]
+    public void StaffPortalSessions_ShouldRequireTheirExactRole(string actionName, string role)
+    {
+        var action = typeof(StaffPortalApiController).GetMethod(actionName);
+        var attribute = action!
+            .GetCustomAttributes(typeof(AuthorizeAttribute), true)
+            .Cast<AuthorizeAttribute>()
+            .FirstOrDefault();
+
+        Assert.NotNull(attribute);
+        Assert.Equal(role, attribute!.Roles);
+    }
+
     [Fact]
     public void AdminApiController_ShouldRequireAdminRole()
     {
