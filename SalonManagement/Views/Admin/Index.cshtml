@@ -18,7 +18,10 @@
             </form>
         </div>
     </section>
-    <button id="logout" class="btn btn-outline-danger">Đăng xuất</button>
+    <div class="d-flex gap-2">
+        <a asp-controller="Account" asp-action="ChangePassword" class="btn btn-outline-secondary">Đổi mật khẩu</a>
+        <button id="logout" class="btn btn-outline-danger">Đăng xuất</button>
+    </div>
 </div>
 
 @section Scripts {

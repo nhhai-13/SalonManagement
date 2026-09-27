@@ -1,0 +1,121 @@
+@{
+    var portal = ViewData["Portal"]?.ToString() ?? "admin";
+    var portalTitle = portal switch
+    {
+        "reception" => "Lễ tân",
+        "stylist" => "Chuyên viên",
+        _ => "Quản trị"
+    };
+    var portalDescription = portal switch
+    {
+        "reception" => "Quản lý lịch hẹn, đón tiếp và chăm sóc khách hàng.",
+        "stylist" => "Theo dõi lịch làm việc và lịch hẹn của bạn.",
+        _ => "Quản lý hoạt động salon trong một không gian duy nhất."
+    };
+    ViewData["Title"] = $"Đăng nhập {portalTitle.ToLower()}";
+    Layout = "_AuthLayout";
+}
+
+<main class="auth-shell">
+    <section class="auth-showcase" aria-label="Giới thiệu Lumière Salon">
+        <a class="brand" asp-controller="Home" asp-action="Index" aria-label="Về trang chủ">
+            <span class="brand-mark" aria-hidden="true">L</span>
+            <span>
+                <strong>Lumière</strong>
+                <small>Salon &amp; Spa</small>
+            </span>
+        </a>
+
+        <div class="showcase-copy">
+            <span class="eyebrow">Không gian @portalTitle.ToLower()</span>
+            <h1>Vẻ đẹp được tạo nên từ những trải nghiệm tinh tế.</h1>
+            <p>@portalDescription</p>
+        </div>
+
+        <div class="showcase-footer">
+            <span>Chăm sóc khách hàng</span>
+            <span class="divider" aria-hidden="true"></span>
+            <span>Vận hành hiệu quả</span>
+        </div>
+    </section>
+
+    <section class="auth-panel">
+        <div class="mobile-brand">
+            <span class="brand-mark" aria-hidden="true">L</span>
+            <span><strong>Lumière</strong><small>Salon &amp; Spa</small></span>
+        </div>
+
+        <div class="login-card">
+            <div class="login-heading">
+                <span class="eyebrow">Cổng @portalTitle.ToLower()</span>
+                <h2>Đăng nhập</h2>
+                <p>Nhập thông tin tài khoản @portalTitle.ToLower() để tiếp tục.</p>
+            </div>
+
+            <form id="login-form" data-portal="@portal" data-redirect="@(portal == "admin" ? "/admin" : "/")" novalidate>
+                <div id="login-error" class="login-alert d-none" role="alert" aria-live="polite">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                    <span></span>
+                </div>
+
+                <div class="field-group">
+                    <label for="email">Địa chỉ email</label>
+                    <div class="input-wrap">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.75 10.34 12a2.83 2.83 0 0 0 3.32 0L21 6.75M5.25 19.5h13.5A2.25 2.25 0 0 0 21 17.25V6.75a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                        <input id="email" name="email" type="email" placeholder="admin@lumiere.vn" autocomplete="username" autofocus required />
+                    </div>
+                    <span class="field-error">Vui lòng nhập email hợp lệ.</span>
+                </div>
+
+                <div class="field-group">
+                    <div class="label-row">
+                        <label for="password">Mật khẩu</label>
+                        <a asp-controller="Account" asp-action="ForgotPassword">Quên mật khẩu?</a>
+                    </div>
+                    <div class="input-wrap">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 10.5V6.75a4.5 4.5 0 0 0-9 0v3.75m-.75 10.125h10.5a2.25 2.25 0 0 0 2.25-2.25v-5.625a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v5.625a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                        <input id="password" name="password" type="password" placeholder="Nhập mật khẩu" autocomplete="current-password" required />
+                        <button id="toggle-password" class="password-toggle" type="button" aria-label="Hiện mật khẩu" aria-pressed="false">
+                            <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.25 12s3.5-6 9.75-6 9.75 6 9.75 6-3.5 6-9.75 6S2.25 12 2.25 12Z"/><circle cx="12" cy="12" r="2.75"/></svg>
+                            <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 6.1A10.8 10.8 0 0 1 12 6c6.25 0 9.75 6 9.75 6a16 16 0 0 1-2.1 2.75M6.25 7.25C3.6 9.05 2.25 12 2.25 12S5.75 18 12 18c1.35 0 2.55-.28 3.62-.73M9.88 9.88a3 3 0 0 0 4.24 4.24"/></svg>
+                        </button>
+                    </div>
+                    <span class="field-error">Vui lòng nhập mật khẩu.</span>
+                </div>
+
+                <label class="remember-option">
+                    <input id="remember" type="checkbox" />
+                    <span>Ghi nhớ đăng nhập trên thiết bị này</span>
+                </label>
+
+                <button id="login-submit" class="login-button" type="submit">
+                    <span class="button-label">Đăng nhập</span>
+                    <span class="button-spinner" aria-hidden="true"></span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
+                </button>
+            </form>
+
+            @if (portal is "reception" or "stylist")
+            {
+                <p class="support-note">Chưa có tài khoản? <a href="/@portal/register">Tự đăng ký</a> hoặc liên hệ quản trị viên.</p>
+            }
+
+            <nav class="portal-switcher" aria-label="Chọn khu vực đăng nhập">
+                <span>Đăng nhập với vai trò khác</span>
+                <div>
+                    <a class="@(portal == "admin" ? "active" : null)" href="/admin/login">Quản trị</a>
+                    <a class="@(portal == "reception" ? "active" : null)" href="/reception/login">Lễ tân</a>
+                    <a class="@(portal == "stylist" ? "active" : null)" href="/stylist/login">Thợ</a>
+                </div>
+            </nav>
+
+            <p class="support-note">Bạn gặp khó khăn? <a href="mailto:support@lumiere.vn">Liên hệ hỗ trợ</a></p>
+        </div>
+
+        <p class="copyright">© @DateTime.Now.Year Lumière Salon. Bảo lưu mọi quyền.</p>
+    </section>
+</main>
+
+@section Scripts {
+    <script>SalonAuth.bindLoginForm();</script>
+}
