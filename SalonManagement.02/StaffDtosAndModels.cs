@@ -33,6 +33,12 @@ namespace SalonManagement.StaffManagement
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        // ===== CÁC FIELD MỚI THÊM =====
+        public int? UpdatedBy { get; set; }            // ai vừa sửa thông tin (Id của admin)
+        public DateTime? PasswordChangedAt { get; set; } // lần đổi mật khẩu gần nhất
+        public DateTime? DeactivatedAt { get; set; }     // thời điểm bị ngưng hoạt động
+        public int? DeactivatedBy { get; set; }          // ai deactivate
     }
 
     public class CreateStaffDto
@@ -51,6 +57,8 @@ namespace SalonManagement.StaffManagement
 
         [Required(ErrorMessage = "Vui lòng chọn vai trò cho nhân sự.")]
         public string Role { get; set; }
+
+        // Không có field Password ở đây — mật khẩu tạm do hệ thống tự sinh (Bước 4)
     }
 
     public class UpdateStaffDto
@@ -64,8 +72,9 @@ namespace SalonManagement.StaffManagement
         [Required(ErrorMessage = "Vui lòng chọn vai trò.")]
         public string Role { get; set; }
 
-        [Required]
-        public bool IsActive { get; set; }
+        // ĐÃ BỎ "IsActive" khỏi đây — chuyển sang 2 endpoint riêng
+        // Deactivate/Activate để rule bảo vệ Admin cuối cùng áp dụng được
+        // (xem DeactivateStaffDto không cần, dùng route riêng /staff/{id}/deactivate)
     }
 
     public class StaffFilterQueryDto
@@ -95,5 +104,37 @@ namespace SalonManagement.StaffManagement
         public string Message { get; set; }
         public string Field { get; set; } // Dùng cho lỗi trùng email chỉ rõ trường bị lỗi
         public object Data { get; set; }
+    }
+
+    // ===== MODEL MỚI: AUDIT LOG =====
+    public class StaffAuditLog
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [Required]
+        public string Action { get; set; } // "CREATE", "UPDATE", "DEACTIVATE", "ACTIVATE", "REVOKE_SESSION", "CHANGE_PASSWORD"
+
+        [Required]
+        public int ActorId { get; set; }   // Id admin thực hiện hành động
+
+        [Required]
+        public int TargetId { get; set; }  // Id tài khoản bị tác động
+
+        public string OldValuesJson { get; set; }
+        public string NewValuesJson { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    // ===== DTO MỚI: đổi mật khẩu lần đầu =====
+    public class ChangePasswordFirstTimeDto
+    {
+        [Required(ErrorMessage = "Vui lòng nhập mật khẩu tạm.")]
+        public string OldTempPassword { get; set; }
+
+        [Required(ErrorMessage = "Vui lòng nhập mật khẩu mới.")]
+        [MinLength(8, ErrorMessage = "Mật khẩu mới phải có ít nhất 8 ký tự.")]
+        public string NewPassword { get; set; }
     }
 }

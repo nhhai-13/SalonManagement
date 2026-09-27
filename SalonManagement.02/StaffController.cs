@@ -1,13 +1,15 @@
+using System;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
 namespace SalonManagement.StaffManagement
 {
-    [Route("api/staff")]
+    [Route("api/admin/staff")]
     [ApiController]
     [Authorize(Roles = "Admin")]
-    public class StaffController : ControllerBase
+    public class StaffController : ControllerBase // ĐÃ SỬA: tên class phải khớp tên constructor
     {
         private readonly IStaffService _staffService;
 
@@ -46,7 +48,7 @@ namespace SalonManagement.StaffManagement
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var result = await _staffService.CreateStaffAsync(dto);
+            var result = await _staffService.CreateStaffAsync(dto, GetCurrentUserId());
             if (!result.Success)
             {
                 return BadRequest(new { field = result.Field, message = result.Message });
@@ -63,22 +65,57 @@ namespace SalonManagement.StaffManagement
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var result = await _staffService.UpdateStaffAsync(id, dto);
+            var result = await _staffService.UpdateStaffAsync(id, dto, GetCurrentUserId());
             if (!result.Success) return BadRequest(new { message = result.Message });
 
             return Ok(result);
         }
 
         /// <summary>
-        /// API Đổi trạng thái Active/Inactive (Xử lý hủy phiên 1 phút và chặn khóa Admin cuối)
+        /// API Đổi trạng thái Active/Inactive (Xử lý hủy phiên và chặn khóa Admin cuối)
         /// </summary>
         [HttpPatch("status/{id}")]
-        public async Task<IActionResult> ChangeStatus(int id, [FromBody] bool isActive)
+        public async Task<IActionResult> ChangeStatus(int id, [FromBody] ChangeStatusDto body)
         {
-            var result = await _staffService.ChangeStatusAsync(id, isActive);
+            // ĐÃ SỬA: nhận vào ChangeStatusDto thay vì bool trần —
+            // ASP.NET Core bind primitive (bool) trực tiếp từ JSON body dễ lỗi/không rõ ràng.
+            var result = await _staffService.ChangeStatusAsync(id, body.IsActive, GetCurrentUserId());
             if (!result.Success) return BadRequest(new { message = result.Message });
 
             return Ok(result);
         }
+
+        /// <summary>
+        /// API MỚI: Thu hồi toàn bộ phiên đăng nhập của một tài khoản nhân sự (Bước 5)
+        /// </summary>
+        [HttpPost("{id}/revoke-session")]
+        public async Task<IActionResult> RevokeSession(int id)
+        {
+            var result = await _staffService.RevokeSessionAsync(id, GetCurrentUserId());
+            if (!result.Success) return BadRequest(new { message = result.Message });
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Lấy Id của Admin đang đăng nhập từ claim JWT, dùng để ghi audit log.
+        /// Đổi tên claim "sub" / ClaimTypes.NameIdentifier cho khớp với cách bạn generate JWT lúc login.
+        /// </summary>
+        private int GetCurrentUserId()
+        {
+            var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                       ?? User.FindFirst("sub")?.Value;
+
+            if (idClaim == null || !int.TryParse(idClaim, out var id))
+                throw new UnauthorizedAccessException("Không xác định được người dùng hiện tại từ token.");
+
+            return id;
+        }
+    }
+
+    // DTO nhỏ, tạo thêm vào StaffDtosAndModels.cs
+    public class ChangeStatusDto
+    {
+        public bool IsActive { get; set; }
     }
 }
