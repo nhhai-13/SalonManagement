@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpContextAccessor();
 // =====================================
 // LOGGING
 // =====================================
@@ -97,14 +98,7 @@ if (builder.Environment.IsDevelopment())
 // JWT AUTHENTICATION
 // =====================================
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme =
-        JwtBearerDefaults.AuthenticationScheme;
-
-    options.DefaultChallengeScheme =
-        JwtBearerDefaults.AuthenticationScheme;
-})
+builder.Services.AddAuthentication()
 .AddJwtBearer(options =>
 {
     var jwt = builder.Configuration.GetSection("Jwt");

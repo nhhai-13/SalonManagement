@@ -1,15 +1,21 @@
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Models;
-
 namespace SalonManagement.Data
 {
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-            : base(options)
-        {
-        }
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+public ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    IHttpContextAccessor httpContextAccessor)
+    : base(options)
+{
+    _httpContextAccessor = httpContextAccessor;
+}
 
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
@@ -32,7 +38,141 @@ namespace SalonManagement.Data
         public DbSet<Payment> Payments => Set<Payment>();
 
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
+        
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+public override int SaveChanges()
+{
+    return SaveChangesAsync().GetAwaiter().GetResult();
+}
 
+public override async Task<int> SaveChangesAsync(
+    CancellationToken cancellationToken = default)
+{
+    var auditEntries = CreateAuditEntries();
+
+    var result = await base.SaveChangesAsync(cancellationToken);
+
+    if (auditEntries.Count > 0)
+    {
+        foreach (var entry in auditEntries)
+        {
+            entry.EntityId = GetEntityId(entry.Entity);
+
+            AuditLogs.Add(new AuditLog
+            {
+                Timestamp = DateTime.UtcNow,
+                UserId = _httpContextAccessor.HttpContext?.User?
+                    .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+                UserName = _httpContextAccessor.HttpContext?.User?.Identity?.Name,
+                Action = entry.Action,
+                EntityType = entry.EntityType,
+                EntityId = entry.EntityId,
+                Changes = entry.Changes
+            });
+        }
+
+        await base.SaveChangesAsync(cancellationToken);
+    }
+
+    return result;
+}
+
+private List<AuditEntry> CreateAuditEntries()
+{
+    ChangeTracker.DetectChanges();
+
+    var entries = new List<AuditEntry>();
+
+    foreach (var entry in ChangeTracker.Entries())
+    {
+        if (entry.Entity is AuditLog ||
+            entry.State == EntityState.Detached ||
+            entry.State == EntityState.Unchanged)
+        {
+            continue;
+        }
+
+        var entityType = entry.Entity.GetType().Name;
+
+        if (entityType != nameof(ApplicationUser) &&
+            entityType != nameof(Service) &&
+            entityType != nameof(WorkSchedule) &&
+            entityType != nameof(Appointment) &&
+            entityType != nameof(Invoice))
+        {
+            continue;
+        }
+
+        var changes = new Dictionary<string, object?>();
+
+        if (entry.State == EntityState.Added)
+        {
+            foreach (var property in entry.Properties)
+            {
+                changes[property.Metadata.Name] = property.CurrentValue;
+            }
+        }
+        else if (entry.State == EntityState.Modified)
+        {
+            foreach (var property in entry.Properties)
+            {
+                if (property.IsModified)
+                {
+                    changes[property.Metadata.Name] = new
+                    {
+                        OldValue = property.OriginalValue,
+                        NewValue = property.CurrentValue
+                    };
+                }
+            }
+        }
+        else if (entry.State == EntityState.Deleted)
+        {
+            foreach (var property in entry.Properties)
+            {
+                changes[property.Metadata.Name] = property.OriginalValue;
+            }
+        }
+
+        entries.Add(new AuditEntry
+        {
+            Entity = entry.Entity,
+            Action = entry.State switch
+            {
+                EntityState.Added => "CREATE",
+                EntityState.Modified => "UPDATE",
+                EntityState.Deleted => "DELETE",
+                _ => string.Empty
+            },
+            EntityType = entityType,
+            Changes = JsonSerializer.Serialize(changes)
+        });
+    }
+
+    return entries;
+}
+
+private static string? GetEntityId(object entity)
+{
+    return entity switch
+    {
+        ApplicationUser user => user.Id,
+        Service service => service.ServiceId.ToString(),
+        WorkSchedule schedule => schedule.WorkScheduleId.ToString(),
+        Appointment appointment => appointment.AppointmentId.ToString(),
+        Invoice invoice => invoice.InvoiceId.ToString(),
+        _ => null
+    };
+}
+
+private class AuditEntry
+{
+    public object Entity { get; set; } = null!;
+    public string Action { get; set; } = string.Empty;
+    public string EntityType { get; set; } = string.Empty;
+    public string? EntityId { get; set; }
+    public string? Changes { get; set; }
+}
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
