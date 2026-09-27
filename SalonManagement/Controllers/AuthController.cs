@@ -135,6 +135,8 @@ public class AuthController(
             storedToken.RevokedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
             await dbContext.SaveChangesAsync();
         }
+
+        Response.Cookies.Delete("salon.accessToken");
         return NoContent();
     }
 
@@ -152,6 +154,19 @@ public class AuthController(
             ExpiresAtUtc = refreshExpiry
         });
         await dbContext.SaveChangesAsync();
+
+        Response.Cookies.Append(
+            "salon.accessToken",
+            accessToken,
+            new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = Request.IsHttps,
+                SameSite = SameSiteMode.Strict,
+                Expires = new DateTimeOffset(accessExpiry),
+                IsEssential = true
+            });
+
         return new TokenResponse(accessToken, accessExpiry, refreshToken, refreshExpiry);
     }
 
