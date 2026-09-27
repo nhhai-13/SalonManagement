@@ -130,6 +130,18 @@ builder.Services.AddAuthentication(options =>
         };
     options.Events = new JwtBearerEvents
     {
+        // Browser page navigations cannot attach an Authorization header.
+        // Accept the same JWT from the secure HttpOnly cookie issued at login.
+        OnMessageReceived = context =>
+        {
+            if (string.IsNullOrWhiteSpace(context.Token) &&
+                context.Request.Cookies.TryGetValue("salon.accessToken", out var cookieToken))
+            {
+                context.Token = cookieToken;
+            }
+
+            return Task.CompletedTask;
+        },
         OnTokenValidated = async context =>
         {
             var userId =
@@ -148,6 +160,20 @@ builder.Services.AddAuthentication(options =>
             if (user is null || !user.IsActive)
             {
                 context.Fail("Account is inactive.");
+                return;
+            }
+
+            // Roles must take effect on the very next request. Reject an old JWT
+            // when its role claims no longer match the roles stored in Identity.
+            var currentRoles = await userManager.GetRolesAsync(user);
+            var tokenRoles = context.Principal?.FindAll(ClaimTypes.Role)
+                .Select(claim => claim.Value)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (!tokenRoles.SetEquals(currentRoles))
+            {
+                context.Fail("User roles changed. Please sign in again.");
             }
         },
         OnChallenge = async context =>
