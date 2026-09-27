@@ -17,11 +17,11 @@
 }
 
 <main class="auth-shell">
-    <section class="auth-showcase" aria-label="Giới thiệu Lumière Salon">
+    <section class="auth-showcase" aria-label="Giới thiệu Luminol Salon">
         <a class="brand" asp-controller="Home" asp-action="Index" aria-label="Về trang chủ">
             <span class="brand-mark" aria-hidden="true">L</span>
             <span>
-                <strong>Lumière</strong>
+                <strong>Luminol</strong>
                 <small>Salon &amp; Spa</small>
             </span>
         </a>
@@ -42,7 +42,7 @@
     <section class="auth-panel">
         <div class="mobile-brand">
             <span class="brand-mark" aria-hidden="true">L</span>
-            <span><strong>Lumière</strong><small>Salon &amp; Spa</small></span>
+            <span><strong>Luminol</strong><small>Salon &amp; Spa</small></span>
         </div>
 
         <div class="login-card">
@@ -52,7 +52,7 @@
                 <p>Nhập thông tin tài khoản @portalTitle.ToLower() để tiếp tục.</p>
             </div>
 
-            <form id="login-form" data-portal="@portal" data-redirect="@(portal == "admin" ? "/admin" : "/")" novalidate>
+            <form id="login-form" data-portal="@portal" data-redirect="@(portal == "admin" ? "/admin" : portal == "reception" ? "/reception" : "/stylist")" novalidate>
                 <div id="login-error" class="login-alert d-none" role="alert" aria-live="polite">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                     <span></span>
@@ -62,7 +62,7 @@
                     <label for="email">Địa chỉ email</label>
                     <div class="input-wrap">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.75 10.34 12a2.83 2.83 0 0 0 3.32 0L21 6.75M5.25 19.5h13.5A2.25 2.25 0 0 0 21 17.25V6.75a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                        <input id="email" name="email" type="email" placeholder="admin@lumiere.vn" autocomplete="username" autofocus required />
+                        <input id="email" name="email" type="email" placeholder="admin@luminol.vn" autocomplete="username" autofocus required />
                     </div>
                     <span class="field-error">Vui lòng nhập email hợp lệ.</span>
                 </div>
@@ -109,10 +109,10 @@
                 </div>
             </nav>
 
-            <p class="support-note">Bạn gặp khó khăn? <a href="mailto:support@lumiere.vn">Liên hệ hỗ trợ</a></p>
+            <p class="support-note">Bạn gặp khó khăn? <a href="mailto:support@luminol.vn">Liên hệ hỗ trợ</a></p>
         </div>
 
-        <p class="copyright">© @DateTime.Now.Year Lumière Salon. Bảo lưu mọi quyền.</p>
+        <p class="copyright">© @DateTime.Now.Year Luminol Salon. Bảo lưu mọi quyền.</p>
     </section>
 </main>
 

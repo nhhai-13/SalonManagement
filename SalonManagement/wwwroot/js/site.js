@@ -23,7 +23,7 @@
             phone.focus();
             return;
         }
-        message.textContent = "Cảm ơn bạn! Lumière đã ghi nhận yêu cầu và sẽ liên hệ để xác nhận lịch hẹn.";
+        message.textContent = "Cảm ơn bạn! Luminol đã ghi nhận yêu cầu và sẽ liên hệ để xác nhận lịch hẹn.";
         message.classList.add("show");
         bookingForm.reset();
     });
