@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,9 +17,8 @@ namespace SalonManagement.StaffManagement
             _emailService = emailService;
         }
 
-        public async Task<ServiceResponseModel> CreateStaffAsync(CreateStaffDto dto)
+        public async Task<ServiceResponseModel> CreateStaffAsync(CreateStaffDto dto, int actorId)
         {
-            // Tiêu chí 2: Email trùng với tài khoản đã có bị từ chối kèm thông báo chỉ rõ trường bị trùng
             var existingEmail = await _context.Users
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Email.ToLower() == dto.Email.ToLower());
@@ -33,7 +33,6 @@ namespace SalonManagement.StaffManagement
                 };
             }
 
-            // Tiêu chí 3: Tạo tài khoản mới sinh mật khẩu tạm ngẫu nhiên
             string tempPassword = GenerateStrongTemporaryPassword();
             string hashedPassword = BCrypt.Net.BCrypt.HashPassword(tempPassword);
 
@@ -45,16 +44,25 @@ namespace SalonManagement.StaffManagement
                 Role = dto.Role,
                 IsActive = true,
                 PasswordHash = hashedPassword,
-                MustChangePasswordOnNextLogin = true, // Buộc đổi mật khẩu ở lần đăng nhập đầu tiên
+                MustChangePasswordOnNextLogin = true,
                 TokenVersion = 1,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
             _context.Users.Add(newStaff);
+            await _context.SaveChangesAsync(); // Save trước để newStaff.Id có giá trị thật
+
+            _context.Add(new StaffAuditLog
+            {
+                Action = "CREATE",
+                ActorId = actorId,
+                TargetId = newStaff.Id,
+                NewValuesJson = JsonSerializer.Serialize(new { newStaff.FullName, newStaff.Email, newStaff.Role }),
+                CreatedAt = DateTime.UtcNow
+            });
             await _context.SaveChangesAsync();
 
-            // Gửi email thông báo mật khẩu tạm thời
             string subject = "Thông tin cấp tài khoản hệ thống SalonManagement";
             string body = $"Xin chào {newStaff.FullName},\n\n" +
                           $"Tài khoản nhân sự của bạn đã được khởi tạo thành công.\n" +
@@ -69,7 +77,6 @@ namespace SalonManagement.StaffManagement
             }
             catch (Exception ex)
             {
-                // Ghi log lỗi gửi email nhưng không làm gián đoạn luồng tạo tài khoản trong DB
                 Console.WriteLine($"[Warning] Không thể gửi email tới {newStaff.Email}: {ex.Message}");
             }
 
@@ -91,7 +98,7 @@ namespace SalonManagement.StaffManagement
             };
         }
 
-        public async Task<ServiceResponseModel> UpdateStaffAsync(int id, UpdateStaffDto dto)
+        public async Task<ServiceResponseModel> UpdateStaffAsync(int id, UpdateStaffDto dto, int actorId)
         {
             var staff = await _context.Users.FindAsync(id);
             if (staff == null)
@@ -99,24 +106,27 @@ namespace SalonManagement.StaffManagement
                 return new ServiceResponseModel { Success = false, Message = "Không tìm thấy thông tin nhân sự cần cập nhật." };
             }
 
-            // Nếu thay đổi trạng thái từ Active (true) sang Inactive (false)
-            if (staff.IsActive && !dto.IsActive)
-            {
-                var validationCheck = await ValidateAndPerformDeactivation(staff);
-                if (!validationCheck.Success) return validationCheck;
-            }
+            // ĐÃ BỎ toàn bộ logic deactivate ở đây — UpdateStaffDto không còn IsActive nữa.
+            // Việc bật/tắt trạng thái tài khoản giờ CHỈ đi qua ChangeStatusAsync bên dưới.
+
+            var oldValues = JsonSerializer.Serialize(new { staff.FullName, staff.PhoneNumber, staff.Role });
 
             staff.FullName = dto.FullName.Trim();
             staff.PhoneNumber = dto.PhoneNumber.Trim();
             staff.Role = dto.Role;
-            staff.IsActive = dto.IsActive;
             staff.UpdatedAt = DateTime.UtcNow;
+            staff.UpdatedBy = actorId;
 
-            // Tiêu chí 4: Nếu ngưng hoạt động, tăng token version để vô hiệu hóa phiên
-            if (!dto.IsActive)
+            var newValues = JsonSerializer.Serialize(new { staff.FullName, staff.PhoneNumber, staff.Role });
+
+            _context.Add(new StaffAuditLog
             {
-                staff.TokenVersion += 1;
-            }
+                Action = "UPDATE",
+                ActorId = actorId,
+                TargetId = staff.Id,
+                OldValuesJson = oldValues,
+                NewValuesJson = newValues
+            });
 
             await _context.SaveChangesAsync();
 
@@ -127,7 +137,7 @@ namespace SalonManagement.StaffManagement
             };
         }
 
-        public async Task<ServiceResponseModel> ChangeStatusAsync(int id, bool newStatus)
+        public async Task<ServiceResponseModel> ChangeStatusAsync(int id, bool newStatus, int actorId)
         {
             var staff = await _context.Users.FindAsync(id);
             if (staff == null)
@@ -140,23 +150,34 @@ namespace SalonManagement.StaffManagement
                 return new ServiceResponseModel { Success = true, Message = "Trạng thái tài khoản không có sự thay đổi." };
             }
 
-            // Nếu thực hiện ngưng hoạt động tài khoản
             if (!newStatus)
             {
-                var validationCheck = await ValidateAndPerformDeactivation(staff);
+                // ---- RULE BẢO VỆ ADMIN CUỐI CÙNG nằm bên trong hàm này ----
+                var validationCheck = await ValidateAndPerformDeactivation(staff, actorId);
                 if (!validationCheck.Success) return validationCheck;
             }
             else
             {
                 staff.IsActive = true;
+                staff.DeactivatedAt = null;
+                staff.DeactivatedBy = null;
             }
 
             staff.UpdatedAt = DateTime.UtcNow;
+            staff.UpdatedBy = actorId;
+
+            _context.Add(new StaffAuditLog
+            {
+                Action = newStatus ? "ACTIVATE" : "DEACTIVATE",
+                ActorId = actorId,
+                TargetId = staff.Id
+            });
+
             await _context.SaveChangesAsync();
 
-            string statusMessage = newStatus 
-                ? "Đã kích hoạt lại tài khoản thành công." 
-                : "Đã ngưng hoạt động tài khoản. Mọi phiên đăng nhập hiện tại sẽ mất hiệu lực trong vòng 1 phút.";
+            string statusMessage = newStatus
+                ? "Đã kích hoạt lại tài khoản thành công."
+                : "Đã ngưng hoạt động tài khoản. Mọi phiên đăng nhập hiện tại đã mất hiệu lực ngay lập tức.";
 
             return new ServiceResponseModel
             {
@@ -169,20 +190,17 @@ namespace SalonManagement.StaffManagement
         {
             var query = _context.Users.AsQueryable();
 
-            // Tìm kiếm theo từ khóa (Tên hoặc Email)
             if (!string.IsNullOrWhiteSpace(queryDto.SearchKeyword))
             {
                 string keyword = queryDto.SearchKeyword.Trim().ToLower();
                 query = query.Where(u => u.FullName.ToLower().Contains(keyword) || u.Email.ToLower().Contains(keyword));
             }
 
-            // Lọc theo Role
             if (!string.IsNullOrWhiteSpace(queryDto.Role))
             {
                 query = query.Where(u => u.Role.ToLower() == queryDto.Role.ToLower());
             }
 
-            // Lọc theo trạng thái Active
             if (queryDto.IsActive.HasValue)
             {
                 query = query.Where(u => u.IsActive == queryDto.IsActive.Value);
@@ -246,12 +264,83 @@ namespace SalonManagement.StaffManagement
             return new ServiceResponseModel { Success = true, Data = staff };
         }
 
+        // ===== METHOD MỚI: BƯỚC 5 - REVOKE SESSION =====
+        public async Task<ServiceResponseModel> RevokeSessionAsync(int id, int actorId)
+        {
+            var staff = await _context.Users.FindAsync(id);
+            if (staff == null)
+            {
+                return new ServiceResponseModel { Success = false, Message = "Không tìm thấy tài khoản nhân sự." };
+            }
+
+            // Tăng TokenVersion -> mọi JWT cũ (mang version thấp hơn) bị từ chối ngay ở request tiếp theo
+            staff.TokenVersion += 1;
+            staff.UpdatedAt = DateTime.UtcNow;
+
+            _context.Add(new StaffAuditLog
+            {
+                Action = "REVOKE_SESSION",
+                ActorId = actorId,
+                TargetId = staff.Id
+            });
+
+            await _context.SaveChangesAsync();
+
+            return new ServiceResponseModel
+            {
+                Success = true,
+                Message = "Đã thu hồi toàn bộ phiên đăng nhập của tài khoản."
+            };
+        }
+
+        // ===== METHOD MỚI: BƯỚC 4 - ĐỔI MẬT KHẨU LẦN ĐẦU =====
+        public async Task<ServiceResponseModel> ChangePasswordFirstTimeAsync(int userId, ChangePasswordFirstTimeDto dto)
+        {
+            var staff = await _context.Users.FindAsync(userId);
+            if (staff == null)
+            {
+                return new ServiceResponseModel { Success = false, Message = "Không tìm thấy tài khoản." };
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.OldTempPassword, staff.PasswordHash))
+            {
+                return new ServiceResponseModel
+                {
+                    Success = false,
+                    Field = "OldTempPassword",
+                    Message = "Mật khẩu tạm thời không chính xác."
+                };
+            }
+
+            staff.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            staff.MustChangePasswordOnNextLogin = false;
+            staff.PasswordChangedAt = DateTime.UtcNow;
+            staff.UpdatedAt = DateTime.UtcNow;
+
+            // Thu hồi token cũ (token đang mang claim mustChangePassword=true) -> bắt đăng nhập lại
+            staff.TokenVersion += 1;
+
+            _context.Add(new StaffAuditLog
+            {
+                Action = "CHANGE_PASSWORD",
+                ActorId = userId,
+                TargetId = userId
+            });
+
+            await _context.SaveChangesAsync();
+
+            return new ServiceResponseModel
+            {
+                Success = true,
+                Message = "Đổi mật khẩu thành công. Vui lòng đăng nhập lại."
+            };
+        }
+
         /// <summary>
         /// Hàm nội bộ kiểm tra ràng buộc bảo mật trước khi ngưng hoạt động tài khoản
         /// </summary>
-        private async Task<ServiceResponseModel> ValidateAndPerformDeactivation(User staff)
+        private async Task<ServiceResponseModel> ValidateAndPerformDeactivation(User staff, int actorId)
         {
-            // Tiêu chí 5: Không cho phép ngưng hoạt động tài khoản quản trị cuối cùng còn lại trong hệ thống
             if (staff.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
             {
                 int activeAdminCount = await _context.Users
@@ -268,8 +357,10 @@ namespace SalonManagement.StaffManagement
             }
 
             staff.IsActive = false;
-            
-            // Tiêu chí 4: Tăng TokenVersion để vô hiệu hóa toàn bộ session/token hiện tại trong vòng 1 phút
+            staff.DeactivatedAt = DateTime.UtcNow;
+            staff.DeactivatedBy = actorId;
+
+            // Tăng TokenVersion để vô hiệu hóa toàn bộ session/token hiện tại ngay lập tức
             staff.TokenVersion += 1;
 
             return new ServiceResponseModel { Success = true };
