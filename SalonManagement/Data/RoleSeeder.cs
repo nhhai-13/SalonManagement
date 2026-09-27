@@ -6,14 +6,14 @@ namespace SalonManagement.Data
     {
         public static async Task SeedRolesAsync(RoleManager<IdentityRole> roleManager)
         {
-            string[] roles =
-            {
-                "Admin",
-                "Owner",
-                "Receptionist",
-                "Stylist"
-            };
-
+           string[] roles =
+{
+    "Admin",
+    "Owner",
+    "Receptionist",
+    "Stylist",
+    "Customer"
+};
             foreach (var role in roles)
             {
                 if (!await roleManager.RoleExistsAsync(role))

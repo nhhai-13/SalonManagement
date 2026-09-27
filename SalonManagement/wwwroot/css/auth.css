@@ -1,0 +1,128 @@
+:root {
+    --ink: #2d2521;
+    --muted: #756b65;
+    --cream: #f8f5f0;
+    --paper: #fffdf9;
+    --brown: #704a37;
+    --brown-dark: #553628;
+    --gold: #c59a5c;
+    --line: #ded7cf;
+    --error: #a83b3b;
+}
+
+* { box-sizing: border-box; }
+
+body.auth-page {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    background: var(--cream);
+    font-family: "DM Sans", sans-serif;
+}
+
+.auth-shell { display: grid; min-height: 100vh; grid-template-columns: minmax(360px, 46%) 1fr; }
+
+.auth-showcase {
+    position: relative;
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    padding: clamp(32px, 5vw, 72px);
+    color: #fff;
+    background:
+        linear-gradient(155deg, rgba(39, 26, 21, .2), rgba(39, 26, 21, .82)),
+        radial-gradient(circle at 72% 25%, rgba(208, 167, 108, .48), transparent 28%),
+        linear-gradient(145deg, #9f7b64, #4c342b 72%);
+}
+
+.auth-showcase::before, .auth-showcase::after {
+    position: absolute;
+    content: "";
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 50%;
+}
+.auth-showcase::before { width: 520px; height: 520px; right: -260px; top: 12%; }
+.auth-showcase::after { width: 310px; height: 310px; right: -100px; top: 27%; }
+
+.brand, .mobile-brand { display: inline-flex; align-items: center; gap: 14px; color: inherit; text-decoration: none; z-index: 1; }
+.brand-mark { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-family: "Playfair Display", serif; font-size: 25px; }
+.brand strong, .mobile-brand strong { display: block; font-family: "Playfair Display", serif; font-size: 23px; letter-spacing: .04em; line-height: 1; }
+.brand small, .mobile-brand small { display: block; margin-top: 5px; font-size: 9px; letter-spacing: .28em; text-transform: uppercase; }
+
+.showcase-copy { position: relative; z-index: 1; max-width: 590px; }
+.eyebrow { color: var(--gold); font-size: 11px; font-weight: 700; letter-spacing: .19em; text-transform: uppercase; }
+.showcase-copy .eyebrow { color: #eed3a8; }
+.showcase-copy h1 { margin: 18px 0 20px; font-family: "Playfair Display", serif; font-size: clamp(40px, 4.3vw, 67px); line-height: 1.08; }
+.showcase-copy p { max-width: 510px; margin: 0; color: rgba(255,255,255,.74); font-size: 16px; line-height: 1.75; }
+.showcase-footer { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; color: rgba(255,255,255,.62); font-size: 10px; letter-spacing: .15em; text-transform: uppercase; }
+.showcase-footer .divider { width: 28px; height: 1px; background: rgba(255,255,255,.4); }
+
+.auth-panel { position: relative; display: grid; min-height: 100vh; place-items: center; padding: 70px clamp(28px, 8vw, 130px); background: var(--paper); }
+.mobile-brand { display: none; color: var(--brown); }
+.login-card { width: min(100%, 440px); }
+.login-heading { margin-bottom: 35px; }
+.login-heading h2 { margin: 10px 0 10px; font-family: "Playfair Display", serif; font-size: clamp(37px, 4vw, 48px); line-height: 1.1; }
+.login-heading p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+
+.login-alert { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px; padding: 12px 14px; border: 1px solid #e8bebe; border-radius: 8px; color: var(--error); background: #fff4f2; font-size: 13px; }
+.login-alert svg { flex: 0 0 18px; width: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 1.7; }
+.field-group { margin-bottom: 22px; }
+.field-group label, .label-row label { margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+.label-row { display: flex; align-items: center; justify-content: space-between; }
+.label-row a, .support-note a { color: var(--brown); font-size: 12px; font-weight: 600; text-decoration: none; }
+.label-row a:hover, .support-note a:hover { text-decoration: underline; }
+.input-wrap { position: relative; }
+.input-wrap > svg { position: absolute; top: 50%; left: 15px; width: 19px; transform: translateY(-50%); fill: none; stroke: #91847c; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
+.input-wrap input { width: 100%; height: 52px; padding: 0 47px; border: 1px solid var(--line); border-radius: 8px; outline: 0; color: var(--ink); background: #fff; font: inherit; font-size: 14px; transition: border-color .2s, box-shadow .2s; }
+.input-wrap input::placeholder { color: #b0a8a3; }
+.input-wrap input:focus { border-color: var(--brown); box-shadow: 0 0 0 3px rgba(112,74,55,.1); }
+.field-group.invalid .input-wrap input { border-color: var(--error); }
+.field-error { display: none; margin-top: 6px; color: var(--error); font-size: 12px; }
+.field-group.invalid .field-error { display: block; }
+.password-toggle { position: absolute; top: 50%; right: 9px; display: grid; width: 36px; height: 36px; transform: translateY(-50%); place-items: center; border: 0; border-radius: 50%; color: #81756e; background: transparent; cursor: pointer; }
+.password-toggle:hover { background: #f5f0eb; }
+.password-toggle svg { width: 19px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; }
+.eye-closed, .password-toggle[aria-pressed="true"] .eye-open { display: none; }
+.password-toggle[aria-pressed="true"] .eye-closed { display: block; }
+.remember-option { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 25px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.remember-option input { width: 16px; height: 16px; accent-color: var(--brown); }
+
+.login-button { display: flex; width: 100%; height: 54px; align-items: center; justify-content: center; gap: 12px; border: 0; border-radius: 8px; color: #fff; background: var(--brown); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .2s, transform .2s; }
+.login-button:hover { background: var(--brown-dark); transform: translateY(-1px); }
+.login-button:disabled { cursor: wait; opacity: .75; transform: none; }
+.login-button svg { width: 19px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.button-spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+.login-button.loading .button-spinner { display: block; }
+.login-button.loading svg { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.support-note { margin: 30px 0 0; color: var(--muted); text-align: center; font-size: 12px; }
+.portal-switcher { margin-top: 28px; padding-top: 22px; border-top: 1px solid #ebe5de; text-align: center; }
+.portal-switcher > span { display: block; margin-bottom: 11px; color: var(--muted); font-size: 11px; }
+.portal-switcher div { display: flex; justify-content: center; gap: 7px; }
+.portal-switcher a { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; font-weight: 600; text-decoration: none; transition: .2s; }
+.portal-switcher a:hover { border-color: var(--brown); color: var(--brown); }
+.portal-switcher a.active { border-color: var(--brown); color: #fff; background: var(--brown); }
+.portal-switcher + .support-note { margin-top: 18px; }
+.copyright { position: absolute; bottom: 24px; margin: 0; color: #a0968f; font-size: 10px; letter-spacing: .04em; }
+
+@media (max-width: 850px) {
+    .auth-shell { display: block; }
+    .auth-showcase { display: none; }
+    .auth-panel { min-height: 100vh; padding: 110px 25px 70px; }
+    .mobile-brand { position: absolute; top: 28px; left: 28px; display: inline-flex; }
+    .mobile-brand .brand-mark { width: 40px; height: 40px; font-size: 21px; }
+    .mobile-brand strong { font-size: 20px; }
+}
+
+@media (max-width: 420px) {
+    .auth-panel { align-items: start; padding-top: 125px; }
+    .login-heading { margin-bottom: 28px; }
+    .login-heading h2 { font-size: 38px; }
+    .copyright { position: static; margin-top: 45px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}
