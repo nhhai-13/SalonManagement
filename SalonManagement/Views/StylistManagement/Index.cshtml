@@ -1,0 +1,51 @@
+@model IReadOnlyList<SalonManagement.Models.Stylist>
+@{
+    ViewData["Title"] = "Quản lý thợ";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>Quản lý thợ</h1>
+        <a asp-action="Create" class="btn btn-primary">Tạo hồ sơ thợ</a>
+    </div>
+
+    @if (TempData["Success"] is string success)
+    {
+        <div class="alert alert-success" role="status">@success</div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0 align-middle">
+                <thead class="table-dark"><tr><th>Ảnh</th><th>Họ tên</th><th>Số điện thoại</th><th>Dịch vụ đảm nhận</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">Chưa có hồ sơ thợ.</td></tr>
+                }
+                else
+                {
+                    @foreach (var stylist in Model)
+                    {
+                        <tr>
+                            <td>@if (!string.IsNullOrWhiteSpace(stylist.ProfileImagePath)) { <img src="~/@stylist.ProfileImagePath" alt="Ảnh @stylist.FullName" width="56" height="56" class="rounded-circle object-fit-cover" /> }</td>
+                            <td><strong>@stylist.FullName</strong><div class="small text-muted">@stylist.Description</div></td>
+                            <td>@stylist.Phone</td>
+                            <td>@string.Join(", ", stylist.Services.Select(item => item.Service.ServiceName))</td>
+                            <td><span class="badge @(stylist.IsActive ? "bg-success" : "bg-secondary")">@(stylist.IsActive ? "Đang làm việc" : "Nghỉ việc")</span></td>
+                            <td>
+                                @if (stylist.IsActive)
+                                {
+                                    <form asp-action="Resign" asp-route-id="@stylist.StylistId" method="post" onsubmit="return confirm('Bạn có chắc muốn chuyển thợ này sang trạng thái nghỉ việc?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Chuyển sang nghỉ việc</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

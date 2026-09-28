@@ -1,0 +1,107 @@
+@model SalonManagement.Models.ViewModels.CreateStylistViewModel
+@{
+    ViewData["Title"] = "Tạo hồ sơ thợ";
+}
+
+<div class="container mt-4" style="max-width: 900px">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>Tạo hồ sơ thợ</h1>
+        <a asp-action="Index" class="btn btn-outline-secondary">Quay lại</a>
+    </div>
+
+    <form asp-action="Create" method="post" enctype="multipart/form-data" class="card shadow-sm" id="create-stylist-form">
+        @Html.AntiForgeryToken()
+        <div class="card-body row g-3">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="col-md-6">
+                <label asp-for="FullName" class="form-label">Họ tên</label>
+                <input asp-for="FullName" class="form-control" autocomplete="name" />
+                <span asp-validation-for="FullName" class="text-danger"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="Phone" class="form-label">Số điện thoại</label>
+                <input asp-for="Phone" class="form-control" type="tel" inputmode="numeric" autocomplete="tel" />
+                <span asp-validation-for="Phone" class="text-danger"></span>
+            </div>
+            <div class="col-12">
+                <label asp-for="Description" class="form-label">Giới thiệu ngắn</label>
+                <textarea asp-for="Description" class="form-control" rows="3" maxlength="500"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+            <div class="col-12">
+                <label for="ProfileImage" class="form-label">Ảnh đại diện (JPG/PNG, tối đa 2MB)</label>
+                <input id="ProfileImage" name="ProfileImage" class="form-control" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                <span asp-validation-for="ProfileImage" class="text-danger"></span>
+                <div id="profile-image-error" class="text-danger mt-1" role="alert"></div>
+                <img id="profile-image-preview" class="mt-3 rounded-circle d-none" alt="Xem trước ảnh đại diện" width="120" height="120" style="object-fit: cover" />
+            </div>
+            <fieldset class="col-12">
+                <legend class="form-label fs-6">Dịch vụ đảm nhận</legend>
+                @if (Model.AvailableServices.Count == 0)
+                {
+                    <p class="text-danger">Hiện chưa có dịch vụ đang hoạt động để gán cho thợ.</p>
+                }
+                else
+                {
+                    <div class="row">
+                    @foreach (var service in Model.AvailableServices)
+                    {
+                        var selected = Model.ServiceIds.Contains(service.ServiceId);
+                        <div class="col-sm-6 col-md-4 mb-2">
+                            <label class="form-check">
+                                <input class="form-check-input service-choice" type="checkbox" name="ServiceIds" value="@service.ServiceId" checked="@(selected ? "checked" : null)" />
+                                <span class="form-check-label">@service.ServiceName</span>
+                            </label>
+                        </div>
+                    }
+                    </div>
+                }
+                <span asp-validation-for="ServiceIds" class="text-danger"></span>
+                <div id="service-selection-error" class="text-danger" role="alert"></div>
+            </fieldset>
+        </div>
+        <div class="card-footer d-flex justify-content-end gap-2">
+            <a asp-action="Index" class="btn btn-outline-secondary">Hủy</a>
+            <button type="submit" class="btn btn-primary">Lưu hồ sơ thợ</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const form = document.getElementById("create-stylist-form");
+            const fileInput = document.getElementById("ProfileImage");
+            const preview = document.getElementById("profile-image-preview");
+            const imageError = document.getElementById("profile-image-error");
+            const serviceError = document.getElementById("service-selection-error");
+            const maxBytes = 2 * 1024 * 1024;
+            const validateImage = file => {
+                if (!file) return "Vui lòng chọn ảnh đại diện.";
+                const extension = file.name.split(".").pop().toLowerCase();
+                const valid = (extension === "jpg" || extension === "jpeg") && file.type === "image/jpeg" || extension === "png" && file.type === "image/png";
+                if (!valid) return "Ảnh đại diện chỉ được phép ở định dạng JPG hoặc PNG.";
+                if (file.size > maxBytes) return "Ảnh đại diện không được vượt quá 2MB.";
+                return "";
+            };
+
+            fileInput.addEventListener("change", () => {
+                const file = fileInput.files[0];
+                imageError.textContent = validateImage(file);
+                preview.classList.add("d-none");
+                if (file && !imageError.textContent) {
+                    preview.src = URL.createObjectURL(file);
+                    preview.classList.remove("d-none");
+                }
+            });
+
+            form.addEventListener("submit", event => {
+                imageError.textContent = validateImage(fileInput.files[0]);
+                const hasService = form.querySelector(".service-choice:checked") !== null;
+                serviceError.textContent = hasService ? "" : "Vui lòng chọn ít nhất một dịch vụ cho thợ.";
+                if (imageError.textContent || !hasService) event.preventDefault();
+            });
+        })();
+    </script>
+}

@@ -1,5 +1,7 @@
 @model IEnumerable<SalonManagement.Models.Service>
 @{
+    var activeStaffCounts = ViewBag.ActiveStaffCounts as IReadOnlyDictionary<int, int> ?? new Dictionary<int, int>();
+    var isManagement = User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.Owner);
     ViewData["Title"] = "Danh sách dịch vụ";
 }
 
@@ -8,6 +10,7 @@
         <h1>Quản lý dịch vụ</h1>
         @if (User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.Owner))
         {
+            <a asp-controller="StylistManagement" asp-action="Index" class="btn btn-outline-primary me-2">Quản lý thợ</a>
             <a asp-action="Create" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> + Thêm dịch vụ
             </a>
@@ -57,7 +60,13 @@
                         @foreach (var item in Model)
                         {
                             <tr>
-                                <td><strong>@item.ServiceName</strong></td>
+                                <td>
+    <strong>@item.ServiceName</strong>
+    @if (isManagement && activeStaffCounts.GetValueOrDefault(item.ServiceId) == 0)
+    {
+        <span class="badge bg-danger ms-2" title="Dịch vụ chưa có thợ đang làm việc phụ trách" aria-label="Cảnh báo: dịch vụ chưa có thợ đang làm việc phụ trách">⚠ Chưa có thợ phụ trách</span>
+    }
+</td>
                                 <td>@(item.ServiceGroup?.GroupName ?? "—")</td>
                                 <td>@item.DurationMinutes phút</td>
                                 <td>@item.Price.ToString("N0") đ</td>

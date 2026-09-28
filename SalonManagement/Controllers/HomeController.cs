@@ -23,6 +23,7 @@ namespace SalonManagement.Controllers
             var model = new HomeViewModel
             {
                 Services = await _dbContext.Services.AsNoTracking().Where(service => service.IsActive).OrderBy(service => service.ServiceName).Take(6).ToListAsync(),
+                BookingServices = await _dbContext.Services.AsNoTracking().Where(service => service.IsActive).OrderBy(service => service.ServiceName).ToListAsync(),
                 Stylists = await _dbContext.Stylists.AsNoTracking().Where(stylist => stylist.IsActive).OrderBy(stylist => stylist.FullName).Take(3).ToListAsync()
             };
             return View(model);

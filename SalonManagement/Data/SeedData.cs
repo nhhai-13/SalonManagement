@@ -253,6 +253,28 @@ public static class SeedData
 
         await context.SaveChangesAsync();
 
+        var cutGroupId = (await context.ServiceGroups.FirstAsync(group => group.GroupName.StartsWith("C"))).ServiceGroupId;
+        var careGroupId = (await context.ServiceGroups.FirstAsync(group => group.GroupName.StartsWith("G"))).ServiceGroupId;
+        var stylistsToSeed = await context.Stylists.ToListAsync();
+        var servicesToSeed = await context.Services.ToListAsync();
+        foreach (var stylist in stylistsToSeed)
+        {
+            var qualifiedServices = stylist.Email switch
+            {
+                "minhanh@salon.local" => servicesToSeed.Where(service => service.ServiceGroupId == cutGroupId),
+                "thuha@salon.local" => servicesToSeed.Where(service => service.ServiceGroupId == cutGroupId),
+                "hoangnam@salon.local" => servicesToSeed.Where(service => service.ServiceName.StartsWith("U")),
+                "ngocmai@salon.local" => servicesToSeed.Where(service => service.ServiceName.StartsWith("N")),
+                "quochuy@salon.local" => servicesToSeed.Where(service => service.ServiceGroupId == careGroupId),
+                _ => Enumerable.Empty<Service>()
+            };
+            foreach (var service in qualifiedServices)
+            {
+                if (!await context.StylistServices.AnyAsync(item => item.StylistId == stylist.StylistId && item.ServiceId == service.ServiceId))
+                    context.StylistServices.Add(new StylistService { StylistId = stylist.StylistId, ServiceId = service.ServiceId });
+            }
+        }
+        await context.SaveChangesAsync();
         // =========================
         // 4. SAMPLE USERS
         // =========================
