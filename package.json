@@ -1,0 +1,10 @@
+{
+  "name": "salon-management", "private": true,
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c magenta,cyan \"pnpm --dir backend dev\" \"pnpm --dir frontend dev\"",
+    "build": "pnpm --dir backend build && pnpm --dir frontend build",
+    "test": "pnpm --dir backend test",
+    "test:e2e": "pnpm --dir backend test:e2e"
+  },
+  "devDependencies": { "concurrently": "^9.2.0" }
+}

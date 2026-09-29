@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: salon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-salon_local}
+      POSTGRES_DB: salon
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - salon_pg15:/var/lib/postgresql/data
+      - ./database/init-test.sql:/docker-entrypoint-initdb.d/init-test.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salon -d salon"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+volumes:
+  salon_pg15:
