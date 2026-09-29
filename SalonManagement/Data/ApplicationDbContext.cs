@@ -23,6 +23,8 @@ public ApplicationDbContext(
 
         public DbSet<Stylist> Stylists => Set<Stylist>();
 
+        public DbSet<StylistService> StylistServices => Set<StylistService>();
+
         public DbSet<Service> Services => Set<Service>();
 
         public DbSet<ServiceGroup> ServiceGroups => Set<ServiceGroup>();
@@ -214,6 +216,8 @@ private class AuditEntry
                 entity.Property(stylist => stylist.Phone).HasMaxLength(20);
                 entity.Property(stylist => stylist.Email).HasMaxLength(256);
                 entity.Property(stylist => stylist.Specialty).HasMaxLength(200);
+                entity.Property(stylist => stylist.Description).HasMaxLength(500);
+                entity.Property(stylist => stylist.ProfileImagePath).HasMaxLength(300);
             });
 
             builder.Entity<ServiceGroup>(entity =>
@@ -232,6 +236,21 @@ private class AuditEntry
                     .WithMany(g => g.Services)
                     .HasForeignKey(s => s.ServiceGroupId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<StylistService>(entity =>
+            {
+                entity.HasKey(item => new { item.StylistId, item.ServiceId });
+
+                entity.HasOne(item => item.Stylist)
+                    .WithMany(stylist => stylist.Services)
+                    .HasForeignKey(item => item.StylistId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(item => item.Service)
+                    .WithMany(service => service.Stylists)
+                    .HasForeignKey(item => item.ServiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<WorkSchedule>(entity =>

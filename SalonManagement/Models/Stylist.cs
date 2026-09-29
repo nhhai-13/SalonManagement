@@ -12,6 +12,10 @@
 
         public string? Specialty { get; set; }
 
+        public string? Description { get; set; }
+
+        public string? ProfileImagePath { get; set; }
+
         public int? ExperienceYears { get; set; }
 
         public bool IsActive { get; set; } = true;
@@ -25,5 +29,8 @@
 
         public ICollection<Appointment> Appointments { get; set; }
             = new List<Appointment>();
+
+        public ICollection<StylistService> Services { get; set; }
+            = new List<StylistService>();
     }
 }
