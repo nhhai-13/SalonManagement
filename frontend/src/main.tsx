@@ -20,7 +20,8 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
   const [help, setHelp] = useState(false);
-  const logout = useCallback(() => { sessionStorage.removeItem('salon-session'); setSession(null); setGroups([]); setEditing(null); setDeleting(null); setNotice(''); }, []);
+  const refreshVersion = useRef(0);
+  const logout = useCallback(() => { ++refreshVersion.current; sessionStorage.removeItem('salon-session'); setSession(null); setGroups([]); setEditing(null); setDeleting(null); setNotice(''); }, []);
   const api = useCallback(async (path: string, options: RequestInit = {}) => {
     const response = await fetch(`/api${path}`, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.accessToken ?? ''}`, ...options.headers } });
     const data = await response.json();
@@ -30,13 +31,29 @@ function App() {
     }
     return data;
   }, [session, logout]);
-  const refresh = useCallback(async () => {
-    setLoading(true); setError('');
-    try { setGroups(await api('/service-groups')); }
-    catch (e) { setError(e instanceof TypeError ? 'Không kết nối được máy chủ. Vui lòng kiểm tra kết nối rồi thử lại.' : (e as Error).message); }
-    finally { setLoading(false); }
+  const refresh = useCallback(async (background = false) => {
+    const version = ++refreshVersion.current;
+    if (!background) setLoading(true);
+    try {
+      const latest = await api('/service-groups', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      if (version === refreshVersion.current) { setGroups(latest); setError(''); }
+    }
+    catch (e) { if (version === refreshVersion.current) setError(e instanceof TypeError ? 'Không kết nối được máy chủ. Vui lòng kiểm tra kết nối rồi thử lại.' : (e as Error).message); }
+    finally { if (version === refreshVersion.current) setLoading(false); }
   }, [api]);
   useEffect(() => { if (session) void refresh(); }, [session, refresh]);
+  useEffect(() => {
+    if (!session) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const changed = () => { clearTimeout(timer); timer = setTimeout(() => { void refresh(true); }, 100); };
+    const stream = new EventSource('/api/public/catalog-events');
+    stream.addEventListener('catalog-changed', changed);
+    const visible = () => { if (document.visibilityState === 'visible') changed(); };
+    window.addEventListener('focus', visible);
+    window.addEventListener('online', visible);
+    const fallback = setInterval(visible, 30000);
+    return () => { clearTimeout(timer); clearInterval(fallback); stream.close(); window.removeEventListener('focus', visible); window.removeEventListener('online', visible); ++refreshVersion.current; };
+  }, [session, refresh]);
   useEffect(() => { if (notice) { const t = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(t); } }, [notice]);
   async function login(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setBusy(true); setError('');

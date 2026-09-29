@@ -53,6 +53,20 @@ $env:TEST_DATABASE_URL='postgresql://salon:salon_local@localhost:5432/salon_test
 pnpm test:e2e
 ```
 
+### Lát 4 — kiểm thử xuyên suốt bằng trình duyệt
+
+```powershell
+pnpm exec playwright install chromium
+$env:TEST_DATABASE_URL='postgresql://salon:salon_local@localhost:5432/salon_test'
+pnpm test:story
+```
+
+Nếu dùng Chrome đã có trên máy, đặt `$env:PLAYWRIGHT_CHANNEL='chrome'` và bỏ bước tải Chromium. Có thể đặt `STORY_REPORT_DIR` đến thư mục xuất báo cáo JSON và ảnh minh chứng. Script tự chạy API và Vite trên các cổng tạm, mở hai phiên trình duyệt riêng, rồi đóng các tiến trình kiểm thử. Chạy `test:e2e` và `test:story` lần lượt: cả hai dùng và xoá dữ liệu trong `salon_test`.
+
+Bộ kiểm thử `backend/test/story.cjs` tạo/sửa/sắp xếp/xoá nhóm qua giao diện Chủ tiệm, kiểm tra đồng thời trang khách và đối chiếu PostgreSQL/API sau từng giai đoạn. Dịch vụ được tạo/gán bằng dữ liệu fixture PostgreSQL vì giao diện quản lý từng dịch vụ chưa thuộc phạm vi story. Bao phủ ba nhóm cùng có 5 dịch vụ, nhóm lớn 1.250 dịch vụ (1.000 đang bán), đổi tên nhóm có dịch vụ, đổi thứ tự nhiều lần, chặn xoá và so sánh dữ liệu trước/sau, xoá nhóm trống, nhóm từng công khai được làm trống rồi xoá, tải lại và mobile 390px.
+
+Lát 4 phát hiện và đã sửa số lượng cũ trên danh sách Chủ tiệm: danh sách nay cập nhật từ thông báo PostgreSQL, đồng bộ với trang khách; phản hồi API cũ không ghi đè kết quả mới hơn.
+
 Kiểm thử API dùng PostgreSQL thật và **xoá dữ liệu trong database `salon_test`**, không dùng database `salon`. File `database/init-test.sql` tạo database test khi khởi tạo volume lần đầu. Nếu dùng volume có sẵn, tạo `salon_test` riêng trước khi chạy test.
 
 Các tình huống kiểm thử: đăng nhập sai/đúng, JWT thiếu/giả/hết hạn, quyền Chủ tiệm, tên rỗng/trùng, thứ tự sai, thêm ba nhóm mẫu, sửa, lưu PostgreSQL, xoá nhóm trống, chặn xoá nhóm đang bán, giữ dịch vụ ngừng bán, ID sai/không tồn tại.

@@ -4,7 +4,8 @@
     "dev": "concurrently -n API,WEB -c magenta,cyan \"pnpm --dir backend dev\" \"pnpm --dir frontend dev\"",
     "build": "pnpm --dir backend build && pnpm --dir frontend build",
     "test": "pnpm --dir backend test",
-    "test:e2e": "pnpm --dir backend test:e2e"
+    "test:e2e": "pnpm --dir backend test:e2e",
+    "test:story": "pnpm build && pnpm --dir backend test:story"
   },
-  "devDependencies": { "concurrently": "^9.2.0" }
+  "devDependencies": { "concurrently": "^9.2.0", "playwright": "1.62.1" }
 }
