@@ -82,7 +82,13 @@ window.SalonAuth = (() => {
     function redirectToLogin(message) {
         const portal = activeStorage().getItem(portalKey) || "admin";
         clearSession();
-        const loginPath = portal === "stylist" ? "/stylist/login" : portal === "reception" ? "/reception/login" : "/admin/login";
+        const loginPath = portal === "stylist"
+            ? "/stylist/login"
+            : portal === "reception"
+                ? "/reception/login"
+                : portal === "owner"
+                    ? "/owner/login"
+                    : "/admin/login";
         const query = message ? `?message=${encodeURIComponent(message)}` : "";
         location.replace(loginPath + query);
     }
@@ -229,8 +235,60 @@ window.SalonAuth = (() => {
                 const result = await response.json().catch(() => ({}));
                 message.textContent = result.message || (response.ok ? "Đã tạo tài khoản." : "Không thể tạo tài khoản.");
                 message.className = `alert ${response.ok ? "alert-success" : "alert-danger"}`;
-                if (response.ok) form.reset();
+                if (response.ok) {
+                    form.reset();
+                    await this.loadStaffAccounts();
+                }
             });
+        },
+        async loadStaffAccounts() {
+            const target = document.getElementById("staff-account-list");
+            if (!target) return;
+            const search = document.getElementById("staff-search")?.value.trim() || "";
+            const role = document.getElementById("staff-filter-role")?.value || "";
+            const status = document.getElementById("staff-filter-status")?.value || "";
+            const query = new URLSearchParams();
+            if (search) query.set("search", search);
+            if (role) query.set("role", role);
+            if (status) query.set("isActive", status);
+            const response = await authenticatedFetch(`/api/admin/staff?${query}`);
+            if (!response.ok) return;
+            const result = await response.json();
+            target.innerHTML = result.items.length ? result.items.map(account => `
+                <tr data-id="${account.id}">
+                    <td><strong>${this.escapeHtml(account.email)}</strong>${account.phoneNumber ? `<small class="d-block text-muted">${this.escapeHtml(account.phoneNumber)}</small>` : ""}</td>
+                    <td>${this.escapeHtml(account.role)}</td>
+                    <td><span class="badge ${account.isActive ? "bg-success" : "bg-secondary"}">${account.isActive ? "Đang hoạt động" : "Ngừng hoạt động"}</span>${account.isLockedOut ? '<span class="badge bg-warning text-dark ms-1">Tạm khóa</span>' : ""}</td>
+                    <td class="text-end"><button class="btn btn-sm ${account.isActive ? "btn-outline-danger" : "btn-outline-success"} staff-status" data-active="${!account.isActive}">${account.isActive ? "Ngừng" : "Kích hoạt"}</button><button class="btn btn-sm btn-outline-secondary ms-1 staff-revoke">Thu hồi phiên</button></td>
+                </tr>`).join("") : '<tr><td colspan="4" class="text-center text-muted py-4">Không có tài khoản phù hợp.</td></tr>';
+        },
+        escapeHtml(value) {
+            const element = document.createElement("span");
+            element.textContent = value || "";
+            return element.innerHTML;
+        },
+        bindStaffManagement() {
+            const list = document.getElementById("staff-account-list");
+            if (!list) return;
+            document.getElementById("staff-filter-form")?.addEventListener("submit", event => { event.preventDefault(); this.loadStaffAccounts(); });
+            document.getElementById("staff-refresh")?.addEventListener("click", () => this.loadStaffAccounts());
+            list.addEventListener("click", async event => {
+                const button = event.target.closest("button");
+                const row = event.target.closest("tr[data-id]");
+                if (!button || !row) return;
+                let response;
+                if (button.classList.contains("staff-status")) {
+                    response = await authenticatedFetch(`/api/admin/staff/${encodeURIComponent(row.dataset.id)}/status`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: button.dataset.active === "true" }) });
+                } else if (button.classList.contains("staff-revoke")) {
+                    response = await authenticatedFetch(`/api/admin/staff/${encodeURIComponent(row.dataset.id)}/revoke-sessions`, { method: "POST" });
+                } else return;
+                const result = await response.json().catch(() => ({}));
+                const message = document.getElementById("staff-account-message");
+                message.textContent = result.message || (response.ok ? "Đã cập nhật." : "Không thể cập nhật.");
+                message.className = `alert ${response.ok ? "alert-success" : "alert-danger"}`;
+                await this.loadStaffAccounts();
+            });
+            this.loadStaffAccounts();
         },
         async requireSession(options = {}) {
             const endpoint = options.endpoint || "/api/admin/session";
@@ -243,7 +301,12 @@ window.SalonAuth = (() => {
             document.querySelectorAll("[data-session-email]").forEach(element => {
                 element.textContent = session.email || "";
             });
-            this.bindStaffAccountForm();
+            const isAdmin = session.role === "Admin";
+            document.getElementById(isAdmin ? "admin-tools" : "owner-tools")?.classList.remove("d-none");
+            if (isAdmin) {
+                this.bindStaffAccountForm();
+                this.bindStaffManagement();
+            }
             document.getElementById("logout")?.addEventListener("click", async () => {
                 const refreshToken = activeStorage().getItem(refreshKey);
                 if (refreshToken) {

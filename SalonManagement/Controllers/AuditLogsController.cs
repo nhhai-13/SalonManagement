@@ -2,10 +2,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
+using SalonManagement.Models;
 
 namespace SalonManagement.Controllers
 {
-    [Authorize]
+    [Authorize(Roles = UserRoles.Admin)]
     public class AuditLogsController : Controller
     {
         private readonly ApplicationDbContext _context;

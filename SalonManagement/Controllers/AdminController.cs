@@ -21,6 +21,13 @@ public class AdminController : Controller
         return View("Login");
     }
 
+    [HttpGet("owner/login")]
+    public IActionResult OwnerLogin()
+    {
+        ViewData["Portal"] = "owner";
+        return View("Login");
+    }
+
     [HttpGet("stylist/login")]
     public IActionResult StylistLogin()
     {
@@ -45,7 +52,10 @@ public class AdminController : Controller
     [HttpGet("admin")]
     public IActionResult Index() => View();
 
-    [HttpGet("admin/business-hours")]
+    [HttpGet("owner")]
+    public IActionResult Owner() => View();
+
+    [HttpGet("owner/business-hours")]
     public IActionResult BusinessHours() => View();
 }
 
@@ -78,14 +88,20 @@ public class StaffPortalApiController : ControllerBase
     });
 }
 
-[Authorize(Roles = UserRoles.Admin)]
 [ApiController]
 [Route("api/admin")]
 public class AdminApiController(UserManager<ApplicationUser> userManager) : ControllerBase
 {
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpGet("session")]
-    public IActionResult Session() => Ok(new { authenticated = true, email = User.FindFirst("email")?.Value });
+    public IActionResult Session() => Ok(new
+    {
+        authenticated = true,
+        email = User.FindFirst("email")?.Value,
+        role = UserRoles.Admin
+    });
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpPost("staff-accounts")]
     public async Task<IActionResult> CreateStaffAccount(CreateStaffAccountRequest request)
     {
@@ -121,4 +137,19 @@ public class AdminApiController(UserManager<ApplicationUser> userManager) : Cont
 
         return Created(string.Empty, new { message = "Đã tạo tài khoản nhân viên.", user.Email, role });
     }
+}
+
+
+[Authorize(Roles = UserRoles.Owner)]
+[ApiController]
+[Route("api/owner")]
+public class OwnerApiController : ControllerBase
+{
+    [HttpGet("session")]
+    public IActionResult Session() => Ok(new
+    {
+        authenticated = true,
+        email = User.FindFirst("email")?.Value,
+        role = UserRoles.Owner
+    });
 }

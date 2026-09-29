@@ -94,7 +94,8 @@ public class AuthController(
 
         var requiredRoles = request.Portal?.ToLowerInvariant() switch
         {
-            "admin" => new[] { "Admin", "Owner" },
+            "admin" => new[] { UserRoles.Admin },
+            "owner" => new[] { UserRoles.Owner },
             "reception" => new[] { "Receptionist" },
             "stylist" => new[] { "Stylist" },
             _ => Array.Empty<string>()

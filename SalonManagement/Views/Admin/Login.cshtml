@@ -2,12 +2,14 @@
     var portal = ViewData["Portal"]?.ToString() ?? "admin";
     var portalTitle = portal switch
     {
+        "owner" => "Chủ tiệm",
         "reception" => "Lễ tân",
         "stylist" => "Chuyên viên",
         _ => "Quản trị"
     };
     var portalDescription = portal switch
     {
+        "owner" => "Quản lý dịch vụ, đội ngũ và giờ hoạt động của salon.",
         "reception" => "Quản lý lịch hẹn, đón tiếp và chăm sóc khách hàng.",
         "stylist" => "Theo dõi lịch làm việc và lịch hẹn của bạn.",
         _ => "Quản lý hoạt động salon trong một không gian duy nhất."
@@ -52,7 +54,7 @@
                 <p>Nhập thông tin tài khoản @portalTitle.ToLower() để tiếp tục.</p>
             </div>
 
-            <form id="login-form" data-portal="@portal" data-redirect="@(portal == "admin" ? "/admin" : portal == "reception" ? "/reception" : "/stylist")" novalidate>
+            <form id="login-form" data-portal="@portal" data-redirect="@(portal == "admin" ? "/admin" : portal == "owner" ? "/owner" : portal == "reception" ? "/reception" : "/stylist")" novalidate>
                 <div id="login-error" class="login-alert d-none" role="alert" aria-live="polite">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                     <span></span>
@@ -104,6 +106,7 @@
                 <span>Đăng nhập với vai trò khác</span>
                 <div>
                     <a class="@(portal == "admin" ? "active" : null)" href="/admin/login">Quản trị</a>
+                    <a class="@(portal == "owner" ? "active" : null)" href="/owner/login">Chủ tiệm</a>
                     <a class="@(portal == "reception" ? "active" : null)" href="/reception/login">Lễ tân</a>
                     <a class="@(portal == "stylist" ? "active" : null)" href="/stylist/login">Thợ</a>
                 </div>

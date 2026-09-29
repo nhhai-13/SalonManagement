@@ -4,9 +4,13 @@
 }
 
 <div class="container mt-4">
+    @if (User.IsInRole(UserRoles.Owner))
+    {
+        <div class="mb-3"><a href="/owner" class="text-decoration-none">← Về khu vực chủ tiệm</a></div>
+    }
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1>Quản lý dịch vụ</h1>
-        @if (User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.Owner))
+        @if (User.IsInRole(UserRoles.Owner))
         {
             <a asp-action="Create" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> + Thêm dịch vụ
@@ -72,7 +76,7 @@
                                     }
                                 </td>
                                 <td>
-                                    @if (User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.Owner))
+                                    @if (User.IsInRole(UserRoles.Owner))
                                     {
                                         <a asp-action="Edit" asp-route-id="@item.ServiceId"
                                            class="btn btn-sm btn-warning">Sửa</a>

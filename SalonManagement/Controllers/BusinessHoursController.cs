@@ -6,7 +6,7 @@ using SalonManagement.Models;
 
 namespace SalonManagement.Controllers;
 
-[Authorize(Roles = RoleGroups.Management)]
+[Authorize(Roles = UserRoles.Owner)]
 [ApiController]
 [Route("api/business-hours")]
 public class BusinessHoursController(ApplicationDbContext dbContext) : ControllerBase
