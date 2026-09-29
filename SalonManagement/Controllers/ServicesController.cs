@@ -30,7 +30,7 @@ namespace SalonManagement.Controllers
         }
 
         // GET: /Services/Create
-        [Authorize(Roles = RoleGroups.Management)]
+        [Authorize(Roles = UserRoles.Owner)]
         public IActionResult Create()
         {
             ViewBag.Groups = _context.ServiceGroups
@@ -43,7 +43,7 @@ namespace SalonManagement.Controllers
         // POST: /Services/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = RoleGroups.Management)]
+        [Authorize(Roles = UserRoles.Owner)]
         public async Task<IActionResult> Create(Service service)
         {
             ValidateService(service);
@@ -68,7 +68,7 @@ namespace SalonManagement.Controllers
         }
 
         // GET: /Services/Edit/5
-        [Authorize(Roles = RoleGroups.Management)]
+        [Authorize(Roles = UserRoles.Owner)]
         public async Task<IActionResult> Edit(int id)
         {
             var service = await _context.Services.FindAsync(id);
@@ -88,7 +88,7 @@ namespace SalonManagement.Controllers
         // POST: /Services/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = RoleGroups.Management)]
+        [Authorize(Roles = UserRoles.Owner)]
         public async Task<IActionResult> Edit(int id, Service service)
         {
             if (id != service.ServiceId)
@@ -120,7 +120,7 @@ namespace SalonManagement.Controllers
         // POST: /Services/ToggleStatus/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = RoleGroups.Management)]
+        [Authorize(Roles = UserRoles.Owner)]
         public async Task<IActionResult> ToggleStatus(int id)
         {
             var service = await _context.Services.FindAsync(id);
@@ -145,7 +145,7 @@ namespace SalonManagement.Controllers
         // POST: /Services/Delete/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = RoleGroups.Management)]
+        [Authorize(Roles = UserRoles.Owner)]
         public async Task<IActionResult> Delete(int id)
         {
             var service = await _context.Services

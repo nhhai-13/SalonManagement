@@ -92,7 +92,16 @@ if (builder.Environment.IsDevelopment())
 // JWT AUTHENTICATION
 // =====================================
 
-builder.Services.AddAuthentication()
+builder.Services.AddAuthentication(options =>
+{
+    // The application issues JWTs (and mirrors the access token into an
+    // HttpOnly cookie for page navigations). AddDefaultIdentity registers its
+    // application cookie as the default scheme, so explicitly select bearer
+    // authentication for every protected MVC/API endpoint.
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+})
 .AddJwtBearer(options =>
 {
     var jwt = builder.Configuration.GetSection("Jwt");
@@ -151,6 +160,14 @@ builder.Services.AddAuthentication()
                 return;
             }
 
+            var tokenSecurityStamp = context.Principal?.FindFirst("security_stamp")?.Value;
+            if (string.IsNullOrWhiteSpace(tokenSecurityStamp) ||
+                !string.Equals(tokenSecurityStamp, user.SecurityStamp, StringComparison.Ordinal))
+            {
+                context.Fail("Session has been revoked.");
+                return;
+            }
+
             // Roles must take effect on the very next request. Reject an old JWT
             // when its role claims no longer match the roles stored in Identity.
             var currentRoles = await userManager.GetRolesAsync(user);
@@ -203,6 +220,8 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<
     IEmailService,
     EmailService>();
+
+builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
 
 builder.Services.AddSingleton<
     IPasswordResetRateLimiter,
