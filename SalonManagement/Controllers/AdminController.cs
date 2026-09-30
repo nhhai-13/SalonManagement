@@ -15,25 +15,13 @@ public class AdminController : Controller
     }
 
     [HttpGet("reception/login")]
-    public IActionResult ReceptionLogin()
-    {
-        ViewData["Portal"] = "reception";
-        return View("Login");
-    }
+    public IActionResult ReceptionLogin() => Redirect($"/admin/login{Request.QueryString}");
 
     [HttpGet("owner/login")]
-    public IActionResult OwnerLogin()
-    {
-        ViewData["Portal"] = "owner";
-        return View("Login");
-    }
+    public IActionResult OwnerLogin() => Redirect($"/admin/login{Request.QueryString}");
 
     [HttpGet("stylist/login")]
-    public IActionResult StylistLogin()
-    {
-        ViewData["Portal"] = "stylist";
-        return View("Login");
-    }
+    public IActionResult StylistLogin() => Redirect($"/admin/login{Request.QueryString}");
 
     [HttpGet("reception/register")]
     public IActionResult ReceptionRegister()

@@ -16,13 +16,13 @@ namespace SalonManagement.Tests;
 public sealed class StylistManagementControllerTests
 {
     [Fact]
-    public void Controller_AllowsOnlyManagementRoles()
+    public void Controller_AllowsOnlyOwnerRole()
     {
         var authorize = Assert.Single(typeof(StylistManagementController)
             .GetCustomAttributes(typeof(AuthorizeAttribute), true)
             .Cast<AuthorizeAttribute>());
 
-        Assert.Equal(RoleGroups.Management, authorize.Roles);
+        Assert.Equal(UserRoles.Owner, authorize.Roles);
     }
 
     [Fact]
