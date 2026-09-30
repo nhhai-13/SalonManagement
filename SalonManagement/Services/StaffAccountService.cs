@@ -32,11 +32,15 @@ public sealed class StaffAccountService(
             if (currentRole is null || (!string.IsNullOrWhiteSpace(role) && !currentRole.Equals(role, StringComparison.OrdinalIgnoreCase))) continue;
             items.Add(new StaffAccountResponse(
                 user.Id,
+                user.FullName,
                 user.Email ?? string.Empty,
                 user.PhoneNumber,
                 currentRole,
                 user.IsActive,
-                await userManager.IsLockedOutAsync(user)));
+                await userManager.IsLockedOutAsync(user),
+                user.MustChangePassword,
+                user.CreatedAtUtc,
+                user.CreatedByUserId));
         }
         return new StaffAccountListResponse(items, items.Count);
     }
