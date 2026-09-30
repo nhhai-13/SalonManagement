@@ -1,20 +1,5 @@
 @{
-    var portal = ViewData["Portal"]?.ToString() ?? "admin";
-    var portalTitle = portal switch
-    {
-        "owner" => "Chủ tiệm",
-        "reception" => "Lễ tân",
-        "stylist" => "Chuyên viên",
-        _ => "Quản trị"
-    };
-    var portalDescription = portal switch
-    {
-        "owner" => "Quản lý dịch vụ, đội ngũ và giờ hoạt động của salon.",
-        "reception" => "Quản lý lịch hẹn, đón tiếp và chăm sóc khách hàng.",
-        "stylist" => "Theo dõi lịch làm việc và lịch hẹn của bạn.",
-        _ => "Quản lý hoạt động salon trong một không gian duy nhất."
-    };
-    ViewData["Title"] = $"Đăng nhập {portalTitle.ToLower()}";
+    ViewData["Title"] = "Đăng nhập";
     Layout = "_AuthLayout";
 }
 
@@ -29,9 +14,9 @@
         </a>
 
         <div class="showcase-copy">
-            <span class="eyebrow">Không gian @portalTitle.ToLower()</span>
+            <span class="eyebrow">Không gian nhân viên</span>
             <h1>Vẻ đẹp được tạo nên từ những trải nghiệm tinh tế.</h1>
-            <p>@portalDescription</p>
+            <p>Quản lý hoạt động salon trong một không gian duy nhất.</p>
         </div>
 
         <div class="showcase-footer">
@@ -49,12 +34,12 @@
 
         <div class="login-card">
             <div class="login-heading">
-                <span class="eyebrow">Cổng @portalTitle.ToLower()</span>
+                <span class="eyebrow">Cổng nhân viên</span>
                 <h2>Đăng nhập</h2>
-                <p>Nhập thông tin tài khoản @portalTitle.ToLower() để tiếp tục.</p>
+                <p>Nhập thông tin tài khoản để tiếp tục.</p>
             </div>
 
-            <form id="login-form" data-portal="@portal" data-redirect="@(portal == "admin" ? "/admin" : portal == "owner" ? "/owner" : portal == "reception" ? "/reception" : "/stylist")" novalidate>
+            <form id="login-form" novalidate>
                 <div id="login-error" class="login-alert d-none" role="alert" aria-live="polite">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                     <span></span>
@@ -96,21 +81,6 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
                 </button>
             </form>
-
-            @if (portal is "reception" or "stylist")
-            {
-                <p class="support-note">Chưa có tài khoản? <a href="/@portal/register">Tự đăng ký</a> hoặc liên hệ quản trị viên.</p>
-            }
-
-            <nav class="portal-switcher" aria-label="Chọn khu vực đăng nhập">
-                <span>Đăng nhập với vai trò khác</span>
-                <div>
-                    <a class="@(portal == "admin" ? "active" : null)" href="/admin/login">Quản trị</a>
-                    <a class="@(portal == "owner" ? "active" : null)" href="/owner/login">Chủ tiệm</a>
-                    <a class="@(portal == "reception" ? "active" : null)" href="/reception/login">Lễ tân</a>
-                    <a class="@(portal == "stylist" ? "active" : null)" href="/stylist/login">Thợ</a>
-                </div>
-            </nav>
 
             <p class="support-note">Bạn gặp khó khăn? <a href="mailto:support@luminol.vn">Liên hệ hỗ trợ</a></p>
         </div>

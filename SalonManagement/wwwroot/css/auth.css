@@ -98,13 +98,6 @@ body.auth-page {
 .login-button.loading svg { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .support-note { margin: 30px 0 0; color: var(--muted); text-align: center; font-size: 12px; }
-.portal-switcher { margin-top: 28px; padding-top: 22px; border-top: 1px solid #ebe5de; text-align: center; }
-.portal-switcher > span { display: block; margin-bottom: 11px; color: var(--muted); font-size: 11px; }
-.portal-switcher div { display: flex; justify-content: center; gap: 7px; }
-.portal-switcher a { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; font-weight: 600; text-decoration: none; transition: .2s; }
-.portal-switcher a:hover { border-color: var(--brown); color: var(--brown); }
-.portal-switcher a.active { border-color: var(--brown); color: #fff; background: var(--brown); }
-.portal-switcher + .support-note { margin-top: 18px; }
 .copyright { position: absolute; bottom: 24px; margin: 0; color: #a0968f; font-size: 10px; letter-spacing: .04em; }
 
 @media (max-width: 850px) {

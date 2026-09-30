@@ -80,17 +80,9 @@ window.SalonAuth = (() => {
     }
 
     function redirectToLogin(message) {
-        const portal = activeStorage().getItem(portalKey) || "admin";
         clearSession();
-        const loginPath = portal === "stylist"
-            ? "/stylist/login"
-            : portal === "reception"
-                ? "/reception/login"
-                : portal === "owner"
-                    ? "/owner/login"
-                    : "/admin/login";
         const query = message ? `?message=${encodeURIComponent(message)}` : "";
-        location.replace(loginPath + query);
+        location.replace("/admin/login" + query);
     }
 
     return {
@@ -145,8 +137,7 @@ window.SalonAuth = (() => {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             email: email.value.trim(),
-                            password: password.value,
-                            portal: form.dataset.portal || null
+                            password: password.value
                         })
                     });
                     if (!response.ok) {
@@ -155,12 +146,13 @@ window.SalonAuth = (() => {
                         error.classList.remove("d-none");
                         return;
                     }
+                    const result = await response.json();
                     saveSession(
-                        await response.json(),
+                        result,
                         document.getElementById("remember")?.checked === true,
-                        form.dataset.portal || "admin"
+                        result.role
                     );
-                    location.replace(form.dataset.redirect || "/admin");
+                    location.replace(result.redirectUrl || "/admin/login");
                 } catch {
                     errorMessage.textContent = "Không thể kết nối đến hệ thống. Vui lòng thử lại.";
                     error.classList.remove("d-none");

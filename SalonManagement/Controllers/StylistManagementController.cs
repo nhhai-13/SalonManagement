@@ -8,7 +8,7 @@ using SalonManagement.Models.ViewModels;
 
 namespace SalonManagement.Controllers;
 
-[Authorize(Roles = RoleGroups.Management)]
+[Authorize(Roles = UserRoles.Owner)]
 [Route("management/stylists")]
 public sealed class StylistManagementController(
     ApplicationDbContext db,

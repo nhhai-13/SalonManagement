@@ -4,8 +4,7 @@ namespace SalonManagement.Models;
 
 public sealed record LoginRequest(
     [Required, EmailAddress] string Email,
-    [Required] string Password,
-    string? Portal = null);
+    [Required] string Password);
 
 public sealed record RegisterStaffRequest(
     [Required, EmailAddress] string Email,
@@ -23,4 +22,6 @@ public sealed record TokenResponse(
     string AccessToken,
     DateTime AccessTokenExpiresAtUtc,
     string RefreshToken,
-    DateTime RefreshTokenExpiresAtUtc);
+    DateTime RefreshTokenExpiresAtUtc,
+    string Role,
+    string RedirectUrl);

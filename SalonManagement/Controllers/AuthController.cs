@@ -92,22 +92,15 @@ public class AuthController(
             return Unauthorized(new { message = "Tài khoản đã ngưng hoạt động. Vui lòng liên hệ quản trị viên." });
         }
 
-        var requiredRoles = request.Portal?.ToLowerInvariant() switch
+        var role = await GetSingleActorRole(user);
+        if (role is null)
         {
-            "admin" => new[] { UserRoles.Admin },
-            "owner" => new[] { UserRoles.Owner },
-            "reception" => new[] { "Receptionist" },
-            "stylist" => new[] { "Stylist" },
-            _ => Array.Empty<string>()
-        };
-        if (requiredRoles.Length > 0 && !await HasAnyRole(user, requiredRoles))
-        {
-            return Unauthorized(new { message = "Tài khoản không có quyền truy cập khu vực này." });
+            return Unauthorized(new { message = "Tài khoản phải được gán đúng một vai trò để đăng nhập." });
         }
 
         await userManager.ResetAccessFailedCountAsync(user);
 
-        return Ok(await IssueTokens(user));
+        return Ok(await IssueTokens(user, role));
     }
 
     [HttpPost("refresh")]
@@ -122,8 +115,14 @@ public class AuthController(
             return Unauthorized(new { message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." });
         }
 
+        var role = await GetSingleActorRole(storedToken.User);
+        if (role is null)
+        {
+            return Unauthorized(new { message = "Quyền tài khoản đã thay đổi. Vui lòng đăng nhập lại." });
+        }
+
         storedToken.RevokedAtUtc = now;
-        return Ok(await IssueTokens(storedToken.User));
+        return Ok(await IssueTokens(storedToken.User, role));
     }
 
     [HttpPost("logout")]
@@ -141,10 +140,9 @@ public class AuthController(
         return NoContent();
     }
 
-    private async Task<TokenResponse> IssueTokens(ApplicationUser user)
+    private async Task<TokenResponse> IssueTokens(ApplicationUser user, string role)
     {
-        var roles = await userManager.GetRolesAsync(user);
-        var (accessToken, accessExpiry) = tokenService.CreateAccessToken(user, roles);
+        var (accessToken, accessExpiry) = tokenService.CreateAccessToken(user, [role]);
         var refreshToken = tokenService.CreateRefreshToken();
         var refreshExpiry = tokenService.GetRefreshTokenExpiry();
         dbContext.RefreshTokens.Add(new RefreshToken
@@ -168,17 +166,29 @@ public class AuthController(
                 IsEssential = true
             });
 
-        return new TokenResponse(accessToken, accessExpiry, refreshToken, refreshExpiry);
+        return new TokenResponse(accessToken, accessExpiry, refreshToken, refreshExpiry, role, GetRedirectUrl(role));
     }
 
-    private async Task<bool> HasAnyRole(ApplicationUser user, IEnumerable<string> roles)
+    private async Task<string?> GetSingleActorRole(ApplicationUser user)
     {
-        foreach (var role in roles)
-        {
-            if (await userManager.IsInRoleAsync(user, role)) return true;
-        }
-        return false;
+        var roles = (await userManager.GetRolesAsync(user))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return roles.Length == 1 && roles[0] is
+            UserRoles.Admin or UserRoles.Owner or UserRoles.Receptionist or UserRoles.Stylist
+                ? roles[0]
+                : null;
     }
+
+    public static string GetRedirectUrl(string role) => role switch
+    {
+        UserRoles.Admin => "/admin",
+        UserRoles.Owner => "/owner",
+        UserRoles.Receptionist => "/reception",
+        UserRoles.Stylist => "/stylist",
+        _ => "/admin/login"
+    };
 
     public static string? NormalizeStaffRole(string? role) => role?.Trim().ToLowerInvariant() switch
     {
