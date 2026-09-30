@@ -16,13 +16,6 @@ public sealed record StaffAccountResponse(
 
 public sealed record ChangeStaffStatusRequest(bool IsActive);
 
-public sealed record CreateStaffAccountRequest(
-    [Required, StringLength(120)] string FullName,
-    [Required, EmailAddress] string Email,
-    [Phone] string? PhoneNumber,
-    [Required] string Role,
-    bool IsActive = true);
-
 public sealed record UpdateStaffAccountRequest(
     [Required, StringLength(120)] string FullName,
     [Required, EmailAddress] string Email,
