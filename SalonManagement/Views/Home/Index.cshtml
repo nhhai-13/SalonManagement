@@ -14,7 +14,18 @@
         <a class="home-brand" href="#top" aria-label="Luminol - Trang chủ"><span class="brand-monogram">L</span><span><strong>Luminol</strong><small>Salon &amp; Spa</small></span></a>
         <button class="home-menu-toggle" type="button" aria-label="Mở menu" aria-expanded="false"><i class="bi bi-list"></i></button>
         <nav class="home-nav" aria-label="Điều hướng chính"><a class="active" href="#top">Trang chủ</a><a href="#services">Dịch vụ</a><a href="#team">Chuyên viên</a><a href="#about">Về Luminol</a><a href="#contact">Liên hệ</a></nav>
-        <div class="nav-actions"><a class="nav-login" href="/admin/login">Đăng nhập</a><a class="button button-primary button-small" href="#booking">Đặt lịch</a></div>
+        <div class="nav-actions">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a class="nav-login" asp-controller="Account" asp-action="ChangePassword">Đổi mật khẩu</a>
+                <a class="nav-login" href="/admin">Khu vực quản trị</a>
+            }
+            else
+            {
+                <a class="nav-login" href="/admin/login">Đăng nhập</a>
+            }
+            <a class="button button-primary button-small" href="#booking">Đặt lịch</a>
+        </div>
     </div>
 </header>
 

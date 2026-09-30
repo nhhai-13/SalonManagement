@@ -22,6 +22,12 @@ public class AccountController(
     TimeProvider timeProvider,
     ILogger<AccountController> logger) : Controller
 {
+    [HttpGet]
+    public IActionResult Login()
+    {
+        return View();
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // AC1: Đổi mật khẩu (yêu cầu đăng nhập)
     // ═══════════════════════════════════════════════════════════════
@@ -46,7 +52,7 @@ public class AccountController(
         var user = await userManager.GetUserAsync(User);
         if (user is null)
         {
-            return RedirectToPage("/Account/Login", new { area = "Identity" });
+            return RedirectToAction(nameof(Login));
         }
 
         // Đổi mật khẩu qua UserManager — xác nhận OldPassword trước khi hash mới
@@ -76,7 +82,7 @@ public class AccountController(
 
         TempData["SuccessMessage"] =
             "Đổi mật khẩu thành công! Vui lòng đăng nhập lại bằng mật khẩu mới.";
-        return RedirectToPage("/Account/Login", new { area = "Identity" });
+        return RedirectToAction(nameof(Login));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -116,12 +122,11 @@ public class AccountController(
         {
             var token = await userManager.GeneratePasswordResetTokenAsync(user);
 
-            // Mã hoá token an toàn khi truyền qua URL
-            var encodedToken = Uri.EscapeDataString(token);
             var resetLink = Url.Action(
-                nameof(ResetPassword), "Account",
-                new { email = model.Email, token = encodedToken },
-                Request.Scheme)!;
+                nameof(ResetPassword),
+                "Account",
+                new { email = user.Email, token = token },
+                protocol: Request.Scheme)!;
 
             await emailService.SendPasswordResetEmailAsync(model.Email, resetLink);
 
@@ -160,7 +165,7 @@ public class AccountController(
         var model = new ResetPasswordViewModel
         {
             Email = email,
-            Token = Uri.UnescapeDataString(token)
+            Token = token
         };
         return View(model);
     }
