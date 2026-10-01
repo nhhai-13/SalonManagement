@@ -9,7 +9,24 @@ public static class StylistBookingDemoSeed
     public static async Task SeedAsync(ApplicationDbContext db, DateTime day)
     {
         var group = await db.ServiceGroups.SingleOrDefaultAsync(g => g.GroupName == "Demo S2-06");
-        if (group != null) return;
+        if (group != null)
+        {
+            // Upgrade an existing opt-in demo without rewriting any appointments.
+            var fullDay = day.Date.AddDays(1);
+            var demo = await db.Appointments.FirstOrDefaultAsync(a => a.Notes == "Demo S2-06" &&
+                a.Stylist.FullName == "Demo Thợ A" && a.AppointmentDate == fullDay &&
+                a.Customer.Notes == "Synthetic demo only");
+            if (demo != null && demo.EndTime < TimeSpan.FromHours(17) &&
+                !await db.Appointments.AnyAsync(a => a.StylistId == demo.StylistId &&
+                    a.AppointmentDate == fullDay && a.Notes == "Demo S2-06 any stylist"))
+            {
+                db.Appointments.Add(new() { StylistId = demo.StylistId, CustomerId = demo.CustomerId,
+                    AppointmentDate = fullDay, StartTime = demo.EndTime, EndTime = TimeSpan.FromHours(17),
+                    Status = "Confirmed", Notes = "Demo S2-06 any stylist" });
+                await db.SaveChangesAsync();
+            }
+            return;
+        }
         var cut = new Service { ServiceName = "Demo Cắt tóc", DurationMinutes = 30, Price = 100000 };
         var wash = new Service { ServiceName = "Demo Gội đầu", DurationMinutes = 30, Price = 50000 };
         var dye = new Service { ServiceName = "Demo Nhuộm tóc", DurationMinutes = 60, Price = 300000 };
@@ -27,7 +44,7 @@ public static class StylistBookingDemoSeed
             foreach (var stylist in new[] { a, b, c })
                 db.WorkSchedules.Add(new() { Stylist = stylist, WorkDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(17) });
             db.Appointments.Add(new() { Stylist = a, Customer = customer, AppointmentDate = date,
-                StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(10), Status = "Confirmed", Notes = "Demo S2-06" });
+                StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(i == 1 ? 17 : 10), Status = "Confirmed", Notes = "Demo S2-06" });
             db.Appointments.Add(new() { Stylist = b, Customer = customer, AppointmentDate = date,
                 StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(11), Status = "Confirmed", Notes = "Demo S2-06" });
         }

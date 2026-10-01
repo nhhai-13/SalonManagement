@@ -9,6 +9,7 @@ public sealed record StylistSlot(string Start, string End);
 
 public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProvider clock)
 {
+    public const int AnyStylist = 0;
     public DateTime SalonNow => TimeZoneInfo.ConvertTime(clock.GetUtcNow(),
         TimeZoneInfo.FindSystemTimeZoneById(BusinessHour.SalonTimeZone)).DateTime;
 
@@ -40,9 +41,14 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     {
         var services = await SelectedServices(serviceIds);
         var ids = services.Select(s => s.ServiceId).ToArray();
-        if (!await db.Stylists.AnyAsync(s => s.StylistId == stylistId && s.IsActive &&
-            s.Services.Count(link => ids.Contains(link.ServiceId)) == ids.Length))
+        if (stylistId < AnyStylist) throw new ArgumentException("Lựa chọn thợ không hợp lệ.");
+        var qualifiedIds = await db.Stylists.AsNoTracking()
+            .Where(s => (stylistId == AnyStylist || s.StylistId == stylistId) && s.IsActive &&
+                s.Services.Count(link => ids.Contains(link.ServiceId)) == ids.Length)
+            .Select(s => s.StylistId).ToListAsync();
+        if (stylistId != AnyStylist && qualifiedIds.Count == 0)
             throw new ArgumentException("Thợ đã chọn không còn phù hợp. Vui lòng chọn lại thợ.");
+        if (qualifiedIds.Count == 0) return [];
 
         var day = date.ToDateTime(TimeOnly.MinValue);
         var now = SalonNow;
@@ -53,39 +59,46 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var open = hours.OpensAt.Value.ToTimeSpan();
         var close = hours.ClosesAt.Value.ToTimeSpan();
         if (open >= close) return [];
-        var shifts = await db.WorkSchedules.AsNoTracking().Where(s => s.StylistId == stylistId &&
+        var shifts = await db.WorkSchedules.AsNoTracking().Where(s => qualifiedIds.Contains(s.StylistId) &&
             s.WorkDate >= day && s.WorkDate < nextDay && s.Status == "Working")
-            .OrderBy(s => s.StartTime).Select(s => new { s.StartTime, s.EndTime }).ToListAsync();
-        var busy = await db.Appointments.AsNoTracking().Where(a => a.StylistId == stylistId &&
+            .OrderBy(s => s.StartTime).Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync();
+        var busy = await db.Appointments.AsNoTracking().Where(a => qualifiedIds.Contains(a.StylistId) &&
             a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled")
-            .Select(a => new { a.StartTime, a.EndTime }).ToListAsync();
+            .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
 
-        // Union overlapping/adjacent shifts, but never bridge a break.
-        var windows = new List<(TimeSpan Start, TimeSpan End)>();
-        foreach (var shift in shifts)
-        {
-            var start = shift.StartTime > open ? shift.StartTime : open;
-            var end = shift.EndTime < close ? shift.EndTime : close;
-            if (start >= end) continue;
-            if (windows.Count > 0 && start <= windows[^1].End)
-                windows[^1] = (windows[^1].Start, end > windows[^1].End ? end : windows[^1].End);
-            else windows.Add((start, end));
-        }
         var duration = services.Sum(s => (long)s.DurationMinutes);
         if (duration > 24 * 60) return [];
         var length = TimeSpan.FromMinutes(duration);
-        var slots = new List<StylistSlot>();
-        foreach (var window in windows)
+        var busyByStylist = busy.ToLookup(a => a.StylistId);
+        var slots = new HashSet<StylistSlot>();
+        // Calculate each stylist independently: never stitch two people's free time together.
+        foreach (var stylistShifts in shifts.GroupBy(s => s.StylistId))
         {
-            // Quarter-hour starts; an appointment ending exactly at start does not overlap.
-            var first = TimeSpan.FromMinutes(Math.Ceiling(window.Start.TotalMinutes / 15) * 15);
-            for (var start = first; start + length <= window.End; start += TimeSpan.FromMinutes(15))
+            var stylistBusy = busyByStylist[stylistShifts.Key].ToList();
+
+            // Union overlapping/adjacent shifts, but never bridge a break.
+            var windows = new List<(TimeSpan Start, TimeSpan End)>();
+            foreach (var shift in stylistShifts)
             {
-                var end = start + length;
-                if (day + start <= now || busy.Any(a => start < a.EndTime && end > a.StartTime)) continue;
-                slots.Add(new(start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
+                var start = shift.StartTime > open ? shift.StartTime : open;
+                var end = shift.EndTime < close ? shift.EndTime : close;
+                if (start >= end) continue;
+                if (windows.Count > 0 && start <= windows[^1].End)
+                    windows[^1] = (windows[^1].Start, end > windows[^1].End ? end : windows[^1].End);
+                else windows.Add((start, end));
+            }
+            foreach (var window in windows)
+            {
+                // Quarter-hour starts; an appointment ending exactly at start does not overlap.
+                var first = TimeSpan.FromMinutes(Math.Ceiling(window.Start.TotalMinutes / 15) * 15);
+                for (var start = first; start + length <= window.End; start += TimeSpan.FromMinutes(15))
+                {
+                    var end = start + length;
+                    if (day + start <= now || stylistBusy.Any(a => start < a.EndTime && end > a.StartTime)) continue;
+                    slots.Add(new(start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
+                }
             }
         }
-        return slots;
+        return slots.OrderBy(s => s.Start, StringComparer.Ordinal).ThenBy(s => s.End, StringComparer.Ordinal).ToList();
     }
 }

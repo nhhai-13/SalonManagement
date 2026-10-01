@@ -18,11 +18,11 @@ public sealed class StylistAvailabilityController(StylistAvailabilityService ava
     }
 
     [HttpGet("slots")]
-    public async Task<IActionResult> Slots([FromQuery] int[] serviceIds, int stylistId, DateOnly date)
+    public async Task<IActionResult> Slots([FromQuery] int[] serviceIds, int? stylistId, DateOnly date)
     {
-        if (!ModelState.IsValid || date == default || stylistId <= 0)
+        if (!ModelState.IsValid || date == default || stylistId == null || stylistId < 0)
             return BadRequest(new { message = "Vui lòng chọn ngày và thợ hợp lệ." });
-        try { return Ok(await availability.GetSlotsAsync(serviceIds, stylistId, date)); }
+        try { return Ok(await availability.GetSlotsAsync(serviceIds, stylistId.Value, date)); }
         catch (ArgumentException e) { return BadRequest(new { message = e.Message }); }
     }
 }
