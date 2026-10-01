@@ -60,6 +60,13 @@ public class PublicServiceCatalogTests
                 ] });
                 db.Services.Add(new() { ServiceName = "Dịch vụ lẻ", DurationMinutes = 15, Price = 50000 });
             }
+            var stylist = new Stylist { FullName = "Thợ đang làm việc" };
+            foreach (var service in db.ChangeTracker.Entries<Service>().Select(entry => entry.Entity).ToList())
+                service.Stylists.Add(new StylistService { Service = service, Stylist = stylist });
+            db.ServiceGroups.Add(new() { GroupName = "Nhóm không có thợ", Services = [
+                new() { ServiceName = "Chưa phân công" },
+                new() { ServiceName = "Thợ đã nghỉ", Stylists = [new() { Stylist = new Stylist { IsActive = false } }] }
+            ] });
             await db.SaveChangesAsync();
         }
         await app.StartAsync();
@@ -72,9 +79,11 @@ public class PublicServiceCatalogTests
                 var response = await client.GetAsync(path);
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 var html = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
-                if (groupCount >= 0)
-                    Assert.Contains("Nhóm này chưa có dịch vụ.", html);
-                else
+                Assert.DoesNotContain("Nhóm rỗng", html);
+                Assert.DoesNotContain("Nhóm không có thợ", html);
+                Assert.DoesNotContain("Chưa phân công", html);
+                Assert.DoesNotContain("Thợ đã nghỉ", html);
+                if (groupCount <= 0)
                     Assert.DoesNotContain("aria-label=\"Nhóm dịch vụ\"", html);
                 if (groupCount <= 0)
                     Assert.Contains("Chưa có dịch vụ nào để hiển thị.", html);
@@ -82,12 +91,9 @@ public class PublicServiceCatalogTests
                 {
                     Assert.DoesNotContain("Chưa có dịch vụ nào để hiển thị.", html);
                     Assert.Contains("A - Cắt tóc</h3>", html);
-                    Assert.Contains("Z - Uốn tóc</h3>", html);
+                    Assert.DoesNotContain("Z - Uốn tóc</h3>", html);
                     Assert.Contains("Thời lượng: 30 phút", html);
-                    Assert.Contains("Thời lượng: 90 phút", html);
                     Assert.Contains("Giá: 150.000 VND", html);
-                    Assert.Contains("Giá: 1.250.000 VND", html);
-                    Assert.True(html.IndexOf("A - Cắt tóc</h3>") < html.IndexOf("Z - Uốn tóc</h3>"));
                     if (groupCount > 1)
                     {
                         Assert.True(html.IndexOf("Gội</h2>") < html.IndexOf("Tóc</h2>"));

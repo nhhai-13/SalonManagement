@@ -3,7 +3,7 @@
 ## Demo
 - Mở `/Services` khi chưa đăng nhập; `/Services/Public` luôn chọn giao diện danh sách công khai, kể cả với Owner.
 - Trang hiển thị tên nhóm trước các dịch vụ, tên dịch vụ, thời lượng phút và giá theo định dạng `150.000 VND`.
-- Nhóm rỗng hiển thị “Nhóm này chưa có dịch vụ.”; khi không có dịch vụ nào, hiển thị “Chưa có dịch vụ nào để hiển thị.”.
+- Nhóm không còn dịch vụ hợp lệ tự ẩn; khi không có dịch vụ nào, hiển thị “Chưa có dịch vụ nào để hiển thị.”.
 - Dịch vụ chưa gán nhóm nằm trong “Chưa phân nhóm”, cuối danh sách.
 
 ## Thứ tự đề xuất — chờ PO xác nhận
@@ -12,8 +12,8 @@
 - Owner chỉnh thứ tự nhóm tại `/ServiceGroups`. Chưa có thứ tự dịch vụ tùy chỉnh.
 
 ## Phạm vi
-- Danh sách này không lọc theo trạng thái dịch vụ hoặc thợ; dịch vụ ngừng bán và chưa có thợ vẫn hiển thị theo phạm vi S2-03.
-- Trang chủ giữ nguyên cách chọn dịch vụ nổi bật hiện có.
+- Chỉ hiển thị dịch vụ đang bán và có ít nhất một thợ đang làm việc đảm nhận. Dịch vụ ngừng bán, chưa có thợ hoặc toàn bộ thợ đã ngưng làm việc đều bị ẩn.
+- Trang chủ và lựa chọn dịch vụ đặt lịch áp dụng cùng điều kiện lọc. Không hiển thị dịch vụ mẫu khi danh sách trống. Trạng thái được cập nhật mỗi lần tải trang.
 - Chưa triển khai tìm kiếm không dấu; chưa nghiệm thu màn hình 360px hoặc tốc độ tải.
 - Không thay đổi schema hoặc dữ liệu production.
 
@@ -22,6 +22,8 @@ Chạy `dotnet test SalonManagement.Tests/SalonManagement.Tests.csproj`.
 
 `PublicServiceCatalogTests` khởi động MVC/Razor thật trên HTTP với database InMemory, chính sách mặc định yêu cầu đăng nhập và client không có cookie. Kiểm tra cả `/Services` và `/Services/Public`: HTTP 200, không nhóm/không dịch vụ, nhóm rỗng, một nhóm nhiều dịch vụ, nhiều nhóm, thứ tự nhóm và dịch vụ, tên, phút, dấu phân cách hàng nghìn và VND. Bao gồm dịch vụ ngừng bán/chưa có thợ và dịch vụ chưa phân nhóm.
 
-`ServiceGroupsControllerTests` kiểm tra thay đổi thứ tự nhóm được phản ánh trên danh sách công khai, đồng thời trang chủ vẫn giữ bộ lọc hiện có.
+`ServiceGroupsControllerTests` kiểm tra thay đổi thứ tự nhóm được phản ánh trên danh sách công khai, đồng thời trang chủ áp dụng cùng bộ lọc khả dụng.
 
 Các test dùng InMemory, chưa thay thế kiểm thử trên SQL Server staging hoặc nghiệm thu giao diện bằng trình duyệt.
+
+`PublicServiceAvailabilityTests` kiểm tra dịch vụ đang bán/ngừng bán, không có thợ, tất cả thợ ngưng làm việc, nhiều thợ có ít nhất một người đang làm việc, nhóm rỗng sau lọc, cập nhật trạng thái và gỡ phân công. Owner vẫn xem đầy đủ danh sách quản lý.

@@ -45,10 +45,12 @@ namespace SalonManagement.Controllers
                     Name = g.GroupName
                 }).ToListAsync();
             var services = await _context.Services.AsNoTracking()
+                .Where(s => s.IsActive && s.Stylists.Any(link => link.Stylist.IsActive))
                 .OrderBy(s => s.ServiceName).ThenBy(s => s.ServiceId).ToListAsync();
             var byGroup = services.ToLookup(s => s.ServiceGroupId);
             foreach (var group in groups)
                 group.Services = byGroup[group.Id].ToList();
+            groups.RemoveAll(group => group.Services.Count == 0);
             if (byGroup[null].Any())
                 groups.Add(new() { Name = "Chưa phân nhóm", Services = byGroup[null].ToList() });
 
