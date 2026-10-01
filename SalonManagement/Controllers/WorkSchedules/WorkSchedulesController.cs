@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -232,6 +233,61 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
         await db.SaveChangesAsync();
         TempData["Success"] = $"Đã sao chép {copiedCount} ca; ghi đè {overwrittenDays} ngày; bỏ qua {skippedDays} ngày.";
         return RedirectToAction(nameof(Index), new { stylistId = model.StylistId, weekStart = sourceStart.AddDays(7) });
+    }
+
+    [HttpGet("{id:int}/delete-preview")]
+    public async Task<ActionResult<DeleteWorkSchedulePreviewResponse>> DeletePreview(int id)
+    {
+        var schedule = await db.WorkSchedules.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.WorkScheduleId == id);
+        if (schedule is null)
+            return NotFound();
+
+        return Ok(new DeleteWorkSchedulePreviewResponse(id, await GetRelatedAppointmentsAsync(schedule)));
+    }
+
+    [HttpPost("{id:int}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var schedule = await db.WorkSchedules.SingleOrDefaultAsync(item => item.WorkScheduleId == id);
+        if (schedule is null)
+            return NotFound();
+
+        var relatedAppointments = await GetRelatedAppointmentsAsync(schedule);
+        if (relatedAppointments.Count > 0)
+        {
+            TempData["Error"] = $"Không thể xóa ca vì có {relatedAppointments.Count} lịch hẹn liên quan.";
+            TempData["BlockedAppointments"] = JsonSerializer.Serialize(relatedAppointments);
+            return RedirectToAction(nameof(Index), new { stylistId = schedule.StylistId, weekStart = StartOfWeek(schedule.WorkDate) });
+        }
+
+        db.WorkSchedules.Remove(schedule);
+        await db.SaveChangesAsync();
+        TempData["Success"] = "Đã xóa ca làm.";
+        return RedirectToAction(nameof(Index), new { stylistId = schedule.StylistId, weekStart = StartOfWeek(schedule.WorkDate) });
+    }
+
+    private async Task<List<BlockedAppointmentViewModel>> GetRelatedAppointmentsAsync(WorkSchedule schedule)
+    {
+        var appointments = await db.Appointments.AsNoTracking()
+            .Include(appointment => appointment.Customer)
+            .Include(appointment => appointment.AppointmentServices)
+            .ThenInclude(item => item.Service)
+            .Where(appointment => appointment.StylistId == schedule.StylistId &&
+                                  appointment.AppointmentDate == schedule.WorkDate.Date)
+            .ToListAsync();
+
+        return appointments
+            .Where(appointment => appointment.StartTime < schedule.EndTime && schedule.StartTime < appointment.EndTime)
+            .OrderBy(appointment => appointment.StartTime)
+            .Select(appointment => new BlockedAppointmentViewModel(
+                appointment.AppointmentId,
+                appointment.Customer.FullName,
+                appointment.StartTime,
+                appointment.EndTime,
+                appointment.AppointmentServices.Select(item => item.Service.ServiceName).OrderBy(name => name).ToList()))
+            .ToList();
     }
 
     private async Task<WorkSchedule?> FindConflictingShiftAsync(

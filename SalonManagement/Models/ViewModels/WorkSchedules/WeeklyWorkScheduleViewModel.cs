@@ -84,3 +84,14 @@ public sealed record CopyWeekPreviewResponse(
     IReadOnlyList<CopyWeekConflictDay> ConflictDays);
 
 public sealed record CopyWeekConflictDay(DateTime Date, int ExistingShiftCount);
+
+public sealed record DeleteWorkSchedulePreviewResponse(
+    int WorkScheduleId,
+    IReadOnlyList<BlockedAppointmentViewModel> RelatedAppointments);
+
+public sealed record BlockedAppointmentViewModel(
+    int AppointmentId,
+    string CustomerName,
+    TimeSpan StartTime,
+    TimeSpan EndTime,
+    IReadOnlyList<string> ServiceNames);

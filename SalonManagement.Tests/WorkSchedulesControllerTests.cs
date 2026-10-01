@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using SalonManagement.Controllers;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -225,6 +226,63 @@ public sealed class WorkSchedulesControllerTests
         Assert.NotNull(preview); Assert.Equal(sourceWeek.AddDays(7), preview.TargetWeekStart); Assert.Single(preview.ConflictDays); Assert.Equal(sourceWeek.AddDays(7), preview.ConflictDays[0].Date); Assert.Equal(1, preview.ConflictDays[0].ExistingShiftCount);
     }
 
+    [Fact]
+    public async Task Delete_ShiftWithoutAppointments_RemovesShift()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Thảo Vy"); var controller = CreateController(db);
+        var schedule = new WorkSchedule { StylistId = stylist.StylistId, WorkDate = new DateTime(2026, 10, 8), StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) };
+        db.WorkSchedules.Add(schedule); await db.SaveChangesAsync();
+
+        var result = await controller.Delete(schedule.WorkScheduleId);
+
+        Assert.IsType<RedirectToActionResult>(result); Assert.Empty(await db.WorkSchedules.ToListAsync());
+    }
+
+    [Fact]
+    public async Task DeletePreview_CancellingBeforeSubmit_LeavesShiftUntouched()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Thanh Hà"); var controller = CreateController(db);
+        var schedule = new WorkSchedule { StylistId = stylist.StylistId, WorkDate = new DateTime(2026, 10, 8), StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) };
+        db.WorkSchedules.Add(schedule); await db.SaveChangesAsync();
+
+        var result = await controller.DeletePreview(schedule.WorkScheduleId);
+
+        var preview = Assert.IsType<OkObjectResult>(result.Result).Value as DeleteWorkSchedulePreviewResponse;
+        Assert.NotNull(preview); Assert.Empty(preview.RelatedAppointments); Assert.Single(await db.WorkSchedules.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Delete_ShiftWithOneAppointment_IsRejectedAndShowsAppointmentDetails()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Kim Oanh"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);
+        var schedule = new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) };
+        db.WorkSchedules.Add(schedule); await db.SaveChangesAsync();
+        await AddAppointmentAsync(db, stylist, date, TimeSpan.FromHours(9), TimeSpan.FromHours(10), "Nguyễn Khách", "Cắt tóc");
+
+        var result = await controller.Delete(schedule.WorkScheduleId);
+
+        Assert.IsType<RedirectToActionResult>(result); Assert.Single(await db.WorkSchedules.ToListAsync());
+        var blocked = JsonSerializer.Deserialize<List<BlockedAppointmentViewModel>>(controller.TempData["BlockedAppointments"]!.ToString()!);
+        var appointment = Assert.Single(blocked!);
+        Assert.Equal("Nguyễn Khách", appointment.CustomerName); Assert.Equal(TimeSpan.FromHours(9), appointment.StartTime); Assert.Contains("Cắt tóc", appointment.ServiceNames);
+    }
+
+    [Fact]
+    public async Task Delete_ShiftWithMultipleAppointments_IsRejectedAndListsAllRelatedAppointments()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Hương Giang"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);
+        var schedule = new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(17) };
+        db.WorkSchedules.Add(schedule); await db.SaveChangesAsync();
+        await AddAppointmentAsync(db, stylist, date, TimeSpan.FromHours(9), TimeSpan.FromHours(10), "Khách Một", "Cắt tóc");
+        await AddAppointmentAsync(db, stylist, date, TimeSpan.FromHours(14), TimeSpan.FromHours(16), "Khách Hai", "Nhuộm tóc");
+
+        var result = await controller.DeletePreview(schedule.WorkScheduleId);
+
+        var preview = Assert.IsType<OkObjectResult>(result.Result).Value as DeleteWorkSchedulePreviewResponse;
+        Assert.NotNull(preview); Assert.Equal(2, preview.RelatedAppointments.Count); Assert.Contains(preview.RelatedAppointments, item => item.CustomerName == "Khách Một"); Assert.Contains(preview.RelatedAppointments, item => item.CustomerName == "Khách Hai");
+        Assert.Single(await db.WorkSchedules.ToListAsync());
+    }
+
     [Theory]
     [InlineData(9, 9)]
     [InlineData(10, 9)]
@@ -258,6 +316,16 @@ public sealed class WorkSchedulesControllerTests
     private static async Task AddBusinessHoursAsync(ApplicationDbContext db, DayOfWeek day, bool isClosed, TimeOnly? opensAt, TimeOnly? closesAt)
     {
         db.BusinessHours.Add(new BusinessHour { DayOfWeek = day, IsClosed = isClosed, OpensAt = opensAt, ClosesAt = closesAt }); await db.SaveChangesAsync();
+    }
+    private static async Task AddAppointmentAsync(ApplicationDbContext db, Stylist stylist, DateTime date, TimeSpan startTime, TimeSpan endTime, string customerName, string serviceName)
+    {
+        var customer = new Customer { FullName = customerName, Phone = $"08{Random.Shared.Next(10000000, 99999999)}" };
+        var service = new Service { ServiceName = serviceName, Price = 100_000, DurationMinutes = 60 };
+        db.AddRange(customer, service); await db.SaveChangesAsync();
+        var appointment = new Appointment { CustomerId = customer.CustomerId, StylistId = stylist.StylistId, AppointmentDate = date, StartTime = startTime, EndTime = endTime };
+        db.Appointments.Add(appointment); await db.SaveChangesAsync();
+        db.AppointmentServices.Add(new AppointmentService { AppointmentId = appointment.AppointmentId, ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes });
+        await db.SaveChangesAsync();
     }
     private static WorkSchedulesController CreateController(ApplicationDbContext db) => new(db) { TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider()) };
     private sealed class TestTempDataProvider : Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider
