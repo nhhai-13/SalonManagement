@@ -64,3 +64,23 @@ public sealed class EditWorkScheduleViewModel : IValidatableObject
                 [nameof(StartTime), nameof(EndTime)]);
     }
 }
+
+public enum CopyConflictResolution
+{
+    Skip,
+    Overwrite
+}
+
+public sealed class CopyWorkWeekViewModel
+{
+    [Range(1, int.MaxValue)]
+    public int StylistId { get; set; }
+    public DateTime SourceWeekStart { get; set; }
+    public CopyConflictResolution ConflictResolution { get; set; } = CopyConflictResolution.Skip;
+}
+
+public sealed record CopyWeekPreviewResponse(
+    DateTime TargetWeekStart,
+    IReadOnlyList<CopyWeekConflictDay> ConflictDays);
+
+public sealed record CopyWeekConflictDay(DateTime Date, int ExistingShiftCount);

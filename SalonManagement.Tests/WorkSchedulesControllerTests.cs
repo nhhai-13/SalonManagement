@@ -158,6 +158,73 @@ public sealed class WorkSchedulesControllerTests
         Assert.NotNull(model); Assert.Equal(new TimeOnly(10, 0), model.BusinessHours[date.DayOfWeek].OpensAt); Assert.Equal(new TimeOnly(19, 0), model.BusinessHours[date.DayOfWeek].ClosesAt);
     }
 
+    [Fact]
+    public async Task CopyWeek_EmptyTarget_CopiesDatesTimesAndNotes()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Tú Anh"); var controller = CreateController(db); var sourceWeek = new DateTime(2026, 10, 5);
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12), Notes = "Nghỉ 10:00" },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek.AddDays(2), StartTime = TimeSpan.FromHours(13), EndTime = TimeSpan.FromHours(17), Notes = "Nghỉ 15:00" });
+        await db.SaveChangesAsync();
+
+        var result = await controller.CopyWeek(new CopyWorkWeekViewModel { StylistId = stylist.StylistId, SourceWeekStart = sourceWeek, ConflictResolution = CopyConflictResolution.Skip });
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var copies = await db.WorkSchedules.Where(schedule => schedule.WorkDate >= sourceWeek.AddDays(7)).OrderBy(schedule => schedule.WorkDate).ToListAsync();
+        Assert.Equal(2, copies.Count);
+        Assert.Equal(sourceWeek.AddDays(7), copies[0].WorkDate); Assert.Equal(TimeSpan.FromHours(8), copies[0].StartTime); Assert.Equal("Nghỉ 10:00", copies[0].Notes);
+        Assert.Equal(sourceWeek.AddDays(9), copies[1].WorkDate); Assert.Equal(TimeSpan.FromHours(17), copies[1].EndTime); Assert.Equal("Nghỉ 15:00", copies[1].Notes);
+    }
+
+    [Fact]
+    public async Task CopyWeek_ExistingTargetWithSkip_KeepsExistingShiftAndDoesNotDuplicate()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Hà My"); var controller = CreateController(db); var sourceWeek = new DateTime(2026, 10, 5);
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12), Notes = "Nguồn" },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek.AddDays(7), StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(11), Notes = "Có sẵn" });
+        await db.SaveChangesAsync();
+
+        await controller.CopyWeek(new CopyWorkWeekViewModel { StylistId = stylist.StylistId, SourceWeekStart = sourceWeek, ConflictResolution = CopyConflictResolution.Skip });
+
+        var target = await db.WorkSchedules.Where(schedule => schedule.WorkDate == sourceWeek.AddDays(7)).ToListAsync();
+        Assert.Single(target); Assert.Equal("Có sẵn", target[0].Notes);
+        Assert.Contains("bỏ qua 1 ngày", controller.TempData["Success"]?.ToString());
+    }
+
+    [Fact]
+    public async Task CopyWeek_ExistingTargetWithOverwrite_ReplacesTargetShifts()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Quỳnh Như"); var controller = CreateController(db); var sourceWeek = new DateTime(2026, 10, 5);
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12), Notes = "Nguồn sáng" },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek, StartTime = TimeSpan.FromHours(13), EndTime = TimeSpan.FromHours(17), Notes = "Nguồn chiều" },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek.AddDays(7), StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(11), Notes = "Ca cũ" });
+        await db.SaveChangesAsync();
+
+        await controller.CopyWeek(new CopyWorkWeekViewModel { StylistId = stylist.StylistId, SourceWeekStart = sourceWeek, ConflictResolution = CopyConflictResolution.Overwrite });
+
+        var target = await db.WorkSchedules.Where(schedule => schedule.WorkDate == sourceWeek.AddDays(7)).OrderBy(schedule => schedule.StartTime).ToListAsync();
+        Assert.Equal(2, target.Count); Assert.DoesNotContain(target, schedule => schedule.Notes == "Ca cũ"); Assert.Equal("Nguồn sáng", target[0].Notes); Assert.Equal("Nguồn chiều", target[1].Notes);
+        Assert.Contains("ghi đè 1 ngày", controller.TempData["Success"]?.ToString());
+    }
+
+    [Fact]
+    public async Task CopyPreview_ReportsOnlyTargetDaysThatAlreadyHaveShifts()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Khánh Linh"); var sourceWeek = new DateTime(2026, 10, 5);
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek.AddDays(1), StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = sourceWeek.AddDays(7), StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(11) });
+        await db.SaveChangesAsync();
+
+        var result = await CreateController(db).CopyPreview(stylist.StylistId, sourceWeek);
+        var preview = Assert.IsType<OkObjectResult>(result.Result).Value as CopyWeekPreviewResponse;
+
+        Assert.NotNull(preview); Assert.Equal(sourceWeek.AddDays(7), preview.TargetWeekStart); Assert.Single(preview.ConflictDays); Assert.Equal(sourceWeek.AddDays(7), preview.ConflictDays[0].Date); Assert.Equal(1, preview.ConflictDays[0].ExistingShiftCount);
+    }
+
     [Theory]
     [InlineData(9, 9)]
     [InlineData(10, 9)]

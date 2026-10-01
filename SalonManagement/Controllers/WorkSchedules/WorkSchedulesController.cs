@@ -135,6 +135,105 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
         return RedirectToAction(nameof(Index), new { stylistId = schedule.StylistId, weekStart = StartOfWeek(schedule.WorkDate) });
     }
 
+    [HttpGet("copy-preview")]
+    public async Task<ActionResult<CopyWeekPreviewResponse>> CopyPreview(int stylistId, DateTime weekStart)
+    {
+        var sourceStart = StartOfWeek(weekStart);
+        var sourceDates = await db.WorkSchedules.AsNoTracking()
+            .Where(schedule => schedule.StylistId == stylistId &&
+                               schedule.WorkDate >= sourceStart && schedule.WorkDate < sourceStart.AddDays(7))
+            .Select(schedule => schedule.WorkDate.Date)
+            .Distinct()
+            .ToListAsync();
+
+        var targetStart = sourceStart.AddDays(7);
+        var targetDates = sourceDates.Select(date => date.AddDays(7)).ToHashSet();
+        var targetWeekShifts = await db.WorkSchedules.AsNoTracking()
+            .Where(schedule => schedule.StylistId == stylistId &&
+                               schedule.WorkDate >= targetStart && schedule.WorkDate < targetStart.AddDays(7))
+            .ToListAsync();
+        var conflicts = targetWeekShifts
+            .Where(schedule => targetDates.Contains(schedule.WorkDate.Date))
+            .GroupBy(schedule => schedule.WorkDate.Date)
+            .Select(group => new CopyWeekConflictDay(group.Key, group.Count()))
+            .OrderBy(day => day.Date)
+            .ToList();
+
+        return Ok(new CopyWeekPreviewResponse(targetStart, conflicts));
+    }
+
+    [HttpPost("copy-week")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CopyWeek(CopyWorkWeekViewModel model)
+    {
+        var sourceStart = StartOfWeek(model.SourceWeekStart);
+        if (!await db.Stylists.AnyAsync(stylist => stylist.StylistId == model.StylistId && stylist.IsActive))
+        {
+            TempData["Error"] = "Thợ được chọn không tồn tại hoặc đã nghỉ việc.";
+            return RedirectToAction(nameof(Index), new { stylistId = model.StylistId, weekStart = sourceStart });
+        }
+
+        var sourceShifts = await db.WorkSchedules.AsNoTracking()
+            .Where(schedule => schedule.StylistId == model.StylistId &&
+                               schedule.WorkDate >= sourceStart && schedule.WorkDate < sourceStart.AddDays(7))
+            .OrderBy(schedule => schedule.WorkDate)
+            .ThenBy(schedule => schedule.StartTime)
+            .ToListAsync();
+
+        if (sourceShifts.Count == 0)
+        {
+            TempData["Error"] = "Tuần hiện tại chưa có ca làm để sao chép.";
+            return RedirectToAction(nameof(Index), new { stylistId = model.StylistId, weekStart = sourceStart });
+        }
+
+        var sourceDays = sourceShifts.GroupBy(schedule => schedule.WorkDate.Date).ToList();
+        var targetStart = sourceStart.AddDays(7);
+        var targetDates = sourceDays.Select(group => group.Key.AddDays(7)).ToHashSet();
+        var targetShifts = (await db.WorkSchedules
+            .Where(schedule => schedule.StylistId == model.StylistId &&
+                               schedule.WorkDate >= targetStart && schedule.WorkDate < targetStart.AddDays(7))
+            .ToListAsync())
+            .Where(schedule => targetDates.Contains(schedule.WorkDate.Date))
+            .ToList();
+
+        var copiedCount = 0;
+        var overwrittenDays = 0;
+        var skippedDays = 0;
+        foreach (var sourceDay in sourceDays)
+        {
+            var targetDate = sourceDay.Key.AddDays(7);
+            var existingForDay = targetShifts.Where(schedule => schedule.WorkDate.Date == targetDate).ToList();
+            if (existingForDay.Count > 0)
+            {
+                if (model.ConflictResolution == CopyConflictResolution.Skip)
+                {
+                    skippedDays++;
+                    continue;
+                }
+
+                db.WorkSchedules.RemoveRange(existingForDay);
+                overwrittenDays++;
+            }
+
+            foreach (var sourceShift in sourceDay)
+            {
+                db.WorkSchedules.Add(new WorkSchedule
+                {
+                    StylistId = model.StylistId,
+                    WorkDate = targetDate,
+                    StartTime = sourceShift.StartTime,
+                    EndTime = sourceShift.EndTime,
+                    Notes = sourceShift.Notes
+                });
+                copiedCount++;
+            }
+        }
+
+        await db.SaveChangesAsync();
+        TempData["Success"] = $"Đã sao chép {copiedCount} ca; ghi đè {overwrittenDays} ngày; bỏ qua {skippedDays} ngày.";
+        return RedirectToAction(nameof(Index), new { stylistId = model.StylistId, weekStart = sourceStart.AddDays(7) });
+    }
+
     private async Task<WorkSchedule?> FindConflictingShiftAsync(
         int stylistId, DateTime workDate, TimeSpan startTime, TimeSpan endTime, int? excludedScheduleId = null) =>
         await db.WorkSchedules.AsNoTracking()
