@@ -54,8 +54,17 @@
     else
     {
         <!-- Main Form & Content -->
-        <form id="booking-form" asp-action="SelectServices" asp-controller="Booking" method="post">
+        <form id="booking-form" asp-action="SelectServices" asp-controller="Booking" method="post" data-max-shift-duration="@Model.Totals.MaxShiftDurationMinutes">
             @Html.AntiForgeryToken()
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage) || !ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger alert-dismissible fade show mb-4 border-0 shadow-sm" role="alert">
+                    <i class="bi bi-exclamation-octagon-fill me-2 fs-5"></i>
+                    <span>@(Model.ErrorMessage ?? "Số lượng dịch vụ trong một lượt đặt không được vượt quá 5.")</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
 
             <div class="row g-4">
                 <!-- Left Column: Services list -->
@@ -162,12 +171,18 @@
                             <h3 class="h6 fw-bold mb-0 text-dark">
                                 <i class="bi bi-cart-check text-primary me-2"></i>Dịch vụ đã chọn
                             </h3>
-                            <span id="selected-count-badge" class="badge bg-primary rounded-pill px-2">
-                                @Model.Totals.SelectedServices.Count dịch vụ
+                            <span id="selected-count-badge" class="badge @(Model.Totals.SelectedServices.Count >= 5 ? "bg-danger" : "bg-primary") rounded-pill px-2">
+                                Đã chọn: @Model.Totals.SelectedServices.Count/5 dịch vụ
                             </span>
                         </div>
 
                         <div class="card-body p-3">
+                            <!-- Max 5 Services Warning Notice (AC1) -->
+                            <div id="max-services-alert" class="alert alert-danger py-2 px-3 small mb-3 border-0 d-flex align-items-center @(Model.Totals.SelectedServices.Count >= 5 ? "" : "d-none")" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill text-danger me-2 fs-6 flex-shrink-0"></i>
+                                <span>Bạn chỉ có thể chọn tối đa 5 dịch vụ trong một lượt đặt lịch</span>
+                            </div>
+
                             <!-- Selected Services Container -->
                             <div id="selected-services-container" class="mb-3" style="max-height: 280px; overflow-y: auto;">
                                 <!-- Empty state -->
@@ -218,6 +233,14 @@
                                 </div>
                             </div>
 
+                            <!-- Longest Shift Warning Alert (AC4) -->
+                            <div id="shift-warning-alert" class="alert alert-warning py-2 px-3 small mb-3 border-0 d-flex align-items-start @(Model.Totals.HasExceededShiftWarning ? "" : "d-none")" role="alert">
+                                <i class="bi bi-clock-history text-warning me-2 fs-6 flex-shrink-0 mt-1"></i>
+                                <div id="shift-warning-message">
+                                    @(Model.Totals.ShiftWarningMessage ?? $"Tổng thời gian các dịch vụ đã chọn ({Model.Totals.TotalDurationMinutes} phút) vượt quá độ dài ca làm việc dài nhất của tiệm ({Model.Totals.MaxShiftDurationMinutes} phút). Quý khách nên cân nhắc tách thành 2 lần hẹn để có trải nghiệm phục vụ tốt nhất.")
+                                </div>
+                            </div>
+
                             <!-- Temporary Price Notice -->
                             <div class="alert alert-warning py-2 px-3 small mb-3 border-0 d-flex align-items-start" role="note">
                                 <i class="bi bi-info-circle-fill text-warning me-2 fs-6 flex-shrink-0 mt-1"></i>
@@ -251,11 +274,16 @@
             const form = document.getElementById("booking-form");
             if (!form) return;
 
+            const MAX_SERVICES = 5;
+            const maxShiftDuration = parseInt(form.dataset.maxShiftDuration || "240", 10);
             const checkboxes = Array.from(document.querySelectorAll(".service-checkbox"));
             const cards = Array.from(document.querySelectorAll(".service-item-card"));
             const emptyState = document.getElementById("empty-state");
             const selectedList = document.getElementById("selected-services-list");
             const badgeCount = document.getElementById("selected-count-badge");
+            const maxAlert = document.getElementById("max-services-alert");
+            const shiftAlert = document.getElementById("shift-warning-alert");
+            const shiftAlertMessage = document.getElementById("shift-warning-message");
             const summaryDuration = document.getElementById("summary-total-duration");
             const summaryPrice = document.getElementById("summary-total-price");
             const btnSubmit = document.getElementById("btn-submit-booking");
@@ -283,6 +311,77 @@
                 } else {
                     card.classList.remove("border-primary", "bg-primary-subtle", "shadow-sm");
                     card.classList.add("border-light-subtle");
+                }
+            }
+
+            // Quản lý trạng thái giới hạn tối đa 5 dịch vụ (AC1)
+            function updateLimitState(count) {
+                const isMaxReached = count >= MAX_SERVICES;
+
+                // 1. Cập nhật nhãn và style bộ đếm
+                if (badgeCount) {
+                    badgeCount.textContent = `Đã chọn: ${count}/${MAX_SERVICES} dịch vụ`;
+                    if (isMaxReached) {
+                        badgeCount.classList.remove("bg-primary");
+                        badgeCount.classList.add("bg-danger");
+                    } else {
+                        badgeCount.classList.remove("bg-danger");
+                        badgeCount.classList.add("bg-primary");
+                    }
+                }
+
+                // 2. Hiển thị / ẩn cảnh báo giới hạn 5 dịch vụ
+                if (maxAlert) {
+                    if (isMaxReached) {
+                        maxAlert.classList.remove("d-none");
+                    } else {
+                        maxAlert.classList.add("d-none");
+                    }
+                }
+
+                // 3. Vô hiệu hóa hoặc kích hoạt lại các checkbox & thẻ dịch vụ chưa được chọn
+                checkboxes.forEach(cb => {
+                    const card = cb.closest(".service-item-card");
+                    if (!cb.checked) {
+                        cb.disabled = isMaxReached;
+                        if (card) {
+                            if (isMaxReached) {
+                                card.classList.add("opacity-50");
+                                card.style.cursor = "not-allowed";
+                                card.setAttribute("title", "Bạn chỉ có thể chọn tối đa 5 dịch vụ trong một lượt đặt lịch");
+                            } else {
+                                card.classList.remove("opacity-50");
+                                card.style.cursor = "pointer";
+                                card.removeAttribute("title");
+                            }
+                        }
+                    } else {
+                        cb.disabled = false;
+                        if (card) {
+                            card.classList.remove("opacity-50");
+                            card.style.cursor = "pointer";
+                            card.removeAttribute("title");
+                        }
+                    }
+                });
+            }
+
+            // Quản lý cảnh báo vượt ca dài nhất trong tuần (AC4)
+            function updateShiftWarning(totalMinutes, serverHasExceeded, serverMessage) {
+                if (!shiftAlert) return;
+
+                const isExceeded = (serverHasExceeded !== undefined && serverHasExceeded !== null)
+                    ? serverHasExceeded
+                    : (totalMinutes > maxShiftDuration);
+
+                if (isExceeded && totalMinutes > 0) {
+                    const msg = serverMessage || `Tổng thời gian các dịch vụ đã chọn (${totalMinutes} phút) vượt quá độ dài ca làm việc dài nhất của tiệm (${maxShiftDuration} phút). Quý khách nên cân nhắc tách thành 2 lần hẹn để có trải nghiệm phục vụ tốt nhất.`;
+                    if (shiftAlertMessage) {
+                        shiftAlertMessage.textContent = msg;
+                    }
+                    shiftAlert.classList.remove("d-none");
+                } else {
+                    shiftAlert.classList.add("d-none");
                 }
             }
 
@@ -339,17 +438,25 @@
                             serverData.totalPrice,
                             serverData.selectedServices,
                             serverData.formattedTotalDuration,
-                            serverData.formattedTotalPrice
+                            serverData.formattedTotalPrice,
+                            serverData.hasExceededShiftWarning,
+                            serverData.shiftWarningMessage
                         );
+                    } else if (response.status === 400) {
+                        const err = await response.json();
+                        console.warn("Server validation:", err.message);
                     }
                 } catch (err) {
                     console.warn("Lỗi đồng bộ giá server, dùng kết quả tính tạm thời client:", err);
                 }
             }
 
-            function renderSummary(count, totalMin, totalPrice, items, serverFormattedDuration, serverFormattedPrice) {
-                // Count badge
-                if (badgeCount) badgeCount.textContent = count + " dịch vụ";
+            function renderSummary(count, totalMin, totalPrice, items, serverFormattedDuration, serverFormattedPrice, serverHasExceededShift, serverShiftWarning) {
+                // Cập nhật bộ đếm và trạng thái giới hạn 5 dịch vụ
+                updateLimitState(count);
+
+                // Cập nhật cảnh báo thời lượng vượt ca dài nhất (AC4)
+                updateShiftWarning(totalMin, serverHasExceededShift, serverShiftWarning);
 
                 // Empty state toggle
                 if (count === 0) {
@@ -360,6 +467,7 @@
                     if (summaryDuration) summaryDuration.textContent = "0 phút";
                     if (summaryPrice) summaryPrice.textContent = "0 đ";
                     if (selectedList) selectedList.innerHTML = "";
+                    if (shiftAlert) shiftAlert.classList.add("d-none");
                     return;
                 }
 
@@ -411,6 +519,9 @@
                     }
                     const cb = card.querySelector(".service-checkbox");
                     if (cb) {
+                        if (cb.disabled) {
+                            return;
+                        }
                         cb.checked = !cb.checked;
                         syncCardState(card, cb.checked);
                         updateTotals();
@@ -421,6 +532,11 @@
             // Checkbox change event
             checkboxes.forEach(cb => {
                 cb.addEventListener("change", function () {
+                    const checkedCount = checkboxes.filter(c => c.checked).length;
+                    if (cb.checked && checkedCount > MAX_SERVICES) {
+                        cb.checked = false;
+                        return;
+                    }
                     const card = cb.closest(".service-item-card");
                     if (card) syncCardState(card, cb.checked);
                     updateTotals();
@@ -454,6 +570,16 @@
                     updateTotals();
                 });
             }
+
+            // Khởi tạo trạng thái giới hạn ban đầu (hỗ trợ trường hợp đã có sẵn dịch vụ được chọn)
+            const initialCount = checkboxes.filter(cb => cb.checked).length;
+            updateLimitState(initialCount);
+            const initialTotalDuration = @Model.Totals.TotalDurationMinutes;
+            updateShiftWarning(
+                initialTotalDuration,
+                @(Model.Totals.HasExceededShiftWarning ? "true" : "false"),
+                @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Totals.ShiftWarningMessage))
+            );
         });
     </script>
 }
