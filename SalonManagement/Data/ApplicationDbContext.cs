@@ -42,6 +42,8 @@ public ApplicationDbContext(
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
 
         public DbSet<ShopHoliday> ShopHolidays => Set<ShopHoliday>();
+        
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
 
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 public override int SaveChanges()
@@ -231,6 +233,24 @@ private class AuditEntry
                 entity.Property(holiday => holiday.Reason).HasMaxLength(250);
                 entity.HasIndex(holiday => holiday.HolidayDate).IsUnique();
             });
+            
+            builder.Entity<StylistTimeOff>(entity =>
+           {
+                entity.HasKey(timeOff => timeOff.StylistTimeOffId);
+                entity.Property(timeOff => timeOff.Reason)
+                    .HasMaxLength(250);
+                entity.HasOne(timeOff => timeOff.Stylist)
+                    .WithMany()
+                    .HasForeignKey(timeOff => timeOff.StylistId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(timeOff => new
+           {
+                timeOff.StylistId,
+                timeOff.OffDate
+          });
+        });
+
             builder.Entity<Customer>(entity =>
             {
                 entity.HasKey(customer => customer.CustomerId);
