@@ -47,12 +47,27 @@ public override int SaveChanges()
     return SaveChangesAsync().GetAwaiter().GetResult();
 }
 
+public override int SaveChanges(bool acceptAllChangesOnSuccess)
+{
+    if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
+    return SaveChanges();
+}
+
+public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+{
+    if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
+    return SaveChangesAsync(cancellationToken);
+}
+
 public override async Task<int> SaveChangesAsync(
     CancellationToken cancellationToken = default)
 {
+    ChangeTracker.DetectChanges();
+    if (ChangeTracker.Entries<AuditLog>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+        throw new InvalidOperationException("Nhật ký hệ thống chỉ đọc, không được sửa hoặc xoá.");
     var auditEntries = CreateAuditEntries();
 
-    var result = await base.SaveChangesAsync(cancellationToken);
+    var result = await base.SaveChangesAsync(true, cancellationToken);
 
     if (auditEntries.Count > 0)
     {
@@ -64,8 +79,10 @@ public override async Task<int> SaveChangesAsync(
             {
                 Timestamp = DateTime.UtcNow,
                 UserId = _httpContextAccessor.HttpContext?.User?
-                    .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
-                UserName = _httpContextAccessor.HttpContext?.User?.Identity?.Name,
+                    .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    ?? _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value,
+                UserName = _httpContextAccessor.HttpContext?.User?.FindFirst("email")?.Value
+                    ?? _httpContextAccessor.HttpContext?.User?.Identity?.Name,
                 Action = entry.Action,
                 EntityType = entry.EntityType,
                 EntityId = entry.EntityId,
@@ -73,7 +90,7 @@ public override async Task<int> SaveChangesAsync(
             });
         }
 
-        await base.SaveChangesAsync(cancellationToken);
+        await base.SaveChangesAsync(true, cancellationToken);
     }
 
     return result;
@@ -97,6 +114,7 @@ private List<AuditEntry> CreateAuditEntries()
         var entityType = entry.Entity.GetType().Name;
 
         if (entityType != nameof(ApplicationUser) &&
+            entry.Entity is not Microsoft.AspNetCore.Identity.IdentityUserRole<string> &&
             entityType != nameof(Service) &&
             entityType != nameof(WorkSchedule) &&
             entityType != nameof(Appointment) &&
@@ -111,6 +129,7 @@ private List<AuditEntry> CreateAuditEntries()
         {
             foreach (var property in entry.Properties)
             {
+                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
                 changes[property.Metadata.Name] = property.CurrentValue;
             }
         }
@@ -118,6 +137,7 @@ private List<AuditEntry> CreateAuditEntries()
         {
             foreach (var property in entry.Properties)
             {
+                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
                 if (property.IsModified)
                 {
                     changes[property.Metadata.Name] = new
@@ -132,6 +152,7 @@ private List<AuditEntry> CreateAuditEntries()
         {
             foreach (var property in entry.Properties)
             {
+                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
                 changes[property.Metadata.Name] = property.OriginalValue;
             }
         }
@@ -154,11 +175,15 @@ private List<AuditEntry> CreateAuditEntries()
     return entries;
 }
 
+private static bool IsSensitiveAuditProperty(string name) => name is
+    "PasswordHash" or "SecurityStamp" or "ConcurrencyStamp" or "EmailVerificationCodeHash";
+
 private static string? GetEntityId(object entity)
 {
     return entity switch
     {
         ApplicationUser user => user.Id,
+        Microsoft.AspNetCore.Identity.IdentityUserRole<string> role => role.UserId,
         Service service => service.ServiceId.ToString(),
         WorkSchedule schedule => schedule.WorkScheduleId.ToString(),
         Appointment appointment => appointment.AppointmentId.ToString(),

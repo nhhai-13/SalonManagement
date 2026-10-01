@@ -13,6 +13,80 @@ public sealed class EmailService(
     IConfiguration configuration,
     IWebHostEnvironment env) : IEmailService
 {
+    public async Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword)
+    {
+        var smtp = configuration.GetSection("SmtpSettings");
+        if (string.IsNullOrWhiteSpace(smtp["Server"]) || string.IsNullOrWhiteSpace(smtp["SenderEmail"]))
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi mật khẩu tạm.");
+        using var client = new SmtpClient(smtp["Server"], smtp.GetValue<int>("Port", 587))
+        {
+            EnableSsl = true,
+            Credentials = new NetworkCredential(smtp["Username"], smtp["Password"]),
+            Timeout = 15000
+        };
+        using var message = new MailMessage(smtp["SenderEmail"]!, toEmail)
+        {
+            Subject = "Tài khoản Salon Management của bạn",
+            Body = $"Tài khoản: {toEmail}\nMật khẩu tạm: {temporaryPassword}\nĐăng nhập tại trang đăng nhập nội bộ của salon. Bạn phải đổi mật khẩu ngay lần đăng nhập đầu tiên."
+        };
+        await client.SendMailAsync(message);
+    }
+
+    public async Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode)
+    {
+        var smtpSection = configuration.GetSection("SmtpSettings");
+        var server = smtpSection["Server"];
+        var senderEmail = smtpSection["SenderEmail"];
+        var senderName = smtpSection["SenderName"] ?? "Luminol Salon";
+        var username = smtpSection["Username"];
+        var password = smtpSection["Password"];
+        var port = int.TryParse(smtpSection["Port"], out var configuredPort) ? configuredPort : 587;
+        var hasSmtpConfig = !string.IsNullOrWhiteSpace(server)
+            && !string.IsNullOrWhiteSpace(senderEmail)
+            && !string.IsNullOrWhiteSpace(username)
+            && !string.IsNullOrWhiteSpace(password);
+
+        if (hasSmtpConfig)
+        {
+            try
+            {
+                using var client = new SmtpClient(server, port)
+                {
+                    EnableSsl = true,
+                    UseDefaultCredentials = false,
+                    Credentials = new NetworkCredential(username, password),
+                    DeliveryMethod = SmtpDeliveryMethod.Network,
+                    Timeout = 15000
+                };
+                using var message = new MailMessage
+                {
+                    From = new MailAddress(senderEmail!, senderName),
+                    Subject = $"{verificationCode} là mã xác minh email Luminol Salon",
+                    IsBodyHtml = true,
+                    Body = BuildEmailVerificationHtmlBody(toEmail, verificationCode)
+                };
+                message.To.Add(toEmail);
+                await client.SendMailAsync(message);
+                logger.LogInformation("Đã gửi mã xác minh email tới {Email}", toEmail);
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Không thể gửi mã xác minh email tới {Email}", toEmail);
+                if (!env.IsDevelopment() && !env.IsStaging()) throw;
+            }
+        }
+        else if (!env.IsDevelopment() && !env.IsStaging())
+        {
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi mã xác minh email.");
+        }
+
+        logger.LogWarning("[FALLBACK EMAIL] Mã xác minh cho {Email}: {Code}", toEmail, verificationCode);
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"[FALLBACK EMAIL] Mã xác minh cho {toEmail}: {verificationCode}");
+        Console.ResetColor();
+    }
+
     public async Task SendPasswordResetEmailAsync(string toEmail, string resetLink)
     {
         var smtpSection = configuration.GetSection("SmtpSettings");
@@ -169,4 +243,23 @@ public sealed class EmailService(
 </html>
 """;
     }
+
+    private static string BuildEmailVerificationHtmlBody(string recipientEmail, string verificationCode) => $"""
+<!DOCTYPE html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Xác minh email</title></head>
+<body style="margin:0;padding:40px 15px;background:#f8f5f0;font-family:Arial,sans-serif;color:#2d2521">
+  <div style="max-width:560px;margin:auto;background:#fffdf9;border:1px solid #ded7cf;border-radius:12px;overflow:hidden">
+    <div style="padding:28px;background:#704a37;color:#fff;text-align:center"><h1 style="margin:0;font-size:24px">Luminol Salon</h1></div>
+    <div style="padding:32px;text-align:center">
+      <h2 style="margin-top:0">Xác minh địa chỉ email</h2>
+      <p>Mã xác minh dành cho <strong>{WebUtility.HtmlEncode(recipientEmail)}</strong> là:</p>
+      <div style="margin:24px 0;font-size:34px;font-weight:700;letter-spacing:10px;color:#704a37">{verificationCode}</div>
+      <p style="color:#756b65">Mã có hiệu lực trong 10 phút. Không chia sẻ mã này với bất kỳ ai.</p>
+      <p style="color:#756b65">Nếu bạn không đăng ký tài khoản, hãy bỏ qua email này.</p>
+    </div>
+  </div>
+</body>
+</html>
+""";
 }

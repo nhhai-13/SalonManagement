@@ -73,6 +73,8 @@ html { scroll-behavior: smooth; }
 .home-brand small { display: block; margin-top: 4px; font-size: 8px; letter-spacing: .24em; text-transform: uppercase; }
 .home-nav { display: flex; align-items: center; gap: clamp(20px, 2.4vw, 36px); }
 .home-nav a, .nav-login { position: relative; color: #544a44; font-size: 13px; font-weight: 600; text-decoration: none; }
+.nav-logout { padding: 0; border: 0; background: transparent; cursor: pointer; }
+.nav-logout:hover { color: #704a37; }
 .home-nav a::after { position: absolute; right: 0; bottom: -9px; left: 0; height: 1px; content: ""; transform: scaleX(0); background: #a97845; transition: transform .2s; }
 .home-nav a:hover::after, .home-nav a.active::after { transform: scaleX(1); }
 .home-nav a.active { color: #704a37; }

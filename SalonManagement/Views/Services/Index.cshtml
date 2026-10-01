@@ -12,7 +12,7 @@
         <h1>Quản lý dịch vụ</h1>
         @if (User.IsInRole(UserRoles.Owner))
         {
-            <a asp-action="Create" class="btn btn-primary">
+            <a asp-controller="ServiceGroups" asp-action="Index" class="btn btn-outline-primary">Quản lý nhóm</a><a asp-action="Create" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> + Thêm dịch vụ
             </a>
         }
@@ -61,10 +61,10 @@
                         @foreach (var item in Model)
                         {
                             <tr>
-                                <td><strong>@item.ServiceName</strong></td>
+                                <td><strong>@item.ServiceName</strong>@if (!item.Stylists.Any(s => s.Stylist.IsActive)) { <small class="d-block text-warning">Chưa có thợ đang làm việc đảm nhận</small> }</td>
                                 <td>@(item.ServiceGroup?.GroupName ?? "—")</td>
                                 <td>@item.DurationMinutes phút</td>
-                                <td>@item.Price.ToString("N0") đ</td>
+                                <td>@item.Price.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) đ</td>
                                 <td>
                                     @if (item.IsActive)
                                     {
@@ -107,3 +107,6 @@
         </div>
     </div>
 </div>
+
+
+

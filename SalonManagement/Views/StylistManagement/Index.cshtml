@@ -41,14 +41,21 @@
                         <td>@stylist.Phone</td>
                         <td>@string.Join(", ", stylist.Services.Select(item => item.Service.ServiceName))</td>
                         <td><span class="badge @(stylist.IsActive ? "bg-success" : "bg-secondary")">@(stylist.IsActive ? "Đang làm việc" : "Nghỉ việc")</span></td>
-                        <td>
+                        <td><div class="d-flex flex-wrap gap-2">
+                            <a asp-action="Edit" asp-route-id="@stylist.StylistId" class="btn btn-sm btn-outline-primary">Sửa hồ sơ</a>
                             @if (stylist.IsActive)
                             {
                                 <form asp-action="Resign" asp-route-id="@stylist.StylistId" method="post" onsubmit="return confirm('Bạn có chắc muốn chuyển thợ này sang trạng thái nghỉ việc?');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Cho nghỉ việc</button>
                                 </form>
                             }
-                        </td>
+                            else
+                            {
+                                <form asp-action="Reinstate" asp-route-id="@stylist.StylistId" method="post" onsubmit="return confirm('Bạn có chắc muốn cho thợ này làm việc trở lại?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Cho làm việc lại</button>
+                                </form>
+                            }
+                        </div></td>
                     </tr>
                 }
             }

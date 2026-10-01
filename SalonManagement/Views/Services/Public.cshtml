@@ -1,0 +1,29 @@
+@model IEnumerable<Service>
+@{ ViewData["Title"] = "Dịch vụ"; }
+<div class="container my-4">
+    <h1>Dịch vụ của salon</h1>
+    <nav aria-label="Nhóm dịch vụ" class="d-flex flex-wrap gap-2 mb-4">
+    @foreach (var group in Model.GroupBy(s => s.ServiceGroupId))
+    {
+        <a class="btn btn-outline-primary" href="#group-@(group.Key ?? 0)">@(group.First().ServiceGroup?.GroupName ?? "Chưa phân nhóm")</a>
+    }
+    </nav>
+    @foreach (var group in Model.GroupBy(s => s.ServiceGroupId))
+    {
+        <section id="group-@(group.Key ?? 0)" class="mb-4">
+            <h2>@(group.First().ServiceGroup?.GroupName ?? "Chưa phân nhóm")</h2>
+            <div class="row g-3">
+            @foreach (var service in group)
+            {
+                <div class="col-md-6 col-lg-4"><article class="card h-100"><div class="card-body">
+                    <h3 class="h5">@service.ServiceName</h3><p>@service.Description</p>
+                    <p>@service.DurationMinutes phút · @service.Price.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) đ</p>
+                    <a href="/#booking" class="btn btn-primary">Đặt lịch</a>
+                </div></article></div>
+            }
+            </div>
+        </section>
+    }
+    @if (!Model.Any()) { <p>Chưa có dịch vụ đang bán.</p> }
+</div>
+
