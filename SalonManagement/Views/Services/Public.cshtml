@@ -1,0 +1,58 @@
+@model SalonManagement.Models.ViewModels.PublicServiceCatalog
+@{ ViewData["Title"] = "Dịch vụ"; Layout = "_CatalogLayout"; }
+<div class="container my-4">
+    <h1>Dịch vụ của salon</h1>
+    <form method="get" asp-controller="Services" asp-action="Public" role="search" class="mb-4">
+        <label for="service-search" class="form-label">Tìm theo tên dịch vụ</label>
+        <div class="d-flex flex-wrap gap-2">
+            <input type="search" id="service-search" name="search" value="@Model.Search"
+                   class="form-control" placeholder="Ví dụ: cat toc, goi" />
+            <button type="submit" class="btn btn-primary">Tìm kiếm</button>
+            @if (!string.IsNullOrEmpty(Model.Search))
+            {
+                <a asp-controller="Services" asp-action="Public" class="btn btn-outline-secondary">Xóa từ khóa</a>
+            }
+        </div>
+    </form>
+    @if (!Model.HasServices)
+    {
+        <p role="status">@(string.IsNullOrEmpty(Model.Search)
+            ? "Chưa có dịch vụ nào để hiển thị."
+            : "Không tìm thấy dịch vụ phù hợp.")</p>
+    }
+    @if (Model.Groups.Count > 0)
+    {
+        <nav aria-label="Nhóm dịch vụ" class="d-flex flex-wrap gap-2 mb-4">
+        @foreach (var group in Model.Groups)
+        {
+            <a class="btn btn-outline-primary" href="#group-@(group.Id?.ToString() ?? "ungrouped")">@group.Name</a>
+        }
+        </nav>
+    }
+    @foreach (var group in Model.Groups)
+    {
+        var key = group.Id?.ToString() ?? "ungrouped";
+        <section id="group-@key" aria-labelledby="heading-@key" class="mb-4">
+            <h2 id="heading-@key">@group.Name</h2>
+            @if (group.Services.Count == 0)
+            {
+                <p class="text-muted">Nhóm này chưa có dịch vụ.</p>
+            }
+            <div class="row g-3">
+            @foreach (var service in group.Services)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <article class="card h-100">
+                        <div class="card-body">
+                            <h3 class="h5">@service.ServiceName</h3>
+                            @if (!string.IsNullOrWhiteSpace(service.Description)) { <p>@service.Description</p> }
+                            <p>Thời lượng: @service.DurationMinutes phút</p>
+                            <p>Giá: @service.Price.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) VND</p>
+                        </div>
+                    </article>
+                </div>
+            }
+            </div>
+        </section>
+    }
+</div>
