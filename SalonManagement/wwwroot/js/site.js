@@ -31,4 +31,34 @@
     const backToTop = document.getElementById("back-to-top");
     window.addEventListener("scroll", () => backToTop?.classList.toggle("show", window.scrollY > 500), { passive: true });
     backToTop?.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+
+    const logoutButton = document.getElementById("home-logout");
+    logoutButton?.addEventListener("click", async () => {
+        logoutButton.disabled = true;
+        logoutButton.textContent = "Đang đăng xuất...";
+
+        const refreshKey = "salon.refreshToken";
+        const refreshToken = localStorage.getItem(refreshKey)
+            || sessionStorage.getItem(refreshKey)
+            || "no-refresh-token";
+
+        try {
+            await fetch("/api/auth/logout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ refreshToken })
+            });
+        } finally {
+            [localStorage, sessionStorage].forEach(storage => {
+                [
+                    "salon.accessToken",
+                    "salon.refreshToken",
+                    "salon.accessExpiresAt",
+                    "salon.refreshExpiresAt",
+                    "salon.portal"
+                ].forEach(key => storage.removeItem(key));
+            });
+            location.replace("/admin/login");
+        }
+    });
 })();

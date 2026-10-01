@@ -68,11 +68,12 @@ body.auth-page {
 
 .login-alert { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px; padding: 12px 14px; border: 1px solid #e8bebe; border-radius: 8px; color: var(--error); background: #fff4f2; font-size: 13px; }
 .login-alert svg { flex: 0 0 18px; width: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 1.7; }
+.login-alert-success { border-color: #b8d9c4; color: #28643d; background: #f1faf4; }
 .field-group { margin-bottom: 22px; }
 .field-group label, .label-row label { margin-bottom: 8px; font-size: 13px; font-weight: 600; }
 .label-row { display: flex; align-items: center; justify-content: space-between; }
-.label-row a, .support-note a { color: var(--brown); font-size: 12px; font-weight: 600; text-decoration: none; }
-.label-row a:hover, .support-note a:hover { text-decoration: underline; }
+.label-row a, .support-note a, .register-note a { color: var(--brown); font-size: 12px; font-weight: 600; text-decoration: none; }
+.label-row a:hover, .support-note a:hover, .register-note a:hover { text-decoration: underline; }
 .input-wrap { position: relative; }
 .input-wrap > svg { position: absolute; top: 50%; left: 15px; width: 19px; transform: translateY(-50%); fill: none; stroke: #91847c; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
 .input-wrap input { width: 100%; height: 52px; padding: 0 47px; border: 1px solid var(--line); border-radius: 8px; outline: 0; color: var(--ink); background: #fff; font: inherit; font-size: 14px; transition: border-color .2s, box-shadow .2s; }
@@ -97,7 +98,13 @@ body.auth-page {
 .login-button.loading .button-spinner { display: block; }
 .login-button.loading svg { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.support-note { margin: 30px 0 0; color: var(--muted); text-align: center; font-size: 12px; }
+.auth-help { margin-top: 30px; text-align: center; }
+.register-note, .support-note { margin: 0; color: var(--muted); font-size: 12px; }
+.support-note { margin-top: 10px; }
+.verification-code-wrap input { padding: 0 18px; text-align: center; font-size: 24px; font-weight: 700; letter-spacing: .45em; }
+.auth-link-button { padding: 0; border: 0; color: var(--brown); background: transparent; font: inherit; font-weight: 600; cursor: pointer; }
+.auth-link-button:hover { text-decoration: underline; }
+.auth-link-button:disabled { cursor: wait; opacity: .6; }
 .copyright { position: absolute; bottom: 24px; margin: 0; color: #a0968f; font-size: 10px; letter-spacing: .04em; }
 
 @media (max-width: 850px) {

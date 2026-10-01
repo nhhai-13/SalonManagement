@@ -45,7 +45,7 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 {
-    options.SignIn.RequireConfirmedAccount = false;
+    options.SignIn.RequireConfirmedAccount = true;
 
     options.Password.RequiredLength = 8;
     options.Password.RequireDigit = true;
@@ -76,7 +76,7 @@ builder.Services.Configure<DataProtectionTokenProviderOptions>(
 // DATA PROTECTION
 // =====================================
 
-if (builder.Environment.IsDevelopment())
+if (builder.Environment.IsDevelopment() || builder.Environment.IsStaging())
 {
     builder.Services.AddDataProtection()
         .PersistKeysToFileSystem(
@@ -85,7 +85,7 @@ if (builder.Environment.IsDevelopment())
                     builder.Environment.ContentRootPath,
                     ".keys")))
         .SetApplicationName(
-            "SalonManagement.Development");
+            $"SalonManagement.{builder.Environment.EnvironmentName}");
 }
 
 // =====================================
@@ -132,6 +132,7 @@ builder.Services.AddAuthentication(options =>
         OnMessageReceived = context =>
         {
             if (string.IsNullOrWhiteSpace(context.Token) &&
+                !context.Request.Headers.ContainsKey("Authorization") &&
                 context.Request.Cookies.TryGetValue("salon.accessToken", out var cookieToken))
             {
                 context.Token = cookieToken;
@@ -141,45 +142,9 @@ builder.Services.AddAuthentication(options =>
         },
         OnTokenValidated = async context =>
         {
-            var userId =
-                context.Principal?.FindFirstValue(
-                    JwtRegisteredClaimNames.Sub);
-
-            var userManager =
-                context.HttpContext.RequestServices
-                    .GetRequiredService<
-                        UserManager<ApplicationUser>>();
-
-            var user = userId is null
-                ? null
-                : await userManager.FindByIdAsync(userId);
-
-            if (user is null || !user.IsActive)
-            {
-                context.Fail("Account is inactive.");
-                return;
-            }
-
-            var tokenSecurityStamp = context.Principal?.FindFirst("security_stamp")?.Value;
-            if (string.IsNullOrWhiteSpace(tokenSecurityStamp) ||
-                !string.Equals(tokenSecurityStamp, user.SecurityStamp, StringComparison.Ordinal))
-            {
-                context.Fail("Session has been revoked.");
-                return;
-            }
-
-            // Roles must take effect on the very next request. Reject an old JWT
-            // when its role claims no longer match the roles stored in Identity.
-            var currentRoles = await userManager.GetRolesAsync(user);
-            var tokenRoles = context.Principal?.FindAll(ClaimTypes.Role)
-                .Select(claim => claim.Value)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase)
-                ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            if (!tokenRoles.SetEquals(currentRoles))
-            {
-                context.Fail("User roles changed. Please sign in again.");
-            }
+            var validator = context.HttpContext.RequestServices.GetRequiredService<SessionPrincipalValidator>();
+            if (context.Principal == null || !await validator.ValidateAsync(context.Principal))
+                context.Fail("Session has been revoked or account is inactive.");
         },
         OnChallenge = async context =>
         {
@@ -227,7 +192,8 @@ builder.Services.AddSingleton<
     IPasswordResetRateLimiter,
     PasswordResetRateLimiter>();
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddScoped<SessionPrincipalValidator>();
+builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
 
 // =====================================
 // BUILD APPLICATION
@@ -359,3 +325,4 @@ using (var scope = app.Services.CreateScope())
 // =====================================
 
 app.Run();
+

@@ -84,6 +84,67 @@ public sealed class StylistManagementControllerTests
         Assert.NotNull(stylist.UpdatedAt);
     }
 
+    [Fact]
+    public async Task Reinstate_InactiveStylist_MarksProfileActive()
+    {
+        await using var db = CreateDb();
+        var stylist = new Stylist
+        {
+            FullName = "Đỗ Quốc Huy",
+            Phone = "0901000005",
+            IsActive = false
+        };
+        db.Stylists.Add(stylist);
+        await db.SaveChangesAsync();
+        var controller = CreateController(db, Path.GetTempPath());
+
+        var result = await controller.Reinstate(stylist.StylistId);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.True(stylist.IsActive);
+        Assert.NotNull(stylist.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task Edit_ValidProfile_UpdatesDetailsAndKeepsExistingImage()
+    {
+        await using var db = CreateDb();
+        var oldService = new Service { ServiceName = "Cắt tóc", Price = 100_000, DurationMinutes = 30 };
+        var newService = new Service { ServiceName = "Tạo kiểu", Price = 200_000, DurationMinutes = 60 };
+        db.Services.AddRange(oldService, newService);
+        await db.SaveChangesAsync();
+        var stylist = new Stylist
+        {
+            FullName = "Tên cũ",
+            Phone = "0901000001",
+            ProfileImagePath = "uploads/stylists/existing.png",
+            Services = [new StylistService { ServiceId = oldService.ServiceId }]
+        };
+        db.Stylists.Add(stylist);
+        await db.SaveChangesAsync();
+        var controller = CreateController(db, Path.GetTempPath());
+        var model = new EditStylistViewModel
+        {
+            StylistId = stylist.StylistId,
+            FullName = "Tên mới",
+            Phone = "0901000099",
+            Description = "Chuyên gia tạo kiểu",
+            ServiceIds = [newService.ServiceId]
+        };
+
+        var result = await controller.Edit(stylist.StylistId, model);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var updated = await db.Stylists.Include(item => item.Services)
+            .SingleAsync(item => item.StylistId == stylist.StylistId);
+        Assert.Equal("Tên mới", updated.FullName);
+        Assert.Equal("0901000099", updated.Phone);
+        Assert.Equal("Chuyên gia tạo kiểu", updated.Description);
+        Assert.Equal("uploads/stylists/existing.png", updated.ProfileImagePath);
+        Assert.Equal(newService.ServiceId, Assert.Single(updated.Services).ServiceId);
+        Assert.NotNull(updated.UpdatedAt);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
