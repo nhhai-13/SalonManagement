@@ -39,6 +39,60 @@ public sealed class WorkSchedulesControllerTests
     }
 
     [Theory]
+    [InlineData(9, 11)]  // Nằm hoàn toàn trong ca đã có.
+    [InlineData(7, 13)]  // Bao phủ ca đã có.
+    [InlineData(7, 9)]   // Chồng phần đầu ca đã có.
+    [InlineData(11, 13)] // Chồng phần cuối ca đã có.
+    public async Task Create_OverlappingShift_IsRejectedAndNamesConflictingShift(int startHour, int endHour)
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Hoàng Dung"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) });
+        await db.SaveChangesAsync();
+
+        await controller.Create(new CreateWorkScheduleViewModel { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(startHour), EndTime = TimeSpan.FromHours(endHour) });
+
+        Assert.Single(await db.WorkSchedules.ToListAsync());
+        Assert.Contains(controller.ModelState.Values.SelectMany(value => value.Errors), error => error.ErrorMessage.Contains("08:00–12:00"));
+    }
+
+    [Fact]
+    public async Task Create_AdjacentShifts_AreAllowed()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Phạm Giang"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);
+        await controller.Create(new CreateWorkScheduleViewModel { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) });
+        await controller.Create(new CreateWorkScheduleViewModel { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(12), EndTime = TimeSpan.FromHours(16) });
+        Assert.Equal(2, await db.WorkSchedules.CountAsync());
+    }
+
+    [Fact]
+    public async Task Edit_OverlappingShift_IsRejectedAndKeepsExistingData()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Vũ Hân"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);
+        var first = new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12), Notes = "Ca sáng" };
+        var second = new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(13), EndTime = TimeSpan.FromHours(17), Notes = "Ca chiều" };
+        db.WorkSchedules.AddRange(first, second); await db.SaveChangesAsync();
+
+        await controller.Edit(second.WorkScheduleId, new EditWorkScheduleViewModel { WorkScheduleId = second.WorkScheduleId, StartTime = TimeSpan.FromHours(11), EndTime = TimeSpan.FromHours(15), Notes = "Ghi chú mới" });
+
+        var unchanged = await db.WorkSchedules.SingleAsync(schedule => schedule.WorkScheduleId == second.WorkScheduleId);
+        Assert.Equal(TimeSpan.FromHours(13), unchanged.StartTime); Assert.Equal(TimeSpan.FromHours(17), unchanged.EndTime); Assert.Equal("Ca chiều", unchanged.Notes);
+        Assert.Contains(controller.ModelState.Values.SelectMany(value => value.Errors), error => error.ErrorMessage.Contains("08:00–12:00"));
+    }
+
+    [Fact]
+    public async Task Edit_NonOverlappingShift_UpdatesTimesAndBreakNote()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Ngô Lan"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);
+        var schedule = new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12), Notes = "Cũ" };
+        db.WorkSchedules.Add(schedule); await db.SaveChangesAsync();
+
+        await controller.Edit(schedule.WorkScheduleId, new EditWorkScheduleViewModel { WorkScheduleId = schedule.WorkScheduleId, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(13), Notes = "Nghỉ 11:00 - 11:15" });
+
+        var updated = await db.WorkSchedules.SingleAsync();
+        Assert.Equal(TimeSpan.FromHours(9), updated.StartTime); Assert.Equal(TimeSpan.FromHours(13), updated.EndTime); Assert.Equal("Nghỉ 11:00 - 11:15", updated.Notes);
+    }
+
+    [Theory]
     [InlineData(9, 9)]
     [InlineData(10, 9)]
     public async Task Create_StartTimeEqualOrAfterEndTime_DoesNotPersist(int startHour, int endHour)

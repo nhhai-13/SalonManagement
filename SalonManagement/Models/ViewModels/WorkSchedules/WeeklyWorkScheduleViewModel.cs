@@ -38,3 +38,27 @@ public sealed class CreateWorkScheduleViewModel : IValidatableObject
                 [nameof(StartTime), nameof(EndTime)]);
     }
 }
+
+public sealed class EditWorkScheduleViewModel : IValidatableObject
+{
+    [Range(1, int.MaxValue)]
+    public int WorkScheduleId { get; set; }
+
+    [DataType(DataType.Time)]
+    public TimeSpan StartTime { get; set; }
+
+    [DataType(DataType.Time)]
+    public TimeSpan EndTime { get; set; }
+
+    [Display(Name = "Ghi chú nghỉ giữa ca")]
+    [StringLength(500, ErrorMessage = "Ghi chú nghỉ giữa ca không được vượt quá 500 ký tự.")]
+    public string? Notes { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (StartTime >= EndTime)
+            yield return new ValidationResult(
+                "Giờ bắt đầu phải sớm hơn giờ kết thúc.",
+                [nameof(StartTime), nameof(EndTime)]);
+    }
+}
