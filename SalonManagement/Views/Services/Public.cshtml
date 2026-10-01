@@ -1,5 +1,5 @@
 @model SalonManagement.Models.ViewModels.PublicServiceCatalog
-@{ ViewData["Title"] = "Dịch vụ"; }
+@{ ViewData["Title"] = "Dịch vụ"; Layout = "_CatalogLayout"; }
 <div class="container my-4">
     <h1>Dịch vụ của salon</h1>
     <form method="get" asp-controller="Services" asp-action="Public" role="search" class="mb-4">
