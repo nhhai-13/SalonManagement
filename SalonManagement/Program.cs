@@ -175,6 +175,7 @@ builder.Services.AddAuthentication(options =>
 // =====================================
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<StylistAvailabilityService>();
 
 builder.Services.AddScoped<
     ITokenService,
@@ -320,6 +321,11 @@ using (var scope = app.Services.CreateScope())
     await SeedData.SeedAsync(
         dbContext,
         userManager);
+    if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
+    {
+        var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;
+        await StylistBookingDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
+    }
 }
 
 // =====================================
