@@ -237,4 +237,166 @@ public class BookingServiceTests
         Assert.Equal("350.000 đ", totals.FormattedTotalPrice);
         Assert.Equal(2, totals.SelectedServices.Count);
     }
+
+    [Fact]
+    public void CalculateTotals_WithExactly5Services_CalculatesSuccessfully()
+    {
+        // Arrange
+        var services = new List<Service>
+        {
+            new Service { ServiceId = 1, ServiceName = "DV 1", DurationMinutes = 30, Price = 100000m },
+            new Service { ServiceId = 2, ServiceName = "DV 2", DurationMinutes = 45, Price = 150000m },
+            new Service { ServiceId = 3, ServiceName = "DV 3", DurationMinutes = 20, Price = 80000m },
+            new Service { ServiceId = 4, ServiceName = "DV 4", DurationMinutes = 60, Price = 200000m },
+            new Service { ServiceId = 5, ServiceName = "DV 5", DurationMinutes = 15, Price = 70000m },
+        };
+
+        // Act
+        var result = _bookingService.CalculateTotals(services);
+
+        // Assert: 170 phút = 2 giờ 50 phút, tổng tiền 600.000 đ
+        Assert.NotNull(result);
+        Assert.Equal(5, result.SelectedServices.Count);
+        Assert.Equal(170, result.TotalDurationMinutes);
+        Assert.Equal(600000m, result.TotalPrice);
+    }
+
+    [Fact]
+    public void CalculateTotals_WithMoreThan5Services_ThrowsArgumentException()
+    {
+        // Arrange: 6 dịch vụ
+        var services = Enumerable.Range(1, 6).Select(i => new Service
+        {
+            ServiceId = i,
+            ServiceName = $"DV {i}",
+            DurationMinutes = 30,
+            Price = 100000m
+        }).ToList();
+
+        // Act & Assert
+        var ex = Assert.Throws<ArgumentException>(() => _bookingService.CalculateTotals(services));
+        Assert.Contains("5", ex.Message);
+    }
+
+    [Fact]
+    public void CalculateTotals_From5ServicesReducedTo4_CalculatesSuccessfully()
+    {
+        // Arrange
+        var services = Enumerable.Range(1, 5).Select(i => new Service
+        {
+            ServiceId = i,
+            ServiceName = $"DV {i}",
+            DurationMinutes = 30,
+            Price = 100000m
+        }).ToList();
+
+        // Ban đầu tính 5 dịch vụ
+        var result5 = _bookingService.CalculateTotals(services);
+        Assert.Equal(5, result5.SelectedServices.Count);
+
+        // Act: Bỏ bớt 1 dịch vụ còn 4
+        services.RemoveAt(services.Count - 1);
+        var result4 = _bookingService.CalculateTotals(services);
+
+        // Assert: Hợp lệ trở lại
+        Assert.Equal(4, result4.SelectedServices.Count);
+        Assert.Equal(120, result4.TotalDurationMinutes);
+        Assert.Equal(400000m, result4.TotalPrice);
+    }
+
+    [Fact]
+    public async Task CalculateTotalsAsync_WithMoreThan5Services_ThrowsArgumentException()
+    {
+        // Arrange
+        var serviceIds = new List<int> { 1, 2, 3, 4, 5, 6 };
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => _bookingService.CalculateTotalsAsync(serviceIds));
+        Assert.Contains("5", ex.Message);
+    }
+
+    [Fact]
+    public async Task BookingController_CalculateTotals_WithMoreThan5Services_ReturnsBadRequest()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, new HttpContextAccessor());
+        var bookingService = new BookingService(context);
+        var controller = new BookingController(bookingService);
+
+        // Act: Gửi 6 service IDs
+        var result = await controller.CalculateTotals(new CalculateBookingTotalsRequest
+        {
+            ServiceIds = new List<int> { 1, 2, 3, 4, 5, 6 }
+        });
+
+        // Assert: Trả về BadRequest kèm thông báo lỗi
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.NotNull(badRequestResult.Value);
+    }
+
+    [Fact]
+    public async Task BookingController_CalculateTotals_With5Services_ReturnsOk()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, new HttpContextAccessor());
+        for (int i = 1; i <= 5; i++)
+        {
+            context.Services.Add(new Service
+            {
+                ServiceId = i,
+                ServiceName = $"DV {i}",
+                DurationMinutes = 20,
+                Price = 50000m,
+                IsActive = true
+            });
+        }
+        await context.SaveChangesAsync();
+
+        var bookingService = new BookingService(context);
+        var controller = new BookingController(bookingService);
+
+        // Act: Gửi đúng 5 service IDs
+        var result = await controller.CalculateTotals(new CalculateBookingTotalsRequest
+        {
+            ServiceIds = new List<int> { 1, 2, 3, 4, 5 }
+        });
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var totals = Assert.IsType<BookingTotalsDto>(okResult.Value);
+        Assert.Equal(5, totals.SelectedServices.Count);
+        Assert.Equal(100, totals.TotalDurationMinutes);
+        Assert.Equal(250000m, totals.TotalPrice);
+    }
+
+    [Fact]
+    public async Task BookingController_SelectServices_WithMoreThan5Services_ReturnsViewWithErrorMessage()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, new HttpContextAccessor());
+        var bookingService = new BookingService(context);
+        var controller = new BookingController(bookingService);
+
+        // Act: Submit form với 6 service IDs
+        var result = await controller.SelectServices(new List<int> { 1, 2, 3, 4, 5, 6 });
+
+        // Assert: Trả về View với ErrorMessage và ModelState có lỗi
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsAssignableFrom<BookingSelectServicesViewModel>(viewResult.Model);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.NotNull(model.ErrorMessage);
+        Assert.Contains("5", model.ErrorMessage);
+    }
 }
