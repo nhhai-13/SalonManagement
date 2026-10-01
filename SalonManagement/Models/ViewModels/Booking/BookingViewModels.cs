@@ -18,6 +18,11 @@ public class BookingTotalsDto
     public string FormattedTotalPrice { get; set; } = "0 đ";
     public string PriceNote { get; set; } = "Giá trên là giá tạm tính, giá cuối do tiệm chốt khi thanh toán";
     public List<SelectedServiceSummaryItem> SelectedServices { get; set; } = new();
+
+    // AC4: Cảnh báo thời lượng vượt ca dài nhất trong tuần
+    public int MaxShiftDurationMinutes { get; set; } = 240;
+    public bool HasExceededShiftWarning { get; set; }
+    public string? ShiftWarningMessage { get; set; }
 }
 
 public class CalculateBookingTotalsRequest
@@ -54,5 +59,6 @@ public class BookingSelectServicesViewModel
     public List<BookingServiceGroupViewModel> Groups { get; set; } = new();
     public List<int> SelectedServiceIds { get; set; } = new();
     public BookingTotalsDto Totals { get; set; } = new();
+    public int MaxShiftDurationMinutes { get; set; } = 240;
     public bool HasServices => Groups.Any(g => g.Services.Any());
 }

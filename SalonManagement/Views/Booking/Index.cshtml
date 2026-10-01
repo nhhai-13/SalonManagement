@@ -54,7 +54,7 @@
     else
     {
         <!-- Main Form & Content -->
-        <form id="booking-form" asp-action="SelectServices" asp-controller="Booking" method="post">
+        <form id="booking-form" asp-action="SelectServices" asp-controller="Booking" method="post" data-max-shift-duration="@Model.Totals.MaxShiftDurationMinutes">
             @Html.AntiForgeryToken()
 
             @if (!string.IsNullOrEmpty(Model.ErrorMessage) || !ViewData.ModelState.IsValid)
@@ -233,6 +233,14 @@
                                 </div>
                             </div>
 
+                            <!-- Longest Shift Warning Alert (AC4) -->
+                            <div id="shift-warning-alert" class="alert alert-warning py-2 px-3 small mb-3 border-0 d-flex align-items-start @(Model.Totals.HasExceededShiftWarning ? "" : "d-none")" role="alert">
+                                <i class="bi bi-clock-history text-warning me-2 fs-6 flex-shrink-0 mt-1"></i>
+                                <div id="shift-warning-message">
+                                    @(Model.Totals.ShiftWarningMessage ?? $"Tổng thời gian các dịch vụ đã chọn ({Model.Totals.TotalDurationMinutes} phút) vượt quá độ dài ca làm việc dài nhất của tiệm ({Model.Totals.MaxShiftDurationMinutes} phút). Quý khách nên cân nhắc tách thành 2 lần hẹn để có trải nghiệm phục vụ tốt nhất.")
+                                </div>
+                            </div>
+
                             <!-- Temporary Price Notice -->
                             <div class="alert alert-warning py-2 px-3 small mb-3 border-0 d-flex align-items-start" role="note">
                                 <i class="bi bi-info-circle-fill text-warning me-2 fs-6 flex-shrink-0 mt-1"></i>
@@ -265,12 +273,15 @@
             if (!form) return;
 
             const MAX_SERVICES = 5;
+            const maxShiftDuration = parseInt(form.dataset.maxShiftDuration || "240", 10);
             const checkboxes = Array.from(document.querySelectorAll(".service-checkbox"));
             const cards = Array.from(document.querySelectorAll(".service-item-card"));
             const emptyState = document.getElementById("empty-state");
             const selectedList = document.getElementById("selected-services-list");
             const badgeCount = document.getElementById("selected-count-badge");
             const maxAlert = document.getElementById("max-services-alert");
+            const shiftAlert = document.getElementById("shift-warning-alert");
+            const shiftAlertMessage = document.getElementById("shift-warning-message");
             const summaryDuration = document.getElementById("summary-total-duration");
             const summaryPrice = document.getElementById("summary-total-price");
             const btnSubmit = document.getElementById("btn-submit-booking");
@@ -353,6 +364,25 @@
                 });
             }
 
+            // Quản lý cảnh báo vượt ca dài nhất trong tuần (AC4)
+            function updateShiftWarning(totalMinutes, serverHasExceeded, serverMessage) {
+                if (!shiftAlert) return;
+
+                const isExceeded = (serverHasExceeded !== undefined && serverHasExceeded !== null)
+                    ? serverHasExceeded
+                    : (totalMinutes > maxShiftDuration);
+
+                if (isExceeded && totalMinutes > 0) {
+                    const msg = serverMessage || `Tổng thời gian các dịch vụ đã chọn (${totalMinutes} phút) vượt quá độ dài ca làm việc dài nhất của tiệm (${maxShiftDuration} phút). Quý khách nên cân nhắc tách thành 2 lần hẹn để có trải nghiệm phục vụ tốt nhất.`;
+                    if (shiftAlertMessage) {
+                        shiftAlertMessage.textContent = msg;
+                    }
+                    shiftAlert.classList.remove("d-none");
+                } else {
+                    shiftAlert.classList.add("d-none");
+                }
+            }
+
             // Recalculate and update UI (Client-Side Instant + Server Verification)
             async function updateTotals() {
                 const selectedBoxes = checkboxes.filter(cb => cb.checked);
@@ -402,7 +432,9 @@
                             serverData.totalPrice,
                             serverData.selectedServices,
                             serverData.formattedTotalDuration,
-                            serverData.formattedTotalPrice
+                            serverData.formattedTotalPrice,
+                            serverData.hasExceededShiftWarning,
+                            serverData.shiftWarningMessage
                         );
                     } else if (response.status === 400) {
                         const err = await response.json();
@@ -413,9 +445,12 @@
                 }
             }
 
-            function renderSummary(count, totalMin, totalPrice, items, serverFormattedDuration, serverFormattedPrice) {
+            function renderSummary(count, totalMin, totalPrice, items, serverFormattedDuration, serverFormattedPrice, serverHasExceededShift, serverShiftWarning) {
                 // Cập nhật bộ đếm và trạng thái giới hạn 5 dịch vụ
                 updateLimitState(count);
+
+                // Cập nhật cảnh báo thời lượng vượt ca dài nhất (AC4)
+                updateShiftWarning(totalMin, serverHasExceededShift, serverShiftWarning);
 
                 // Empty state toggle
                 if (count === 0) {
@@ -426,6 +461,7 @@
                     if (summaryDuration) summaryDuration.textContent = "0 phút";
                     if (summaryPrice) summaryPrice.textContent = "0 đ";
                     if (selectedList) selectedList.innerHTML = "";
+                    if (shiftAlert) shiftAlert.classList.add("d-none");
                     return;
                 }
 
@@ -532,6 +568,12 @@
             // Khởi tạo trạng thái giới hạn ban đầu (hỗ trợ trường hợp đã có sẵn dịch vụ được chọn)
             const initialCount = checkboxes.filter(cb => cb.checked).length;
             updateLimitState(initialCount);
+            const initialTotalDuration = @Model.Totals.TotalDurationMinutes;
+            updateShiftWarning(
+                initialTotalDuration,
+                @(Model.Totals.HasExceededShiftWarning ? "true" : "false"),
+                @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Totals.ShiftWarningMessage))
+            );
         });
     </script>
 }
