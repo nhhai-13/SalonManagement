@@ -1,0 +1,13 @@
+@model ServiceGroupInput
+@{ ViewData["Title"] = Model.ServiceGroupId == 0 ? "Thêm nhóm dịch vụ" : "Sửa nhóm dịch vụ"; }
+<div class="container my-4">
+    <h1>@ViewData["Title"]</h1>
+    <form asp-action="@(Model.ServiceGroupId == 0 ? "Create" : "Edit")" asp-route-id="@Model.ServiceGroupId" method="post">
+        <input asp-for="ServiceGroupId" type="hidden" />
+        <div asp-validation-summary="All" class="text-danger"></div>
+        <div class="mb-3"><label asp-for="GroupName" class="form-label">Tên nhóm</label><input asp-for="GroupName" class="form-control" maxlength="100" required /><span asp-validation-for="GroupName" class="text-danger"></span></div>
+        <div class="mb-3"><label asp-for="DisplayOrder" class="form-label">Thứ tự hiển thị</label><input asp-for="DisplayOrder" class="form-control" min="0" /><span asp-validation-for="DisplayOrder" class="text-danger"></span><small class="text-muted">Số nhỏ hiển thị trước. Thay đổi có hiệu lực khi tải lại trang công khai.</small></div>
+        <button class="btn btn-primary" type="submit">Lưu nhóm</button>
+        <a asp-action="Index" class="btn btn-outline-secondary">Huỷ</a>
+    </form>
+</div>
