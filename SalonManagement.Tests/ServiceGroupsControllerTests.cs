@@ -102,7 +102,7 @@ public class ServiceGroupsControllerTests
     }
 
     [Fact]
-    public async Task PublicPages_UseNewGroupOrderAndExcludeInactiveServices()
+    public async Task PublicCatalog_UsesNewGroupOrderWhileHomeKeepsActiveServices()
     {
         await using var db = CreateDb();
         var first = new ServiceGroup { GroupName = "Tóc", DisplayOrder = 0, Services = [new() { ServiceName = "Z" }] };
@@ -115,12 +115,12 @@ public class ServiceGroupsControllerTests
         {
             var result = Assert.IsType<ViewResult>(await services.Index());
             Assert.Equal("Public", result.ViewName);
-            return Assert.IsAssignableFrom<IEnumerable<Service>>(result.Model).Select(s => s.ServiceName).ToArray();
+            return Assert.IsType<PublicServiceCatalog>(result.Model).Groups.SelectMany(g => g.Services).Select(s => s.ServiceName).ToArray();
         }
-        Assert.Equal(new[] { "Z", "A", "Chưa phân nhóm" }, await PublicNames());
+        Assert.Equal(new[] { "Z", "A", "Ẩn", "Chưa phân nhóm" }, await PublicNames());
         await Controller(db).Edit(second.ServiceGroupId, new() { ServiceGroupId = second.ServiceGroupId, GroupName = "Gội", DisplayOrder = 0 });
         await Controller(db).Edit(first.ServiceGroupId, new() { ServiceGroupId = first.ServiceGroupId, GroupName = "Tóc", DisplayOrder = 2 });
-        Assert.Equal(new[] { "A", "Z", "Chưa phân nhóm" }, await PublicNames());
+        Assert.Equal(new[] { "A", "Ẩn", "Z", "Chưa phân nhóm" }, await PublicNames());
         var home = new HomeController(NullLogger<HomeController>.Instance, db);
         var model = Assert.IsType<HomeViewModel>(Assert.IsType<ViewResult>(await home.Index()).Model);
         Assert.Equal(new[] { "A", "Z", "Chưa phân nhóm" }, model.Services.Select(s => s.ServiceName));

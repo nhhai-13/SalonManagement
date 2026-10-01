@@ -21,14 +21,38 @@ namespace SalonManagement.Controllers
         public async Task<IActionResult> Index()
         {
             var isOwner = User.IsInRole(UserRoles.Owner);
-            var services = await _context.Services.AsNoTracking().Where(s => isOwner || s.IsActive)
+            if (!isOwner) return await Public();
+
+            var services = await _context.Services.AsNoTracking()
                 .Include(s => s.ServiceGroup)
                 .Include(s => s.Stylists).ThenInclude(s => s.Stylist)
                 .OrderBy(s => s.ServiceGroupId == null).ThenBy(s => s.ServiceGroup!.DisplayOrder).ThenBy(s => s.ServiceGroupId)
                 .ThenBy(s => s.ServiceName)
                 .ToListAsync();
 
-            return View(isOwner ? "Index" : "Public", services);
+            return View("Index", services);
+        }
+
+        // Owners can also preview the public catalog using /Services/Public.
+        [AllowAnonymous]
+        public async Task<IActionResult> Public()
+        {
+            var groups = await _context.ServiceGroups.AsNoTracking()
+                .OrderBy(g => g.DisplayOrder).ThenBy(g => g.ServiceGroupId)
+                .Select(g => new SalonManagement.Models.ViewModels.PublicServiceGroup
+                {
+                    Id = g.ServiceGroupId,
+                    Name = g.GroupName
+                }).ToListAsync();
+            var services = await _context.Services.AsNoTracking()
+                .OrderBy(s => s.ServiceName).ThenBy(s => s.ServiceId).ToListAsync();
+            var byGroup = services.ToLookup(s => s.ServiceGroupId);
+            foreach (var group in groups)
+                group.Services = byGroup[group.Id].ToList();
+            if (byGroup[null].Any())
+                groups.Add(new() { Name = "Chưa phân nhóm", Services = byGroup[null].ToList() });
+
+            return View("Public", new SalonManagement.Models.ViewModels.PublicServiceCatalog { Groups = groups });
         }
 
         // GET: /Services/Create
