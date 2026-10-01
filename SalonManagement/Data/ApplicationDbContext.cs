@@ -33,6 +33,8 @@ namespace SalonManagement.Data
 
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
 
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -179,6 +181,16 @@ namespace SalonManagement.Data
                     .WithMany(invoice => invoice.Payments)
                     .HasForeignKey(payment => payment.InvoiceId);
             });
+               // Cấu hình lịch nghỉ riêng của thợ
+        builder.Entity<StylistTimeOff>(entity =>
+            {
+                entity.HasKey(timeOff => timeOff.StylistTimeOffId);
+
+                entity.HasOne(timeOff => timeOff.Stylist)
+                    .WithMany()
+                    .HasForeignKey(timeOff => timeOff.StylistId)
+                    .OnDelete(DeleteBehavior.Cascade);
+           });
         }
     }
 }
