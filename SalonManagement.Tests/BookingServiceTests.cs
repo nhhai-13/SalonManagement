@@ -399,4 +399,215 @@ public class BookingServiceTests
         Assert.NotNull(model.ErrorMessage);
         Assert.Contains("5", model.ErrorMessage);
     }
+
+    [Fact]
+    public void CalculateTotals_DurationLessThanMaxShift_HasNoWarning()
+    {
+        // Arrange: 180 phút < 240 phút
+        var services = new List<Service>
+        {
+            new Service { ServiceId = 1, ServiceName = "DV 1", DurationMinutes = 60, Price = 100000m },
+            new Service { ServiceId = 2, ServiceName = "DV 2", DurationMinutes = 120, Price = 200000m }
+        };
+
+        // Act
+        var result = _bookingService.CalculateTotals(services, maxShiftDurationMinutes: 240);
+
+        // Assert
+        Assert.False(result.HasExceededShiftWarning);
+        Assert.Null(result.ShiftWarningMessage);
+        Assert.Equal(240, result.MaxShiftDurationMinutes);
+    }
+
+    [Fact]
+    public void CalculateTotals_DurationEqualToMaxShift_HasNoWarning()
+    {
+        // Arrange: Đúng 240 phút = 240 phút
+        var services = new List<Service>
+        {
+            new Service { ServiceId = 1, ServiceName = "DV 1", DurationMinutes = 120, Price = 100000m },
+            new Service { ServiceId = 2, ServiceName = "DV 2", DurationMinutes = 120, Price = 200000m }
+        };
+
+        // Act
+        var result = _bookingService.CalculateTotals(services, maxShiftDurationMinutes: 240);
+
+        // Assert
+        Assert.False(result.HasExceededShiftWarning);
+        Assert.Null(result.ShiftWarningMessage);
+    }
+
+    [Fact]
+    public void CalculateTotals_DurationExceedsMaxShiftBy1Minute_HasWarning()
+    {
+        // Arrange: 241 phút > 240 phút
+        var services = new List<Service>
+        {
+            new Service { ServiceId = 1, ServiceName = "DV 1", DurationMinutes = 120, Price = 100000m },
+            new Service { ServiceId = 2, ServiceName = "DV 2", DurationMinutes = 121, Price = 200000m }
+        };
+
+        // Act
+        var result = _bookingService.CalculateTotals(services, maxShiftDurationMinutes: 240);
+
+        // Assert
+        Assert.True(result.HasExceededShiftWarning);
+        Assert.NotNull(result.ShiftWarningMessage);
+        Assert.Contains("241", result.ShiftWarningMessage);
+        Assert.Contains("240", result.ShiftWarningMessage);
+        Assert.Contains("tách thành 2 lần hẹn", result.ShiftWarningMessage);
+    }
+
+    [Fact]
+    public void CalculateTotals_RemoveServiceBringsDurationBelowThreshold_WarningDisappears()
+    {
+        // Arrange: 3 dịch vụ tổng 250 phút > 240 phút
+        var services = new List<Service>
+        {
+            new Service { ServiceId = 1, ServiceName = "DV 1", DurationMinutes = 100, Price = 100000m },
+            new Service { ServiceId = 2, ServiceName = "DV 2", DurationMinutes = 100, Price = 100000m },
+            new Service { ServiceId = 3, ServiceName = "DV 3", DurationMinutes = 50, Price = 50000m }
+        };
+
+        var resultBefore = _bookingService.CalculateTotals(services, maxShiftDurationMinutes: 240);
+        Assert.True(resultBefore.HasExceededShiftWarning);
+
+        // Act: Bỏ dịch vụ 3 (còn 200 phút <= 240 phút)
+        services.RemoveAt(2);
+        var resultAfter = _bookingService.CalculateTotals(services, maxShiftDurationMinutes: 240);
+
+        // Assert: Cảnh báo biến mất
+        Assert.False(resultAfter.HasExceededShiftWarning);
+        Assert.Null(resultAfter.ShiftWarningMessage);
+        Assert.Equal(200, resultAfter.TotalDurationMinutes);
+    }
+
+    [Fact]
+    public async Task GetMaxShiftDurationMinutesAsync_WithWorkSchedules_ReturnsLongestShift()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, new HttpContextAccessor());
+        context.WorkSchedules.AddRange(
+            new WorkSchedule
+            {
+                WorkScheduleId = 1,
+                StylistId = 1,
+                WorkDate = DateTime.Today,
+                StartTime = new TimeSpan(8, 0, 0),
+                EndTime = new TimeSpan(12, 0, 0), // 4 giờ = 240 phút
+                Status = "Working"
+            },
+            new WorkSchedule
+            {
+                WorkScheduleId = 2,
+                StylistId = 2,
+                WorkDate = DateTime.Today,
+                StartTime = new TimeSpan(13, 0, 0),
+                EndTime = new TimeSpan(18, 30, 0), // 5.5 giờ = 330 phút (ca dài nhất)
+                Status = "Working"
+            }
+        );
+        await context.SaveChangesAsync();
+
+        var service = new BookingService(context);
+
+        // Act
+        var maxShift = await service.GetMaxShiftDurationMinutesAsync();
+
+        // Assert
+        Assert.Equal(330, maxShift);
+    }
+
+    [Fact]
+    public async Task GetMaxShiftDurationMinutesAsync_WithoutWorkSchedules_UsesBusinessHours()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, new HttpContextAccessor());
+        context.BusinessHours.AddRange(
+            new BusinessHour
+            {
+                BusinessHourId = 1,
+                DayOfWeek = DayOfWeek.Monday,
+                OpensAt = new TimeOnly(8, 0),
+                ClosesAt = new TimeOnly(17, 0), // 9 giờ = 540 phút
+                IsClosed = false
+            }
+        );
+        await context.SaveChangesAsync();
+
+        var service = new BookingService(context);
+
+        // Act
+        var maxShift = await service.GetMaxShiftDurationMinutesAsync();
+
+        // Assert
+        Assert.Equal(540, maxShift);
+    }
+
+    [Fact]
+    public async Task GetMaxShiftDurationMinutesAsync_NoData_ReturnsDefault240()
+    {
+        // Arrange: Db trống
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, new HttpContextAccessor());
+        var service = new BookingService(context);
+
+        // Act
+        var maxShift = await service.GetMaxShiftDurationMinutesAsync();
+
+        // Assert: Giá trị mặc định 240 phút
+        Assert.Equal(240, maxShift);
+    }
+
+    [Fact]
+    public async Task CalculateTotalsAsync_WhenExceedsShift_PopulatesWarningInTotals()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, new HttpContextAccessor());
+        // Ca dài nhất = 120 phút
+        context.WorkSchedules.Add(new WorkSchedule
+        {
+            WorkScheduleId = 1,
+            StylistId = 1,
+            WorkDate = DateTime.Today,
+            StartTime = new TimeSpan(8, 0, 0),
+            EndTime = new TimeSpan(10, 0, 0),
+            Status = "Working"
+        });
+
+        // 2 dịch vụ tổng 150 phút
+        context.Services.AddRange(
+            new Service { ServiceId = 201, ServiceName = "DV A", DurationMinutes = 90, Price = 200000m, IsActive = true },
+            new Service { ServiceId = 202, ServiceName = "DV B", DurationMinutes = 60, Price = 150000m, IsActive = true }
+        );
+        await context.SaveChangesAsync();
+
+        var service = new BookingService(context);
+
+        // Act
+        var totals = await service.CalculateTotalsAsync(new[] { 201, 202 });
+
+        // Assert
+        Assert.Equal(150, totals.TotalDurationMinutes);
+        Assert.Equal(120, totals.MaxShiftDurationMinutes);
+        Assert.True(totals.HasExceededShiftWarning);
+        Assert.NotNull(totals.ShiftWarningMessage);
+        Assert.Contains("150", totals.ShiftWarningMessage);
+        Assert.Contains("120", totals.ShiftWarningMessage);
+    }
 }
