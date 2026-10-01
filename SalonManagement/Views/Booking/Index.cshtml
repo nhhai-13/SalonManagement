@@ -1,0 +1,453 @@
+@model SalonManagement.Models.ViewModels.Booking.BookingSelectServicesViewModel
+@{
+    ViewData["Title"] = "Đặt lịch - Chọn dịch vụ";
+}
+
+<div class="container py-4">
+    <!-- Booking Stepper -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-12 col-lg-10">
+            <div class="d-flex justify-content-between align-items-center position-relative">
+                <div class="text-center flex-fill">
+                    <div class="rounded-circle bg-primary text-white d-inline-flex justify-content-center align-items-center mb-1 shadow-sm" style="width: 36px; height: 36px;">
+                        <span class="fw-bold">1</span>
+                    </div>
+                    <div class="small fw-bold text-primary">Chọn dịch vụ</div>
+                </div>
+                <div class="border-top border-2 flex-fill position-relative" style="top: -12px;"></div>
+                <div class="text-center flex-fill">
+                    <div class="rounded-circle bg-light text-muted border d-inline-flex justify-content-center align-items-center mb-1" style="width: 36px; height: 36px;">
+                        <span>2</span>
+                    </div>
+                    <div class="small text-muted">Thời gian &amp; Thợ</div>
+                </div>
+                <div class="border-top border-2 flex-fill position-relative" style="top: -12px;"></div>
+                <div class="text-center flex-fill">
+                    <div class="rounded-circle bg-light text-muted border d-inline-flex justify-content-center align-items-center mb-1" style="width: 36px; height: 36px;">
+                        <span>3</span>
+                    </div>
+                    <div class="small text-muted">Xác nhận</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <span class="badge bg-primary-subtle text-primary mb-2 px-3 py-2 rounded-pill fw-semibold">
+                <i class="bi bi-stars me-1"></i> Bước 1 trong 3 bước
+            </span>
+            <h1 class="h2 fw-bold text-dark mb-1">Chọn dịch vụ bạn muốn trải nghiệm</h1>
+            <p class="text-muted">Chọn một hoặc nhiều dịch vụ để xem tổng thời lượng và giá tiền tạm tính.</p>
+        </div>
+    </div>
+
+    @if (!Model.HasServices)
+    {
+        <div class="alert alert-info py-4 text-center">
+            <i class="bi bi-info-circle fs-3 d-block mb-2 text-primary"></i>
+            <h5>Hiện tại chưa có dịch vụ nào đang kinh doanh</h5>
+            <p class="text-muted mb-0">Vui lòng quay lại sau hoặc liên hệ salon để được hỗ trợ.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Main Form & Content -->
+        <form id="booking-form" asp-action="SelectServices" asp-controller="Booking" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="row g-4">
+                <!-- Left Column: Services list -->
+                <div class="col-12 col-lg-8">
+                    <!-- Category jump pills -->
+                    @if (Model.Groups.Count > 1)
+                    {
+                        <div class="sticky-top bg-white py-2 mb-3 z-2 border-bottom" style="top: 70px;">
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var group in Model.Groups)
+                                {
+                                    var targetId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
+                                    <a href="#@targetId" class="btn btn-sm btn-outline-secondary rounded-pill">
+                                        @group.Name (@group.Services.Count)
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Service Groups -->
+                    @foreach (var group in Model.Groups)
+                    {
+                        var groupId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
+                        <div id="@groupId" class="mb-5 scroll-mt">
+                            <h2 class="h5 fw-bold text-dark pb-2 border-bottom mb-3">
+                                <i class="bi bi-gem text-primary me-2"></i>@group.Name
+                            </h2>
+
+                            @if (group.Services.Count == 0)
+                            {
+                                <p class="text-muted small italic">Nhóm này chưa có dịch vụ nào.</p>
+                            }
+                            else
+                            {
+                                <div class="row g-3">
+                                    @foreach (var service in group.Services)
+                                    {
+                                        var isChecked = service.IsSelected;
+                                        var cardClass = isChecked ? "border-primary bg-primary-subtle shadow-sm" : "border-light-subtle";
+                                        <div class="col-12 col-md-6">
+                                            <div class="card h-100 service-item-card transition-all @cardClass"
+                                                 data-service-id="@service.ServiceId"
+                                                 data-name="@service.ServiceName"
+                                                 data-duration="@service.DurationMinutes"
+                                                 data-price="@service.Price"
+                                                 style="cursor: pointer; border-width: 2px;">
+                                                <div class="card-body d-flex flex-column justify-content-between p-3">
+                                                    <div>
+                                                        <div class="d-flex align-items-start justify-content-between mb-2">
+                                                            <div class="form-check m-0">
+                                                                <input class="form-check-input service-checkbox fs-5"
+                                                                       type="checkbox"
+                                                                       name="selectedServiceIds"
+                                                                       value="@service.ServiceId"
+                                                                       id="service-@service.ServiceId"
+                                                                       data-service-id="@service.ServiceId"
+                                                                       data-name="@service.ServiceName"
+                                                                       data-duration="@service.DurationMinutes"
+                                                                       data-price="@service.Price"
+                                                                       @(isChecked ? "checked" : "")>
+                                                                <label class="form-check-label fw-bold text-dark ms-1" for="service-@service.ServiceId">
+                                                                    @service.ServiceName
+                                                                </label>
+                                                            </div>
+                                                        </div>
+
+                                                        @if (!string.IsNullOrWhiteSpace(service.Description))
+                                                        {
+                                                            <p class="text-muted small mb-3 line-clamp-2" style="min-height: 38px;">
+                                                                @service.Description
+                                                            </p>
+                                                        }
+                                                        else
+                                                        {
+                                                            <p class="text-muted small mb-3 fst-italic" style="min-height: 38px;">
+                                                                Dịch vụ cao cấp chuẩn Lumière.
+                                                            </p>
+                                                        }
+                                                    </div>
+
+                                                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                                        <span class="badge bg-light text-secondary border">
+                                                            <i class="bi bi-clock me-1"></i>@service.FormattedDuration
+                                                        </span>
+                                                        <strong class="text-primary fs-6">
+                                                            @service.FormattedPrice
+                                                        </strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <!-- Right Column: Summary Card (Sticky) -->
+                <div class="col-12 col-lg-4">
+                    <div class="card shadow-sm border-0 rounded-3 sticky-top" style="top: 90px;">
+                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                            <h3 class="h6 fw-bold mb-0 text-dark">
+                                <i class="bi bi-cart-check text-primary me-2"></i>Dịch vụ đã chọn
+                            </h3>
+                            <span id="selected-count-badge" class="badge bg-primary rounded-pill px-2">
+                                @Model.Totals.SelectedServices.Count dịch vụ
+                            </span>
+                        </div>
+
+                        <div class="card-body p-3">
+                            <!-- Selected Services Container -->
+                            <div id="selected-services-container" class="mb-3" style="max-height: 280px; overflow-y: auto;">
+                                <!-- Empty state -->
+                                <div id="empty-state" class="text-center py-4 @(Model.Totals.SelectedServices.Count > 0 ? "d-none" : "")">
+                                    <i class="bi bi-hand-index-thumb fs-2 text-muted d-block mb-2"></i>
+                                    <p class="text-muted small mb-0">Chưa chọn dịch vụ nào.</p>
+                                    <small class="text-secondary">Hãy tích chọn các dịch vụ bạn muốn từ danh sách bên cạnh.</small>
+                                </div>
+
+                                <!-- Items list -->
+                                <ul id="selected-services-list" class="list-group list-group-flush @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
+                                    @foreach (var item in Model.Totals.SelectedServices)
+                                    {
+                                        <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-start border-light" data-service-id="@item.ServiceId">
+                                            <div class="me-2">
+                                                <div class="fw-semibold text-dark small">@item.ServiceName</div>
+                                                <div class="text-muted" style="font-size: 0.75rem;">
+                                                    <i class="bi bi-clock"></i> @item.FormattedDuration · <span class="text-primary">@item.FormattedPrice</span>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 remove-service-btn" data-service-id="@item.ServiceId" title="Bỏ chọn dịch vụ này">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+
+                            <hr class="my-3">
+
+                            <!-- Totals Calculation -->
+                            <div class="bg-light p-3 rounded-3 mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-muted small">
+                                        <i class="bi bi-clock-history me-1"></i>Tổng thời lượng:
+                                    </span>
+                                    <span id="summary-total-duration" class="fw-bold text-dark">
+                                        @Model.Totals.FormattedTotalDuration
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small">
+                                        <i class="bi bi-cash-stack me-1"></i>Tổng tiền tạm tính:
+                                    </span>
+                                    <span id="summary-total-price" class="fw-bold text-primary fs-5">
+                                        @Model.Totals.FormattedTotalPrice
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Temporary Price Notice -->
+                            <div class="alert alert-warning py-2 px-3 small mb-3 border-0 d-flex align-items-start" role="note">
+                                <i class="bi bi-info-circle-fill text-warning me-2 fs-6 flex-shrink-0 mt-1"></i>
+                                <div>
+                                    <strong>Ghi chú:</strong> Giá trên là giá tạm tính, giá cuối do tiệm chốt khi thanh toán.
+                                </div>
+                            </div>
+
+                            <!-- Submit / Continue Button -->
+                            <div class="d-grid gap-2">
+                                <button type="submit" id="btn-submit-booking" class="btn btn-primary btn-lg fw-semibold" @(Model.Totals.SelectedServices.Count == 0 ? "disabled" : "")>
+                                    Tiếp tục đặt lịch <i class="bi bi-arrow-right ms-1"></i>
+                                </button>
+                                <button type="button" id="btn-clear-all" class="btn btn-sm btn-link text-muted text-decoration-none @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
+                                    <i class="bi bi-trash3 me-1"></i>Bỏ chọn tất cả
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const form = document.getElementById("booking-form");
+            if (!form) return;
+
+            const checkboxes = Array.from(document.querySelectorAll(".service-checkbox"));
+            const cards = Array.from(document.querySelectorAll(".service-item-card"));
+            const emptyState = document.getElementById("empty-state");
+            const selectedList = document.getElementById("selected-services-list");
+            const badgeCount = document.getElementById("selected-count-badge");
+            const summaryDuration = document.getElementById("summary-total-duration");
+            const summaryPrice = document.getElementById("summary-total-price");
+            const btnSubmit = document.getElementById("btn-submit-booking");
+            const btnClearAll = document.getElementById("btn-clear-all");
+
+            // Formatters
+            function formatVND(amount) {
+                return new Intl.NumberFormat("vi-VN").format(amount) + " đ";
+            }
+
+            function formatDuration(minutes) {
+                if (minutes <= 0) return "0 phút";
+                if (minutes < 60) return minutes + " phút";
+                const hours = Math.floor(minutes / 60);
+                const rem = minutes % 60;
+                if (rem === 0) return `${hours} giờ (${minutes} phút)`;
+                return `${hours} giờ ${rem} phút (${minutes} phút)`;
+            }
+
+            // Sync card styling
+            function syncCardState(card, isChecked) {
+                if (isChecked) {
+                    card.classList.add("border-primary", "bg-primary-subtle", "shadow-sm");
+                    card.classList.remove("border-light-subtle");
+                } else {
+                    card.classList.remove("border-primary", "bg-primary-subtle", "shadow-sm");
+                    card.classList.add("border-light-subtle");
+                }
+            }
+
+            // Recalculate and update UI (Client-Side Instant + Server Verification)
+            async function updateTotals() {
+                const selectedBoxes = checkboxes.filter(cb => cb.checked);
+                const selectedIds = selectedBoxes.map(cb => parseInt(cb.value, 10));
+
+                // 1. Cập nhật tức thời Client-side (Zero latency)
+                let totalMin = 0;
+                let totalPrice = 0;
+                const itemsData = [];
+
+                selectedBoxes.forEach(cb => {
+                    const duration = parseInt(cb.dataset.duration || "0", 10);
+                    const price = parseFloat(cb.dataset.price || "0");
+                    const name = cb.dataset.name || "";
+                    const id = parseInt(cb.value, 10);
+
+                    totalMin += duration;
+                    totalPrice += price;
+
+                    itemsData.push({
+                        serviceId: id,
+                        serviceName: name,
+                        durationMinutes: duration,
+                        price: price,
+                        formattedDuration: formatDuration(duration),
+                        formattedPrice: formatVND(price)
+                    });
+                });
+
+                renderSummary(selectedIds.length, totalMin, totalPrice, itemsData);
+
+                // 2. Gọi Server API để tính toán lại và đảm bảo tính toàn vẹn dữ liệu
+                try {
+                    const response = await fetch("/booking/calculate-totals", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ serviceIds: selectedIds })
+                    });
+
+                    if (response.ok) {
+                        const serverData = await response.json();
+                        renderSummary(
+                            serverData.selectedServices.length,
+                            serverData.totalDurationMinutes,
+                            serverData.totalPrice,
+                            serverData.selectedServices,
+                            serverData.formattedTotalDuration,
+                            serverData.formattedTotalPrice
+                        );
+                    }
+                } catch (err) {
+                    console.warn("Lỗi đồng bộ giá server, dùng kết quả tính tạm thời client:", err);
+                }
+            }
+
+            function renderSummary(count, totalMin, totalPrice, items, serverFormattedDuration, serverFormattedPrice) {
+                // Count badge
+                if (badgeCount) badgeCount.textContent = count + " dịch vụ";
+
+                // Empty state toggle
+                if (count === 0) {
+                    if (emptyState) emptyState.classList.remove("d-none");
+                    if (selectedList) selectedList.classList.add("d-none");
+                    if (btnSubmit) btnSubmit.disabled = true;
+                    if (btnClearAll) btnClearAll.classList.add("d-none");
+                    if (summaryDuration) summaryDuration.textContent = "0 phút";
+                    if (summaryPrice) summaryPrice.textContent = "0 đ";
+                    if (selectedList) selectedList.innerHTML = "";
+                    return;
+                }
+
+                if (emptyState) emptyState.classList.add("d-none");
+                if (selectedList) selectedList.classList.remove("d-none");
+                if (btnSubmit) btnSubmit.disabled = false;
+                if (btnClearAll) btnClearAll.classList.remove("d-none");
+
+                // Duration & Price
+                if (summaryDuration) summaryDuration.textContent = serverFormattedDuration || formatDuration(totalMin);
+                if (summaryPrice) summaryPrice.textContent = serverFormattedPrice || formatVND(totalPrice);
+
+                // Render list items
+                if (selectedList) {
+                    selectedList.innerHTML = "";
+                    items.forEach(item => {
+                        const li = document.createElement("li");
+                        li.className = "list-group-item px-0 py-2 d-flex justify-content-between align-items-start border-light";
+                        li.dataset.serviceId = item.serviceId;
+                        li.innerHTML = `
+                            <div class="me-2">
+                                <div class="fw-semibold text-dark small">${escapeHtml(item.serviceName)}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <i class="bi bi-clock"></i> ${escapeHtml(item.formattedDuration || formatDuration(item.durationMinutes))} · <span class="text-primary">${escapeHtml(item.formattedPrice || formatVND(item.price))}</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 remove-service-btn" data-service-id="${item.serviceId}" title="Bỏ chọn dịch vụ này">
+                                <i class="bi bi-x-circle"></i>
+                            </button>
+                        `;
+                        selectedList.appendChild(li);
+                    });
+                }
+            }
+
+            function escapeHtml(str) {
+                if (!str) return "";
+                const div = document.createElement("div");
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // Click card toggles checkbox
+            cards.forEach(card => {
+                card.addEventListener("click", function (e) {
+                    // Tránh toggle 2 lần nếu click trực tiếp vào checkbox
+                    if (e.target.matches("input[type='checkbox']") || e.target.closest("label")) {
+                        return;
+                    }
+                    const cb = card.querySelector(".service-checkbox");
+                    if (cb) {
+                        cb.checked = !cb.checked;
+                        syncCardState(card, cb.checked);
+                        updateTotals();
+                    }
+                });
+            });
+
+            // Checkbox change event
+            checkboxes.forEach(cb => {
+                cb.addEventListener("change", function () {
+                    const card = cb.closest(".service-item-card");
+                    if (card) syncCardState(card, cb.checked);
+                    updateTotals();
+                });
+            });
+
+            // Delegate remove button click from summary list
+            if (selectedList) {
+                selectedList.addEventListener("click", function (e) {
+                    const removeBtn = e.target.closest(".remove-service-btn");
+                    if (!removeBtn) return;
+                    const serviceId = removeBtn.dataset.serviceId;
+                    const cb = document.querySelector(`.service-checkbox[value='${serviceId}']`);
+                    if (cb) {
+                        cb.checked = false;
+                        const card = cb.closest(".service-item-card");
+                        if (card) syncCardState(card, false);
+                        updateTotals();
+                    }
+                });
+            }
+
+            // Clear all button
+            if (btnClearAll) {
+                btnClearAll.addEventListener("click", function () {
+                    checkboxes.forEach(cb => {
+                        cb.checked = false;
+                        const card = cb.closest(".service-item-card");
+                        if (card) syncCardState(card, false);
+                    });
+                    updateTotals();
+                });
+            }
+        });
+    </script>
+}
