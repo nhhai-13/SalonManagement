@@ -20,6 +20,11 @@ public class BookingService : IBookingService
     {
         var servicesList = selectedServices?.ToList() ?? new List<Service>();
 
+        if (servicesList.Count > IBookingService.MaxServicesLimit)
+        {
+            throw new ArgumentException($"Số lượng dịch vụ trong một lượt đặt không được vượt quá {IBookingService.MaxServicesLimit}", nameof(selectedServices));
+        }
+
         if (servicesList.Count == 0)
         {
             return new BookingTotalsDto
@@ -58,6 +63,12 @@ public class BookingService : IBookingService
     public async Task<BookingTotalsDto> CalculateTotalsAsync(IEnumerable<int> selectedServiceIds)
     {
         var idList = selectedServiceIds?.Distinct().ToList() ?? new List<int>();
+
+        if (idList.Count > IBookingService.MaxServicesLimit)
+        {
+            throw new ArgumentException($"Số lượng dịch vụ trong một lượt đặt không được vượt quá {IBookingService.MaxServicesLimit}", nameof(selectedServiceIds));
+        }
+
         if (idList.Count == 0)
         {
             return CalculateTotals(Enumerable.Empty<Service>());
@@ -102,9 +113,17 @@ public class BookingService : IBookingService
 
         var byGroup = services.ToLookup(s => s.ServiceGroupId);
 
+        string? errorMessage = null;
+        var validPreselected = preselectedSet;
+        if (preselectedSet.Count > IBookingService.MaxServicesLimit)
+        {
+            errorMessage = $"Số lượng dịch vụ trong một lượt đặt không được vượt quá {IBookingService.MaxServicesLimit}";
+            validPreselected = preselectedSet.Take(IBookingService.MaxServicesLimit).ToHashSet();
+        }
+
         foreach (var group in groups)
         {
-            group.Services = byGroup[group.Id].Select(s => MapToItemViewModel(s, preselectedSet)).ToList();
+            group.Services = byGroup[group.Id].Select(s => MapToItemViewModel(s, validPreselected)).ToList();
         }
 
         if (byGroup[null].Any())
@@ -114,18 +133,20 @@ public class BookingService : IBookingService
                 Id = null,
                 Name = "Chưa phân nhóm",
                 DisplayOrder = int.MaxValue,
-                Services = byGroup[null].Select(s => MapToItemViewModel(s, preselectedSet)).ToList()
+                Services = byGroup[null].Select(s => MapToItemViewModel(s, validPreselected)).ToList()
             });
         }
 
         // Tính totals ban đầu cho các preselected services
-        var totals = await CalculateTotalsAsync(preselectedSet);
+        var totals = await CalculateTotalsAsync(validPreselected);
 
         return new BookingSelectServicesViewModel
         {
             Groups = groups,
-            SelectedServiceIds = preselectedSet.ToList(),
-            Totals = totals
+            SelectedServiceIds = validPreselected.ToList(),
+            Totals = totals,
+            ErrorMessage = errorMessage,
+            MaxServicesLimit = IBookingService.MaxServicesLimit
         };
     }
 

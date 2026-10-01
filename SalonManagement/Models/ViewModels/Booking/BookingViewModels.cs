@@ -49,6 +49,8 @@ public class BookingServiceGroupViewModel
 
 public class BookingSelectServicesViewModel
 {
+    public int MaxServicesLimit { get; set; } = 5;
+    public string? ErrorMessage { get; set; }
     public List<BookingServiceGroupViewModel> Groups { get; set; } = new();
     public List<int> SelectedServiceIds { get; set; } = new();
     public BookingTotalsDto Totals { get; set; } = new();

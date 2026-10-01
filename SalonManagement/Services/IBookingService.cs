@@ -6,6 +6,11 @@ namespace SalonManagement.Services;
 public interface IBookingService
 {
     /// <summary>
+    /// Giới hạn số lượng dịch vụ tối đa cho một lượt đặt lịch (AC1).
+    /// </summary>
+    public const int MaxServicesLimit = 5;
+
+    /// <summary>
     /// Tính toán tổng thời lượng và tổng tiền tạm tính từ danh sách thực thể Service (Pure Logic).
     /// </summary>
     BookingTotalsDto CalculateTotals(IEnumerable<Service> selectedServices);

@@ -38,6 +38,11 @@ public class BookingController : Controller
             preselected.Add(serviceId.Value);
         }
 
+        if (preselected.Count > IBookingService.MaxServicesLimit)
+        {
+            ModelState.AddModelError(string.Empty, "Số lượng dịch vụ trong một lượt đặt không được vượt quá 5");
+        }
+
         var viewModel = await _bookingService.GetSelectServicesViewModelAsync(preselected);
         return View("~/Views/Booking/Index.cshtml", viewModel);
     }
@@ -45,24 +50,49 @@ public class BookingController : Controller
     /// <summary>
     /// POST: /booking/calculate-totals
     /// Endpoint AJAX tính toán lại tổng thời lượng và tổng tiền tạm tính thời gian thực từ phía server.
+    /// Từ chối tính toán nếu vượt quá 5 dịch vụ (AC1).
     /// </summary>
     [HttpPost("calculate-totals")]
     public async Task<IActionResult> CalculateTotals([FromBody] CalculateBookingTotalsRequest? request)
     {
         var serviceIds = request?.ServiceIds ?? new List<int>();
-        var totals = await _bookingService.CalculateTotalsAsync(serviceIds);
-        return Ok(totals);
+
+        if (serviceIds.Count > IBookingService.MaxServicesLimit)
+        {
+            return BadRequest(new { message = "Số lượng dịch vụ trong một lượt đặt không được vượt quá 5" });
+        }
+
+        try
+        {
+            var totals = await _bookingService.CalculateTotalsAsync(serviceIds);
+            return Ok(totals);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     /// <summary>
     /// POST: /booking/select-services
     /// Tiếp nhận danh sách dịch vụ đã chọn từ form submit.
+    /// Kiểm tra xác thực không cho phép vượt quá 5 dịch vụ (AC1).
     /// </summary>
     [HttpPost("select-services")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SelectServices([FromForm] List<int> selectedServiceIds)
+    public async Task<IActionResult> SelectServices([FromForm] List<int>? selectedServiceIds)
     {
-        var viewModel = await _bookingService.GetSelectServicesViewModelAsync(selectedServiceIds);
+        var ids = selectedServiceIds ?? new List<int>();
+
+        if (ids.Count > IBookingService.MaxServicesLimit)
+        {
+            ModelState.AddModelError(string.Empty, "Số lượng dịch vụ trong một lượt đặt không được vượt quá 5");
+            var errorViewModel = await _bookingService.GetSelectServicesViewModelAsync(ids.Take(IBookingService.MaxServicesLimit));
+            errorViewModel.ErrorMessage = "Số lượng dịch vụ trong một lượt đặt không được vượt quá 5";
+            return View("~/Views/Booking/Index.cshtml", errorViewModel);
+        }
+
+        var viewModel = await _bookingService.GetSelectServicesViewModelAsync(ids);
         return View("~/Views/Booking/Index.cshtml", viewModel);
     }
 }
