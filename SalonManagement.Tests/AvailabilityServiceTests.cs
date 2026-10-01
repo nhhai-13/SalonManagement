@@ -36,5 +36,14 @@ public sealed class AvailabilityServiceTests
         Assert.Equal([TimeSpan.FromHours(8), TimeSpan.FromHours(8.25), TimeSpan.FromHours(8.5)], result.Slots);
     }
 
+    [Fact]
+    public async Task GetSlots_BlocksActiveAppointmentsButKeepsCancelledAppointments()
+    {
+        await using var db = CreateDb(); var date = new DateTime(2026, 10, 6); var service = new Service { ServiceName = "Cắt", DurationMinutes = 30, Price = 1 }; db.Services.Add(service); await db.SaveChangesAsync(); var stylist = new Stylist { FullName = "A", Phone = "0900000001", Services = [new StylistService { ServiceId = service.ServiceId }] }; db.Stylists.Add(stylist); await db.SaveChangesAsync(); db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(11) }); await db.SaveChangesAsync();
+        db.Appointments.AddRange(new Appointment { StylistId = stylist.StylistId, CustomerId = 1, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(10), Status = "Confirmed" }, new Appointment { StylistId = stylist.StylistId, CustomerId = 2, AppointmentDate = date, StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(10.5), Status = "Cancelled" }); await db.SaveChangesAsync();
+        var result = await new AvailabilityService(db).GetSlotsAsync(date, [service.ServiceId]);
+        Assert.DoesNotContain(TimeSpan.FromHours(8.75), result.Slots); Assert.Contains(TimeSpan.FromHours(10), result.Slots);
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 }

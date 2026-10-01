@@ -18,7 +18,9 @@ public sealed class AvailabilityService(ApplicationDbContext db)
             .Include(s => s.Services)
             .Include(s => s.WorkSchedules.Where(w => w.WorkDate == date.Date)).ToListAsync();
         var eligible = candidates.Where(s => requiredIds.All(id => s.Services.Any(skill => skill.ServiceId == id))).ToList();
-        var slots = eligible.SelectMany(stylist => stylist.WorkSchedules.SelectMany(shift => SlotsForShift(shift, duration)))
+        var appointments = await db.Appointments.AsNoTracking().Where(a => a.AppointmentDate == date.Date && a.Status != "Cancelled" && a.Status != "NoShow").ToListAsync();
+        var slots = eligible.SelectMany(stylist => stylist.WorkSchedules.SelectMany(shift => SlotsForShift(shift, duration)
+                .Where(slot => !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime))))
             .Distinct().OrderBy(time => time).ToList();
         return new AvailabilityResult(duration, slots);
     }
