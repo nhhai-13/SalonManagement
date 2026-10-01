@@ -8,6 +8,8 @@ public sealed class WeeklyWorkScheduleViewModel
     public DateTime WeekStart { get; set; }
     public IReadOnlyList<Stylist> Stylists { get; set; } = [];
     public IReadOnlyList<WorkSchedule> Schedules { get; set; } = [];
+    public IReadOnlyDictionary<DayOfWeek, BusinessHour> BusinessHours { get; set; }
+        = new Dictionary<DayOfWeek, BusinessHour>();
 
     public DateTime WeekEnd => WeekStart.AddDays(6);
 }

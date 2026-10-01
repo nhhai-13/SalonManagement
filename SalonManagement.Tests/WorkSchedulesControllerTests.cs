@@ -93,6 +93,72 @@ public sealed class WorkSchedulesControllerTests
     }
 
     [Theory]
+    [InlineData(8, 0, 17, 0)]
+    [InlineData(8, 0, 12, 0)]
+    [InlineData(9, 0, 17, 0)]
+    public async Task Create_ShiftWithinBusinessHours_IncludingBoundaries_IsAllowed(int startHour, int startMinute, int endHour, int endMinute)
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Đinh Mai"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);
+        await AddBusinessHoursAsync(db, date.DayOfWeek, false, new TimeOnly(8, 0), new TimeOnly(17, 0));
+
+        await controller.Create(new CreateWorkScheduleViewModel { StylistId = stylist.StylistId, WorkDate = date, StartTime = new TimeSpan(startHour, startMinute, 0), EndTime = new TimeSpan(endHour, endMinute, 0) });
+
+        Assert.Single(await db.WorkSchedules.ToListAsync());
+    }
+
+    [Theory]
+    [InlineData(7, 30, 16, 0)]
+    [InlineData(9, 0, 17, 30)]
+    public async Task Create_ShiftOutsideBusinessHours_IsRejectedWithAllowedRange(int startHour, int startMinute, int endHour, int endMinute)
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Đặng Ngân"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);
+        await AddBusinessHoursAsync(db, date.DayOfWeek, false, new TimeOnly(8, 0), new TimeOnly(17, 0));
+
+        await controller.Create(new CreateWorkScheduleViewModel { StylistId = stylist.StylistId, WorkDate = date, StartTime = new TimeSpan(startHour, startMinute, 0), EndTime = new TimeSpan(endHour, endMinute, 0) });
+
+        Assert.Empty(await db.WorkSchedules.ToListAsync());
+        Assert.Contains(controller.ModelState.Values.SelectMany(value => value.Errors), error => error.ErrorMessage.Contains("08:00–17:00"));
+    }
+
+    [Fact]
+    public async Task Create_ShiftOnClosedDay_IsRejected()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Mai Yến"); var controller = CreateController(db); var date = new DateTime(2026, 10, 11);
+        await AddBusinessHoursAsync(db, date.DayOfWeek, true, null, null);
+
+        await controller.Create(new CreateWorkScheduleViewModel { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(12) });
+
+        Assert.Empty(await db.WorkSchedules.ToListAsync());
+        Assert.Contains(controller.ModelState.Values.SelectMany(value => value.Errors), error => error.ErrorMessage.Contains("không hoạt động"));
+    }
+
+    [Fact]
+    public async Task Edit_ShiftOutsideBusinessHours_IsRejectedAndKeepsExistingData()
+    {
+        await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Bảo Trâm"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);
+        await AddBusinessHoursAsync(db, date.DayOfWeek, false, new TimeOnly(8, 0), new TimeOnly(17, 0));
+        var schedule = new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(12), Notes = "Giữ nguyên" };
+        db.WorkSchedules.Add(schedule); await db.SaveChangesAsync();
+
+        await controller.Edit(schedule.WorkScheduleId, new EditWorkScheduleViewModel { WorkScheduleId = schedule.WorkScheduleId, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(18), Notes = "Không được lưu" });
+
+        var unchanged = await db.WorkSchedules.SingleAsync();
+        Assert.Equal(TimeSpan.FromHours(9), unchanged.StartTime); Assert.Equal(TimeSpan.FromHours(12), unchanged.EndTime); Assert.Equal("Giữ nguyên", unchanged.Notes);
+    }
+
+    [Fact]
+    public async Task Index_ShowsBusinessHoursForEachDay()
+    {
+        await using var db = CreateDb(); var date = new DateTime(2026, 10, 8);
+        await AddBusinessHoursAsync(db, date.DayOfWeek, false, new TimeOnly(10, 0), new TimeOnly(19, 0));
+
+        var result = await CreateController(db).Index(null, date);
+        var model = Assert.IsType<ViewResult>(result).Model as WeeklyWorkScheduleViewModel;
+
+        Assert.NotNull(model); Assert.Equal(new TimeOnly(10, 0), model.BusinessHours[date.DayOfWeek].OpensAt); Assert.Equal(new TimeOnly(19, 0), model.BusinessHours[date.DayOfWeek].ClosesAt);
+    }
+
+    [Theory]
     [InlineData(9, 9)]
     [InlineData(10, 9)]
     public async Task Create_StartTimeEqualOrAfterEndTime_DoesNotPersist(int startHour, int endHour)
@@ -121,6 +187,10 @@ public sealed class WorkSchedulesControllerTests
     private static async Task<Stylist> AddStylistAsync(ApplicationDbContext db, string name)
     {
         var stylist = new Stylist { FullName = name, Phone = $"09{Random.Shared.Next(10000000, 99999999)}" }; db.Stylists.Add(stylist); await db.SaveChangesAsync(); return stylist;
+    }
+    private static async Task AddBusinessHoursAsync(ApplicationDbContext db, DayOfWeek day, bool isClosed, TimeOnly? opensAt, TimeOnly? closesAt)
+    {
+        db.BusinessHours.Add(new BusinessHour { DayOfWeek = day, IsClosed = isClosed, OpensAt = opensAt, ClosesAt = closesAt }); await db.SaveChangesAsync();
     }
     private static WorkSchedulesController CreateController(ApplicationDbContext db) => new(db) { TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider()) };
     private sealed class TestTempDataProvider : Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider

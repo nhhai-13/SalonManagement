@@ -33,12 +33,24 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
                 .ThenBy(schedule => schedule.StartTime)
                 .ToListAsync();
 
+        var configuredHours = await db.BusinessHours.AsNoTracking()
+            .ToDictionaryAsync(hours => hours.DayOfWeek);
+        var businessHours = Enum.GetValues<DayOfWeek>().ToDictionary(day => day,
+            day => configuredHours.GetValueOrDefault(day) ?? new BusinessHour
+            {
+                DayOfWeek = day,
+                OpensAt = new TimeOnly(8, 0),
+                ClosesAt = new TimeOnly(17, 0),
+                TimeZoneId = BusinessHour.SalonTimeZone
+            });
+
         return View(new WeeklyWorkScheduleViewModel
         {
             StylistId = selectedStylistId,
             WeekStart = start,
             Stylists = stylists,
-            Schedules = schedules
+            Schedules = schedules,
+            BusinessHours = businessHours
         });
     }
 
@@ -58,6 +70,10 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
             model.StylistId, model.WorkDate.Date, model.StartTime, model.EndTime);
         if (conflictingShift is not null)
             ModelState.AddModelError(string.Empty, ConflictMessage(conflictingShift));
+
+        var businessHoursError = await ValidateBusinessHoursAsync(model.WorkDate.Date, model.StartTime, model.EndTime);
+        if (businessHoursError is not null)
+            ModelState.AddModelError(string.Empty, businessHoursError);
 
         if (!ModelState.IsValid)
         {
@@ -99,6 +115,10 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
         if (conflictingShift is not null)
             ModelState.AddModelError(string.Empty, ConflictMessage(conflictingShift));
 
+        var businessHoursError = await ValidateBusinessHoursAsync(schedule.WorkDate.Date, model.StartTime, model.EndTime);
+        if (businessHoursError is not null)
+            ModelState.AddModelError(string.Empty, businessHoursError);
+
         if (!ModelState.IsValid)
         {
             TempData["Error"] = ModelState.Values.SelectMany(value => value.Errors)
@@ -127,6 +147,21 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
 
     private static string ConflictMessage(WorkSchedule schedule) =>
         $"Ca làm bị chồng lấn với ca {schedule.StartTime:hh\\:mm}–{schedule.EndTime:hh\\:mm} ngày {schedule.WorkDate:dd/MM/yyyy}.";
+
+    private async Task<string?> ValidateBusinessHoursAsync(DateTime workDate, TimeSpan startTime, TimeSpan endTime)
+    {
+        var hours = await db.BusinessHours.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.DayOfWeek == workDate.DayOfWeek);
+
+        if (hours?.IsClosed == true)
+            return $"Tiệm không hoạt động vào ngày {workDate:dd/MM/yyyy}.";
+
+        var opensAt = (hours?.OpensAt ?? new TimeOnly(8, 0)).ToTimeSpan();
+        var closesAt = (hours?.ClosesAt ?? new TimeOnly(17, 0)).ToTimeSpan();
+        return startTime < opensAt || endTime > closesAt
+            ? $"Ca làm phải trong giờ hoạt động {opensAt:hh\\:mm}–{closesAt:hh\\:mm}."
+            : null;
+    }
 
     internal static DateTime StartOfWeek(DateTime date)
     {
