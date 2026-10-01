@@ -193,6 +193,7 @@ builder.Services.AddSingleton<
     PasswordResetRateLimiter>();
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
+builder.Services.AddScoped<AvailabilityService>();
 builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
 
 // =====================================
