@@ -7,7 +7,7 @@
     </header>
 
     <nav class="portal-shortcuts" aria-label="Chức năng quản trị Sprint 1">
-        <a href="#staff-accounts"><i class="bi bi-people"></i><span><strong>Tài khoản nhân viên</strong><small>S1-02 · Tạo tài khoản lễ tân và thợ</small></span></a>
+        <a href="#staff-accounts"><i class="bi bi-people"></i><span><strong>Tài khoản nhân viên</strong><small>S1-02 · Tạo tài khoản nhân sự</small></span></a>
         <a asp-controller="AuditLogs" asp-action="Index"><i class="bi bi-clock-history"></i><span><strong>Nhật ký hệ thống</strong><small>S1-09 · Theo dõi thay đổi dữ liệu</small></span></a>
         <a asp-controller="Account" asp-action="ChangePassword"><i class="bi bi-shield-lock"></i><span><strong>Đổi mật khẩu</strong><small>S1-04 · Bảo vệ tài khoản</small></span></a>
     </nav>
@@ -17,16 +17,28 @@
         <div id="staff-account-message" class="alert d-none" role="alert"></div>
         <form id="staff-account-form" class="portal-form-grid">
             <div><label class="form-label" for="staff-email">Email nhân viên</label><input class="form-control" id="staff-email" name="email" type="email" placeholder="nhanvien@salon.local" autocomplete="off" required /></div>
-            <div><label class="form-label" for="staff-role">Vai trò</label><select class="form-select" id="staff-role" name="role" required><option value="Receptionist">Lễ tân</option><option value="Stylist">Thợ</option></select></div>
-            <div class="portal-form-wide"><label class="form-label" for="staff-password">Mật khẩu ban đầu</label><input class="form-control" id="staff-password" name="password" type="password" minlength="8" autocomplete="new-password" required /><div class="form-text">Ít nhất 8 ký tự, có chữ thường và chữ số.</div></div>
+            <div><label class="form-label" for="staff-role">Vai trò</label><select class="form-select" id="staff-role" name="role" required><option value="Receptionist">Lễ tân</option><option value="Stylist">Thợ</option><option value="Owner">Chủ tiệm</option><option value="Admin">Quản trị</option></select></div>
+            <div><label class="form-label" for="staff-name">Họ tên</label><input class="form-control" id="staff-name" name="fullName" maxlength="120" required /></div><div><label class="form-label" for="staff-phone">Số điện thoại</label><input class="form-control" id="staff-phone" name="phoneNumber" pattern="0[0-9]{9}" required /></div><div><label class="form-label" for="staff-active">Trạng thái</label><select class="form-select" id="staff-active" name="isActive"><option value="true">Đang hoạt động</option><option value="false">Ngừng hoạt động</option></select></div><p>Mật khẩu tạm được hệ thống sinh và gửi qua email. Người dùng phải đổi khi đăng nhập lần đầu.</p>
             <div class="portal-form-wide"><button class="btn btn-primary" type="submit"><i class="bi bi-person-plus me-2"></i>Tạo tài khoản</button></div>
         </form>
 
+        <dialog id="staff-edit-dialog" class="rounded border p-4">
+            <form id="staff-edit-form">
+                <h2 class="h4">Sửa tài khoản</h2>
+                <input name="id" type="hidden" />
+                <label class="form-label" for="edit-full-name">Họ tên</label><input id="edit-full-name" name="fullName" class="form-control mb-2" required maxlength="120" />
+                <label class="form-label" for="edit-email">Email</label><input id="edit-email" name="email" type="email" class="form-control mb-2" required />
+                <label class="form-label" for="edit-phone">Số điện thoại</label><input id="edit-phone" name="phoneNumber" class="form-control mb-2" pattern="0[0-9]{9}" required />
+                <label class="form-label" for="edit-role">Vai trò</label><select id="edit-role" name="role" class="form-select mb-3"><option>Admin</option><option>Owner</option><option>Receptionist</option><option>Stylist</option></select>
+                <p id="staff-edit-error" class="text-danger" role="alert"></p>
+                <button type="submit" class="btn btn-primary">Lưu</button><button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('staff-edit-dialog').close()">Huỷ</button>
+            </form>
+        </dialog>
         <hr class="my-4" />
         <div class="portal-panel-heading"><div><h2>Danh sách tài khoản</h2><p>Tìm kiếm, lọc và thay đổi trạng thái tài khoản ngay lập tức.</p></div><button id="staff-refresh" class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-arrow-clockwise"></i> Làm mới</button></div>
         <form id="staff-filter-form" class="row g-2 mb-3">
             <div class="col-md-5"><input id="staff-search" class="form-control" placeholder="Tìm theo email" /></div>
-            <div class="col-md-3"><select id="staff-filter-role" class="form-select"><option value="">Tất cả vai trò</option><option>Admin</option><option>Owner</option><option value="Receptionist">Lễ tân</option><option value="Stylist">Thợ</option></select></div>
+            <div class="col-md-3"><select id="staff-filter-role" class="form-select"><option value="">Tất cả vai trò</option><option>Admin</option><option>Owner</option><option value="Receptionist">Lễ tân</option><option value="Stylist">Thợ</option><option value="Owner">Chủ tiệm</option><option value="Admin">Quản trị</option></select></div>
             <div class="col-md-3"><select id="staff-filter-status" class="form-select"><option value="">Tất cả trạng thái</option><option value="true">Đang hoạt động</option><option value="false">Ngừng hoạt động</option></select></div>
             <div class="col-md-1 d-grid"><button class="btn btn-outline-primary" type="submit" aria-label="Lọc"><i class="bi bi-search"></i></button></div>
         </form>
@@ -42,3 +54,4 @@
 </div>
 
 @section Scripts { <script src="~/js/auth.js" asp-append-version="true"></script><script>SalonAuth.requireSession();</script> }
+

@@ -55,9 +55,10 @@ public sealed class StaffAccountService(
         if (duplicate is not null && duplicate.Id != id) return (false, "Email này đã được sử dụng.");
 
         var currentRoles = await userManager.GetRolesAsync(user);
-        if (!currentRoles.Contains(role) && currentRoles.Contains(UserRoles.Admin) && !await CanRemoveAdminAsync(user.Id))
-            return (false, "Không thể đổi vai trò của Admin cuối cùng đang hoạt động.");
+        if (!currentRoles.Contains(role) && currentRoles.Contains(UserRoles.Admin) && await IsLastActiveAdminAsync(user.Id))
+            return (false, "Không thể thay đổi vai trò của tài khoản Admin.");
 
+        user.FullName = request.FullName.Trim();
         user.Email = request.Email.Trim();
         user.UserName = request.Email.Trim();
         user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
@@ -69,7 +70,7 @@ public sealed class StaffAccountService(
             if (currentRoles.Count > 0) await userManager.RemoveFromRolesAsync(user, currentRoles);
             var roleResult = await userManager.AddToRoleAsync(user, role);
             if (!roleResult.Succeeded) return (false, "Không thể cập nhật vai trò.");
-            await RevokeSessionsAsync(id);
+
         }
         return (true, "Đã cập nhật tài khoản.");
     }
@@ -78,8 +79,8 @@ public sealed class StaffAccountService(
     {
         var user = await userManager.FindByIdAsync(id);
         if (user is null) return (false, "Không tìm thấy tài khoản.");
-        if (!isActive && await userManager.IsInRoleAsync(user, UserRoles.Admin) && !await CanRemoveAdminAsync(id))
-            return (false, "Không thể ngừng hoạt động Admin cuối cùng.");
+        if (!isActive && await userManager.IsInRoleAsync(user, UserRoles.Admin) && await IsLastActiveAdminAsync(user.Id))
+            return (false, "Không thể ngừng hoạt động tài khoản Admin.");
 
         user.IsActive = isActive;
         var result = await userManager.UpdateAsync(user);
@@ -88,22 +89,32 @@ public sealed class StaffAccountService(
         return (true, isActive ? "Đã kích hoạt tài khoản." : "Đã ngừng hoạt động và thu hồi phiên đăng nhập.");
     }
 
+    public async Task<(bool Success, string Message)> UnlockAsync(string id)
+    {
+        var user = await userManager.FindByIdAsync(id);
+        if (user is null) return (false, "Không tìm thấy tài khoản.");
+
+        var unlockResult = await userManager.SetLockoutEndDateAsync(user, null);
+        if (!unlockResult.Succeeded) return (false, "Không thể mở khóa tài khoản.");
+
+        var resetResult = await userManager.ResetAccessFailedCountAsync(user);
+        if (!resetResult.Succeeded) return (false, "Đã bỏ thời gian khóa nhưng không thể đặt lại số lần đăng nhập sai.");
+
+        return (true, "Đã mở khóa tài khoản. Người dùng có thể đăng nhập lại ngay.");
+    }
+
     public async Task<(bool Success, string Message)> RevokeSessionsAsync(string id)
     {
         var user = await userManager.FindByIdAsync(id);
         if (user is null) return (false, "Không tìm thấy tài khoản.");
+        if (await userManager.IsInRoleAsync(user, UserRoles.Admin))
+            return (false, "Không thể thu hồi phiên đăng nhập của tài khoản Admin.");
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var tokens = await dbContext.RefreshTokens.Where(token => token.UserId == id && token.RevokedAtUtc == null).ToListAsync();
         foreach (var token in tokens) token.RevokedAtUtc = now;
         await dbContext.SaveChangesAsync();
         await userManager.UpdateSecurityStampAsync(user);
         return (true, "Đã thu hồi toàn bộ phiên đăng nhập.");
-    }
-
-    private async Task<bool> CanRemoveAdminAsync(string excludedId)
-    {
-        var admins = await userManager.GetUsersInRoleAsync(UserRoles.Admin);
-        return admins.Any(user => user.Id != excludedId && user.IsActive);
     }
 
     private static string? NormalizeRole(string? role) => role?.Trim().ToLowerInvariant() switch
@@ -114,4 +125,17 @@ public sealed class StaffAccountService(
         "stylist" => UserRoles.Stylist,
         _ => null
     };
+
+    private async Task<bool> IsLastActiveAdminAsync(string userId)
+    {
+        var activeAdminIds = await (
+            from user in userManager.Users
+            join userRole in dbContext.UserRoles on user.Id equals userRole.UserId
+            join role in dbContext.Roles on userRole.RoleId equals role.Id
+            where user.IsActive && role.Name == UserRoles.Admin
+            select user.Id).ToListAsync();
+
+        return activeAdminIds.Count == 1 && activeAdminIds[0] == userId;
+    }
 }
+
