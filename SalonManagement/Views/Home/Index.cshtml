@@ -19,7 +19,7 @@
             {
                 <a class="nav-login" href="/admin/login">Đăng nhập</a>
             }
-            <a class="button button-primary button-small" href="#booking">Đặt lịch</a>
+            <a class="button button-primary button-small" href="/booking">Đặt lịch</a>
         </div>
     </div>
 </header>
@@ -27,7 +27,7 @@
 <main class="home-page">
     <section class="hero">
         <div class="hero-media" role="img" aria-label="Khách hàng được chăm sóc tóc tại Luminol Salon"></div><div class="hero-overlay"></div>
-        <div class="home-container hero-content"><span class="home-eyebrow">Luminol Salon &amp; Spa</span><h1>Vẻ đẹp của bạn,<br/><em>cảm hứng của chúng tôi.</em></h1><p>Trải nghiệm chăm sóc tóc tinh tế trong một không gian thư giãn, nơi mỗi dịch vụ được thiết kế dành riêng cho bạn.</p><div class="hero-actions"><a class="button button-primary" href="#booking">Đặt lịch ngay <i class="bi bi-arrow-right"></i></a><a class="button button-ghost" href="#services">Khám phá dịch vụ</a></div><div class="hero-trust"><span><strong>4.9/5</strong><small><i class="bi bi-star-fill"></i> hơn 1.200 đánh giá</small></span><span><strong>8+</strong><small>năm tận tâm phục vụ</small></span></div></div>
+        <div class="home-container hero-content"><span class="home-eyebrow">Luminol Salon &amp; Spa</span><h1>Vẻ đẹp của bạn,<br/><em>cảm hứng của chúng tôi.</em></h1><p>Trải nghiệm chăm sóc tóc tinh tế trong một không gian thư giãn, nơi mỗi dịch vụ được thiết kế dành riêng cho bạn.</p><div class="hero-actions"><a class="button button-primary" href="/booking">Đặt lịch ngay <i class="bi bi-arrow-right"></i></a><a class="button button-ghost" href="#services">Khám phá dịch vụ</a></div><div class="hero-trust"><span><strong>4.9/5</strong><small><i class="bi bi-star-fill"></i> hơn 1.200 đánh giá</small></span><span><strong>8+</strong><small>năm tận tâm phục vụ</small></span></div></div>
     </section>
 
     <section class="booking-strip" id="booking"><div class="home-container booking-card"><div class="booking-copy"><span class="home-eyebrow">Đặt lịch trong 30 giây</span><h2>Sẵn sàng cho diện mạo mới?</h2><p>Để lại số điện thoại, chúng tôi sẽ giúp bạn chọn dịch vụ và khung giờ phù hợp.</p></div><form id="quick-booking-form" class="booking-form" novalidate><label><span>Số điện thoại</span><span class="booking-input"><i class="bi bi-telephone"></i><input id="booking-phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="Nhập số điện thoại" pattern="0[0-9]{9}" required /></span></label><label><span>Dịch vụ quan tâm</span><span class="booking-input"><i class="bi bi-stars"></i><select id="booking-service"><option value="">Chọn dịch vụ</option>@foreach (var group in Model.Services.GroupBy(s => s.ServiceGroupId)){<optgroup label="@(group.First().ServiceGroup?.GroupName ?? "Chưa phân nhóm")">@foreach(var service in group){<option value="@service.ServiceId">@service.ServiceName</option>}</optgroup>}<option value="consult">Tư vấn giúp tôi</option></select></span></label><button class="button button-primary" type="submit">Đặt lịch ngay</button><p id="booking-message" class="booking-message" role="status"></p></form></div></section>

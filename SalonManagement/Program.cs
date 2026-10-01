@@ -192,6 +192,8 @@ builder.Services.AddSingleton<
     IPasswordResetRateLimiter,
     PasswordResetRateLimiter>();
 
+builder.Services.AddScoped<IBookingService, BookingService>();
+
 builder.Services.AddScoped<SessionPrincipalValidator>();
 builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
 
