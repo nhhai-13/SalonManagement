@@ -79,6 +79,7 @@ public class PublicServiceCatalogTests
                 var response = await client.GetAsync(path);
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 var html = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+                Assert.Contains("name=\"search\"", html);
                 Assert.DoesNotContain("Nhóm rỗng", html);
                 Assert.DoesNotContain("Nhóm không có thợ", html);
                 Assert.DoesNotContain("Chưa phân công", html);
@@ -102,6 +103,20 @@ public class PublicServiceCatalogTests
                         Assert.Contains("Dịch vụ lẻ</h3>", html);
                     }
                 }
+                var searchResponse = await client.GetAsync(path + "?search=cat%20toc");
+                Assert.Equal(HttpStatusCode.OK, searchResponse.StatusCode);
+                var searched = WebUtility.HtmlDecode(await searchResponse.Content.ReadAsStringAsync());
+                Assert.Contains("value=\"cat toc\"", searched);
+                Assert.Contains("Xóa từ khóa", searched);
+                Assert.DoesNotContain("Gội thư giãn</h3>", searched);
+                if (groupCount > 0) Assert.Contains("A - Cắt tóc</h3>", searched);
+                else Assert.Contains("Không tìm thấy dịch vụ phù hợp.", searched);
+
+                var missing = WebUtility.HtmlDecode(await client.GetStringAsync(path + "?search=xyznotfound"));
+                Assert.Contains("Không tìm thấy dịch vụ phù hợp.", missing);
+                Assert.DoesNotContain("aria-label=\"Nhóm dịch vụ\"", missing);
+                var cleared = WebUtility.HtmlDecode(await client.GetStringAsync(path + "?search="));
+                Assert.Equal(html, cleared);
             }
         }
         finally { await app.StopAsync(); }
