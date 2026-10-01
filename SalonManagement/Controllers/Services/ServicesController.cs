@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
+using System.Globalization;
+using System.Text;
 
 namespace SalonManagement.Controllers
 {
@@ -18,10 +20,10 @@ namespace SalonManagement.Controllers
         // GET: /Services
         // Cho phép xem danh sách dịch vụ
         [AllowAnonymous]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? search = null)
         {
             var isOwner = User.IsInRole(UserRoles.Owner);
-            if (!isOwner) return await Public();
+            if (!isOwner) return await Public(search);
 
             var services = await _context.Services.AsNoTracking()
                 .Include(s => s.ServiceGroup)
@@ -35,8 +37,10 @@ namespace SalonManagement.Controllers
 
         // Owners can also preview the public catalog using /Services/Public.
         [AllowAnonymous]
-        public async Task<IActionResult> Public()
+        public async Task<IActionResult> Public(string? search = null)
         {
+            search = search?.Trim() ?? string.Empty;
+            var keyword = NormalizeSearch(search);
             var groups = await _context.ServiceGroups.AsNoTracking()
                 .OrderBy(g => g.DisplayOrder).ThenBy(g => g.ServiceGroupId)
                 .Select(g => new SalonManagement.Models.ViewModels.PublicServiceGroup
@@ -45,14 +49,32 @@ namespace SalonManagement.Controllers
                     Name = g.GroupName
                 }).ToListAsync();
             var services = await _context.Services.AsNoTracking()
+                .Where(s => s.IsActive && s.Stylists.Any(link => link.Stylist.IsActive))
                 .OrderBy(s => s.ServiceName).ThenBy(s => s.ServiceId).ToListAsync();
-            var byGroup = services.ToLookup(s => s.ServiceGroupId);
+            var byGroup = services
+                .Where(s => NormalizeSearch(s.ServiceName).Contains(keyword, StringComparison.Ordinal))
+                .ToLookup(s => s.ServiceGroupId);
             foreach (var group in groups)
                 group.Services = byGroup[group.Id].ToList();
+            groups.RemoveAll(group => group.Services.Count == 0);
             if (byGroup[null].Any())
                 groups.Add(new() { Name = "Chưa phân nhóm", Services = byGroup[null].ToList() });
 
-            return View("Public", new SalonManagement.Models.ViewModels.PublicServiceCatalog { Groups = groups });
+            return View("Public", new SalonManagement.Models.ViewModels.PublicServiceCatalog { Groups = groups, Search = search });
+        }
+
+        // Normalize both sides in memory so Vietnamese matching is independent of database collation.
+        private static string NormalizeSearch(string value)
+        {
+            var normalized = new StringBuilder();
+            foreach (var character in value.Normalize(NormalizationForm.FormD))
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark)
+                    continue;
+                var lower = char.ToLowerInvariant(character);
+                normalized.Append(lower == 'đ' ? 'd' : lower);
+            }
+            return normalized.ToString();
         }
 
         // GET: /Services/Create

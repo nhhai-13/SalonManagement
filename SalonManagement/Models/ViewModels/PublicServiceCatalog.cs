@@ -2,6 +2,7 @@ namespace SalonManagement.Models.ViewModels;
 
 public sealed class PublicServiceCatalog
 {
+    public string Search { get; init; } = string.Empty;
     public List<PublicServiceGroup> Groups { get; init; } = [];
     public bool HasServices => Groups.Any(g => g.Services.Count > 0);
 }
