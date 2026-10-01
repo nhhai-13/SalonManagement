@@ -80,6 +80,10 @@ public class PublicServiceCatalogTests
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 var html = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
                 Assert.Contains("name=\"search\"", html);
+                Assert.Contains("/css/catalog.css", html);
+                Assert.DoesNotContain("<script", html);
+                Assert.DoesNotContain("fonts.googleapis.com", html);
+                Assert.DoesNotContain("bootstrap.min.css", html);
                 Assert.DoesNotContain("Nhóm rỗng", html);
                 Assert.DoesNotContain("Nhóm không có thợ", html);
                 Assert.DoesNotContain("Chưa phân công", html);

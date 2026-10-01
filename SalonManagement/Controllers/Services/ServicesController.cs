@@ -50,7 +50,13 @@ namespace SalonManagement.Controllers
                 }).ToListAsync();
             var services = await _context.Services.AsNoTracking()
                 .Where(s => s.IsActive && s.Stylists.Any(link => link.Stylist.IsActive))
-                .OrderBy(s => s.ServiceName).ThenBy(s => s.ServiceId).ToListAsync();
+                .OrderBy(s => s.ServiceName).ThenBy(s => s.ServiceId)
+                .Select(s => new Service
+                {
+                    ServiceId = s.ServiceId, ServiceGroupId = s.ServiceGroupId,
+                    ServiceName = s.ServiceName, Description = s.Description,
+                    DurationMinutes = s.DurationMinutes, Price = s.Price
+                }).ToListAsync();
             var byGroup = services
                 .Where(s => NormalizeSearch(s.ServiceName).Contains(keyword, StringComparison.Ordinal))
                 .ToLookup(s => s.ServiceGroupId);
