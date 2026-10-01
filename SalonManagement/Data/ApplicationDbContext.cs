@@ -40,7 +40,9 @@ public ApplicationDbContext(
         public DbSet<Payment> Payments => Set<Payment>();
 
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
-        
+
+        public DbSet<ShopHoliday> ShopHolidays => Set<ShopHoliday>();
+
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 public override int SaveChanges()
 {
@@ -223,7 +225,12 @@ private class AuditEntry
                 entity.Property(hours => hours.TimeZoneId).HasMaxLength(64);
                 entity.HasIndex(hours => hours.DayOfWeek).IsUnique();
             });
-
+            builder.Entity<ShopHoliday>(entity =>
+            {
+                entity.HasKey(holiday => holiday.ShopHolidayId);
+                entity.Property(holiday => holiday.Reason).HasMaxLength(250);
+                entity.HasIndex(holiday => holiday.HolidayDate).IsUnique();
+            });
             builder.Entity<Customer>(entity =>
             {
                 entity.HasKey(customer => customer.CustomerId);
