@@ -55,7 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await json(`${panel.dataset.slotsUrl}?${q}`, slotRequest.signal);
             if (current !== slotVersion) return;
-            slotMessage.textContent = data.length ? 'Chọn giờ bắt đầu (giờ Việt Nam).' : 'Thợ đã chọn không còn khung giờ phù hợp trong ngày này. Hãy đổi ngày hoặc đổi thợ.';
+            slotMessage.textContent = data.length ? 'Chọn giờ bắt đầu (giờ Việt Nam).' : selected.value === '0'
+                ? 'Không có thợ phù hợp nào còn khung giờ trống trong ngày này. Hãy đổi ngày hoặc dịch vụ.'
+                : 'Thợ đã chọn không còn khung giờ phù hợp trong ngày này. Hãy đổi ngày hoặc đổi thợ.';
             for (const slot of data) {
                 const b = button(`${slot.start} – ${slot.end}`);
                 b.addEventListener('click', () => { selectedSlot.value = slot.start; choose(slots, b); });
@@ -78,9 +80,15 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await json(`${panel.dataset.stylistsUrl}?${query()}`, stylistRequest.signal);
             if (current !== version) return;
-            selected.value = data.some(s => String(s.id) === previous) ? previous : '';
+            selected.value = (previous === '0' && data.length > 0) || data.some(s => String(s.id) === previous) ? previous : '';
             message.textContent = !data.length ? 'Không có thợ nào thực hiện được toàn bộ dịch vụ. Vui lòng bỏ bớt hoặc đổi dịch vụ.'
                 : previous && !selected.value ? 'Thợ đã chọn không còn phù hợp. Vui lòng chọn lại thợ.' : 'Các thợ có thể thực hiện toàn bộ dịch vụ:';
+            const any = button('Thợ bất kỳ');
+            any.dataset.anyStylist = 'true';
+            any.disabled = data.length === 0;
+            options.append(any);
+            if (selected.value === '0') choose(options, any);
+            any.addEventListener('click', () => { selected.value = '0'; choose(options, any); loadSlots(); });
             for (const stylist of data) {
                 const b = button(stylist.name + (stylist.specialty ? ` — ${stylist.specialty}` : ''));
                 if (stylist.image && stylist.image.startsWith('/') && !stylist.image.startsWith('//')) {
