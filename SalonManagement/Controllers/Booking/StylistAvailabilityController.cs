@@ -17,7 +17,7 @@ public sealed class StylistAvailabilityController(StylistAvailabilityService ava
         catch (ArgumentException e) { return BadRequest(new { message = e.Message }); }
     }
 
-    [HttpGet("slots")]
+    [HttpGet("stylist-slots")]
     public async Task<IActionResult> Slots([FromQuery] int[] serviceIds, int? stylistId, DateOnly date)
     {
         if (!ModelState.IsValid || date == default || stylistId == null || stylistId < 0)
@@ -26,7 +26,7 @@ public sealed class StylistAvailabilityController(StylistAvailabilityService ava
         catch (ArgumentException e) { return BadRequest(new { message = e.Message }); }
     }
 
-    [HttpGet("assignment")]
+    [HttpGet("stylist-assignment")]
     public async Task<IActionResult> Assignment([FromQuery] int[] serviceIds, int? stylistId, DateOnly date, TimeOnly? start)
     {
         if (!ModelState.IsValid || date == default || stylistId == null || stylistId < 0 || start == null)

@@ -262,20 +262,6 @@
                     </div>
                 </div>
             </div>
-            <section class="card shadow-sm border-0 mt-4" aria-labelledby="availability-heading">
-                <div class="card-body">
-                    <h2 id="availability-heading" class="h5">Chọn khung giờ</h2>
-                    <label class="form-label" for="booking-date">Ngày hẹn</label>
-                    <input id="booking-date" class="form-control" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" />
-                    <p id="slot-message" class="text-muted mt-3 mb-2">Chọn ít nhất một dịch vụ và ngày hẹn để xem lịch trống.</p>
-                    <div id="slot-list" class="d-flex flex-wrap gap-2"></div>
-                    <div id="no-slots" class="alert alert-info mt-3 d-none" role="status">
-                        <div>Không còn khung giờ trống trong ngày đã chọn.</div>
-                        <div id="suggestion-message" class="small mt-2"></div>
-                        <div id="suggestion-list" class="d-flex flex-wrap gap-2 mt-2"></div>
-                    </div>
-                </div>
-            </section>
             <partial name="_StylistSelection" />
         </form>
     }
@@ -595,25 +581,6 @@
                 @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Totals.ShiftWarningMessage))
             );
 
-            const dateInput = document.getElementById("booking-date");
-            const slotList = document.getElementById("slot-list");
-            const slotMessage = document.getElementById("slot-message");
-            const noSlots = document.getElementById("no-slots");
-            const suggestionMessage = document.getElementById("suggestion-message");
-            const suggestionList = document.getElementById("suggestion-list");
-            async function loadSlots() {
-                const ids = checkboxes.filter(cb => cb.checked).map(cb => cb.value);
-                noSlots.classList.add("d-none"); suggestionList.replaceChildren();
-                if (!dateInput.value || !ids.length) { slotList.replaceChildren(); slotMessage.textContent = "Chọn ít nhất một dịch vụ và ngày hẹn để xem lịch trống."; return; }
-                const response = await fetch(`/booking/slots?date=${dateInput.value}&serviceIds=${ids.join("&serviceIds=")}`);
-                const data = await response.json();
-                if (!response.ok) { slotList.replaceChildren(); slotMessage.textContent = data.message; return; }
-                slotMessage.textContent = `Tổng thời lượng: ${data.totalDurationMinutes} phút.`;
-                slotList.replaceChildren(...data.slots.map(slot => { const button = document.createElement("button"); button.className = "btn btn-outline-primary"; button.type = "button"; button.textContent = slot; return button; }));
-                if (!data.slots.length) { noSlots.classList.remove("d-none"); suggestionMessage.textContent = data.suggestions.length ? "Bạn có thể chọn một trong các ngày còn chỗ:" : "Chưa tìm thấy ngày còn chỗ trong 14 ngày tới."; suggestionList.replaceChildren(...data.suggestions.map(item => { const button = document.createElement("button"); button.className = "btn btn-primary"; button.type = "button"; button.textContent = `${item.label} · sớm nhất ${item.earliestSlot}`; button.addEventListener("click", () => { dateInput.value = item.date; loadSlots(); }); return button; })); }
-            }
-            dateInput.addEventListener("change", loadSlots);
-            document.addEventListener("booking:services-changed", loadSlots);
         });
     </script>
 }

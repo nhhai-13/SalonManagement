@@ -38,7 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     async function json(url, signal) {
         const response = await fetch(url, { signal, cache: 'no-store' });
-        const data = await response.json();
+        const text = await response.text();
+        let data;
+        try { data = JSON.parse(text); }
+        catch { throw new Error('Máy chủ không thể tải dữ liệu đặt lịch. Vui lòng thử lại.'); }
         if (!response.ok) throw new Error(data.message || 'Không thể tải dữ liệu. Vui lòng thử lại.');
         return data;
     }
