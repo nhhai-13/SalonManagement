@@ -16,6 +16,7 @@ public sealed record BookingCreationResult(BookingConfirmation? Confirmation, st
 public sealed class BookingService(ApplicationDbContext db, TimeProvider timeProvider)
 {
     private const string ReferenceAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static readonly SemaphoreSlim ConfirmationLock = new(1, 1);
 
     public async Task<BookingCreationResult> CreateAsync(BookingRequest request)
     {
@@ -57,26 +58,23 @@ public sealed class BookingService(ApplicationDbContext db, TimeProvider timePro
         if (stylist is null)
             return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác.");
 
-        var customer = await db.Customers.FirstOrDefaultAsync(item => item.Phone == phone)
-            ?? new Customer { FullName = name, Phone = phone!, Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim() };
-        if (customer.CustomerId == 0) db.Customers.Add(customer); else { customer.FullName = name; customer.Email = string.IsNullOrWhiteSpace(request.Email) ? customer.Email : request.Email.Trim(); }
-        var reference = await CreateReferenceAsync();
-        var appointment = new Appointment
+        await ConfirmationLock.WaitAsync();
+        try
         {
-            Customer = customer,
-            StylistId = stylist.StylistId,
-            AppointmentDate = request.Date.Date,
-            StartTime = request.StartTime,
-            EndTime = endTime,
-            Status = "Confirmed",
-            BookingReference = reference,
-            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-            AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList()
-        };
-        db.Appointments.Add(appointment);
-        try { await db.SaveChangesAsync(); }
-        catch (DbUpdateException) { return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác."); }
-        return new BookingCreationResult(new BookingConfirmation(reference, stylist.FullName, services.Select(item => item.ServiceName).ToList(), request.Date.Date, request.StartTime, endTime), null, null);
+            var activeCount = await db.Appointments.Include(item => item.Customer)
+                .CountAsync(item => item.Customer.Phone == phone && item.Status != "Cancelled" && item.Status != "Completed" && item.Status != "NoShow");
+            if (activeCount >= 3)
+                return BookingCreationResult.Rejected("appointment_limit", "Bạn đã có 3 lịch hẹn chưa hoàn tất. Vui lòng huỷ bớt lịch cũ hoặc liên hệ tiệm.");
+            var customer = await db.Customers.FirstOrDefaultAsync(item => item.Phone == phone)
+                ?? new Customer { FullName = name, Phone = phone!, Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim() };
+            if (customer.CustomerId == 0) db.Customers.Add(customer); else { customer.FullName = name; customer.Email = string.IsNullOrWhiteSpace(request.Email) ? customer.Email : request.Email.Trim(); }
+            var reference = await CreateReferenceAsync();
+            db.Appointments.Add(new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "Confirmed", BookingReference = reference, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() });
+            try { await db.SaveChangesAsync(); }
+            catch (DbUpdateException) { return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác."); }
+            return new BookingCreationResult(new BookingConfirmation(reference, stylist.FullName, services.Select(item => item.ServiceName).ToList(), request.Date.Date, request.StartTime, endTime), null, null);
+        }
+        finally { ConfirmationLock.Release(); }
     }
 
     private async Task<string> CreateReferenceAsync()

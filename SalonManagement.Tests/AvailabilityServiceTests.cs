@@ -177,6 +177,22 @@ public sealed class AvailabilityServiceTests
         Assert.Contains("notes", result.FieldErrors.Keys);
     }
 
+    [Fact]
+    public async Task CreateBooking_RejectsFourthUnfinishedAppointmentButIgnoresCancelledAndCompleted()
+    {
+        await using var db = CreateDb(); var date = new DateTime(2026, 10, 10);
+        var service = new Service { ServiceName = "Cắt", DurationMinutes = 30, Price = 1 }; db.Services.Add(service); await db.SaveChangesAsync();
+        var stylist = new Stylist { FullName = "Mai", Phone = "0900000001", Services = [new StylistService { ServiceId = service.ServiceId }] }; var customer = new Customer { FullName = "Khách", Phone = "0900000002" }; db.AddRange(stylist, customer); await db.SaveChangesAsync();
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(17) });
+        db.Appointments.AddRange(Enumerable.Range(0, 3).Select(index => new Appointment { CustomerId = customer.CustomerId, StylistId = stylist.StylistId, AppointmentDate = date.AddDays(index + 1), StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(9), Status = "Confirmed", BookingReference = $"TEST000{index}" })); await db.SaveChangesAsync();
+
+        var result = await new BookingService(db, TimeProvider.System).CreateAsync(new BookingRequest(date, TimeSpan.FromHours(10), [service.ServiceId], "Khách", "+84900000002"));
+
+        Assert.Equal("appointment_limit", result.ErrorCode);
+        db.Appointments.Where(item => item.Status == "Confirmed").First().Status = "Cancelled"; await db.SaveChangesAsync();
+        Assert.NotNull((await new BookingService(db, TimeProvider.System).CreateAsync(new BookingRequest(date, TimeSpan.FromHours(10), [service.ServiceId], "Khách", "0900000002"))).Confirmation);
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
