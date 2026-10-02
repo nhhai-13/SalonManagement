@@ -225,6 +225,20 @@ public sealed class AvailabilityServiceTests
         Assert.Equal(["EFGH2345", "ABCD2345"], byPhone.Items.Select(item => item.Reference));
     }
 
+    [Fact]
+    public void AppointmentLookupRateLimiter_BlocksEleventhFailureThenExpires()
+    {
+        const string ip = "203.0.113.84";
+        var now = new DateTimeOffset(2026, 10, 2, 2, 0, 0, TimeSpan.Zero);
+        var limiter = new AppointmentLookupRateLimiter(new FixedTimeProvider(now));
+
+        Assert.All(Enumerable.Range(0, 10), _ => Assert.False(limiter.RegisterFailure(ip).IsBlocked));
+        var blocked = limiter.RegisterFailure(ip);
+        Assert.True(blocked.IsBlocked); Assert.Equal(now.AddMinutes(30), blocked.RetryAt);
+        Assert.True(limiter.Check(ip).IsBlocked);
+        Assert.False(new AppointmentLookupRateLimiter(new FixedTimeProvider(now.AddMinutes(31))).Check(ip).IsBlocked);
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
