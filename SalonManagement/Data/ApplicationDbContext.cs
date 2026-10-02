@@ -310,6 +310,7 @@ private class AuditEntry
             {
                 entity.HasKey(appointment => appointment.AppointmentId);
                 entity.Property(appointment => appointment.Status).HasMaxLength(30);
+                entity.Property(appointment => appointment.BookingReference).HasMaxLength(8);
 
                 entity.HasOne(appointment => appointment.Customer)
                     .WithMany(customer => customer.Appointments)
@@ -328,6 +329,7 @@ private class AuditEntry
                         appointment.AppointmentDate,
                         appointment.StartTime
                     });
+                entity.HasIndex(appointment => appointment.BookingReference).IsUnique();
             });
 
             builder.Entity<AppointmentService>(entity =>

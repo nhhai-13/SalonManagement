@@ -141,6 +141,26 @@ public sealed class AvailabilityServiceTests
         Assert.Empty(await new AvailabilityService(db).GetSuggestedDatesAsync(selectedDate, [service.ServiceId], maximumDaysToSearch: 2));
     }
 
+    [Fact]
+    public async Task CreateBooking_CreatesSummaryAndRejectsASecondBookingForTheSameSlot()
+    {
+        await using var db = CreateDb(); var date = new DateTime(2026, 10, 10);
+        var service = new Service { ServiceName = "Cắt", DurationMinutes = 60, Price = 100_000 }; db.Services.Add(service); await db.SaveChangesAsync();
+        var stylist = new Stylist { FullName = "Mai", Phone = "0900000001", Services = [new StylistService { ServiceId = service.ServiceId }] }; db.Stylists.Add(stylist); await db.SaveChangesAsync();
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) }); await db.SaveChangesAsync();
+        var booking = new BookingService(db, new FixedTimeProvider(new DateTimeOffset(2026, 10, 2, 2, 0, 0, TimeSpan.Zero)));
+
+        var created = await booking.CreateAsync(new BookingRequest(date, TimeSpan.FromHours(9), [service.ServiceId], "Khách A", "0900000002"));
+        var rejected = await booking.CreateAsync(new BookingRequest(date, TimeSpan.FromHours(9), [service.ServiceId], "Khách B", "0900000003"));
+
+        Assert.NotNull(created.Confirmation);
+        Assert.Matches("^[A-Z2-9]{8}$", created.Confirmation!.Reference);
+        Assert.Equal("Mai", created.Confirmation.StylistName);
+        Assert.Equal(TimeSpan.FromHours(10), created.Confirmation.EndTime);
+        Assert.Equal("slot_unavailable", rejected.ErrorCode);
+        Assert.Single(db.Appointments);
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider

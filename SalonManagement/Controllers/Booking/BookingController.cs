@@ -8,6 +8,8 @@ namespace SalonManagement.Controllers;
 
 [AllowAnonymous]
 [Route("booking")]
+public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, string FullName, string Phone);
+
 public sealed class BookingController(ApplicationDbContext db, AvailabilityService availability, TimeProvider timeProvider) : Controller
 {
     [HttpGet("")]
@@ -36,6 +38,26 @@ public sealed class BookingController(ApplicationDbContext db, AvailabilityServi
                 item.SlotCount,
                 earliestSlot = item.EarliestSlot.ToString(@"hh\:mm")
             })
+        });
+    }
+
+    [HttpPost("confirm")]
+    public async Task<IActionResult> Confirm([FromBody] ConfirmBookingInput input)
+    {
+        if (!TimeSpan.TryParse(input.StartTime, out var startTime))
+            return BadRequest(new { message = "Giờ hẹn không hợp lệ." });
+        var result = await new BookingService(db, timeProvider).CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, input.Phone));
+        if (result.Confirmation is null)
+            return Conflict(new { code = result.ErrorCode, message = result.Message });
+        var confirmation = result.Confirmation;
+        return Ok(new
+        {
+            confirmation.Reference,
+            confirmation.StylistName,
+            confirmation.Services,
+            date = confirmation.Date.ToString("dd/MM/yyyy"),
+            startTime = confirmation.StartTime.ToString(@"hh\:mm"),
+            endTime = confirmation.EndTime.ToString(@"hh\:mm")
         });
     }
 }
