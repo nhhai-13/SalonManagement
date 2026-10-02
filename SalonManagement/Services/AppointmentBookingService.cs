@@ -43,6 +43,18 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
         await ConfirmationLock.WaitAsync();
         try
         {
+            // The availability query above is only a preview. Re-check after taking the
+            // booking lock so a competing request cannot commit the same interval.
+            var collisionExists = await db.Appointments.AnyAsync(item =>
+                item.StylistId == stylist.StylistId &&
+                item.AppointmentDate == request.Date.Date &&
+                item.Status != "Cancelled" &&
+                item.Status != "NoShow" &&
+                item.Status != "Completed" &&
+                item.StartTime < endTime && request.StartTime < item.EndTime);
+            if (collisionExists)
+                return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa có người đặt. Vui lòng chọn khung giờ khác.");
+
             var activeCount = await db.Appointments.Include(item => item.Customer).CountAsync(item => item.Customer.Phone == phone && item.Status != "Cancelled" && item.Status != "Completed" && item.Status != "NoShow");
             if (activeCount >= 3) return BookingCreationResult.Rejected("appointment_limit", "Bạn đã có 3 lịch hẹn chưa hoàn tất. Vui lòng huỷ bớt lịch cũ hoặc liên hệ tiệm.");
             var customer = await db.Customers.FirstOrDefaultAsync(item => item.Phone == phone) ?? new Customer { FullName = name, Phone = phone!, Email = request.Email?.Trim() };
