@@ -47,10 +47,8 @@ public override int SaveChanges()
     return SaveChangesAsync().GetAwaiter().GetResult();
 }
 
-<<<<<<< HEAD
         public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
 
-=======
 public override int SaveChanges(bool acceptAllChangesOnSuccess)
 {
     if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
@@ -204,7 +202,6 @@ private class AuditEntry
     public string? EntityId { get; set; }
     public string? Changes { get; set; }
 }
->>>>>>> origin/develop
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
