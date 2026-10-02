@@ -263,11 +263,6 @@ namespace SalonManagement.Data.Migrations
                     b.Property<DateTime>("AppointmentDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("BookingReference")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("nvarchar(8)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -295,9 +290,6 @@ namespace SalonManagement.Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("AppointmentId");
-
-                    b.HasIndex("BookingReference")
-                        .IsUnique();
 
                     b.HasIndex("CustomerId");
 
