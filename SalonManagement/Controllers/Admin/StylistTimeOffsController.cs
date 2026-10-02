@@ -92,7 +92,43 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         });
     }
 }
-        var timeOff = new StylistTimeOff
+        // Kiểm tra các lịch hẹn bị ảnh hưởng bởi ngày/giờ nghỉ
+        var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
+        var nextDay = appointmentDay.AddDays(1);
+
+        var affectedAppointments = await dbContext.Appointments
+            .AsNoTracking()
+            .Where(a =>
+                a.StylistId == request.StylistId &&
+                a.AppointmentDate >= appointmentDay &&
+                a.AppointmentDate < nextDay &&
+                a.Status != "Cancelled")
+            .Where(a =>
+                request.IsFullDay ||
+                (request.StartTime.HasValue &&
+                request.EndTime.HasValue &&
+                a.StartTime < request.EndTime.Value.ToTimeSpan() &&
+                a.EndTime > request.StartTime.Value.ToTimeSpan()))
+            .OrderBy(a => a.StartTime)
+            .Select(a => new
+            {
+                a.AppointmentId,
+                a.AppointmentDate,
+                a.StartTime,
+                a.EndTime,
+                a.Status
+           })
+            .ToListAsync();
+
+   if (affectedAppointments.Count > 0)
+   {
+    return Conflict(new
+    {
+        message = "Thời gian nghỉ trùng với lịch hẹn đã có.",
+        affectedAppointments
+    });
+}
+        var timeOff = new StylistTimeOff    
         {
             StylistId = request.StylistId,
             OffDate = request.OffDate,
