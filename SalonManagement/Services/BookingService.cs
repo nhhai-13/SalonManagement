@@ -16,9 +16,16 @@ public class BookingService : IBookingService
         _context = context;
     }
 
-    public BookingTotalsDto CalculateTotals(IEnumerable<Service> selectedServices)
+    public BookingTotalsDto CalculateTotals(IEnumerable<Service> selectedServices, int? maxShiftDurationMinutes = null)
     {
         var servicesList = selectedServices?.ToList() ?? new List<Service>();
+
+        if (servicesList.Count > IBookingService.MaxServicesLimit)
+        {
+            throw new ArgumentException($"Số lượng dịch vụ trong một lượt đặt không được vượt quá {IBookingService.MaxServicesLimit}", nameof(selectedServices));
+        }
+
+        var maxShift = maxShiftDurationMinutes ?? IBookingService.DefaultMaxShiftDurationMinutes;
 
         if (servicesList.Count == 0)
         {
@@ -28,7 +35,10 @@ public class BookingService : IBookingService
                 FormattedTotalDuration = "0 phút",
                 TotalPrice = 0m,
                 FormattedTotalPrice = "0 đ",
-                SelectedServices = new List<SelectedServiceSummaryItem>()
+                SelectedServices = new List<SelectedServiceSummaryItem>(),
+                MaxShiftDurationMinutes = maxShift,
+                HasExceededShiftWarning = false,
+                ShiftWarningMessage = null
             };
         }
 
@@ -45,22 +55,38 @@ public class BookingService : IBookingService
             FormattedDuration = FormatDuration(s.DurationMinutes)
         }).ToList();
 
+        var hasExceededShift = totalMinutes > maxShift;
+        string? shiftWarningMessage = hasExceededShift
+            ? FormatShiftWarningMessage(totalMinutes, maxShift)
+            : null;
+
         return new BookingTotalsDto
         {
             TotalDurationMinutes = totalMinutes,
             FormattedTotalDuration = FormatDuration(totalMinutes),
             TotalPrice = totalPrice,
             FormattedTotalPrice = FormatCurrency(totalPrice),
-            SelectedServices = summaryItems
+            SelectedServices = summaryItems,
+            MaxShiftDurationMinutes = maxShift,
+            HasExceededShiftWarning = hasExceededShift,
+            ShiftWarningMessage = shiftWarningMessage
         };
     }
 
     public async Task<BookingTotalsDto> CalculateTotalsAsync(IEnumerable<int> selectedServiceIds)
     {
         var idList = selectedServiceIds?.Distinct().ToList() ?? new List<int>();
+
+        if (idList.Count > IBookingService.MaxServicesLimit)
+        {
+            throw new ArgumentException($"Số lượng dịch vụ trong một lượt đặt không được vượt quá {IBookingService.MaxServicesLimit}", nameof(selectedServiceIds));
+        }
+
+        var maxShiftMinutes = await GetMaxShiftDurationMinutesAsync();
+
         if (idList.Count == 0)
         {
-            return CalculateTotals(Enumerable.Empty<Service>());
+            return CalculateTotals(Enumerable.Empty<Service>(), maxShiftMinutes);
         }
 
         // Chỉ truy vấn các dịch vụ đang kinh doanh (IsActive == true)
@@ -75,7 +101,52 @@ public class BookingService : IBookingService
             .Select(s => s!)
             .ToList();
 
-        return CalculateTotals(orderedServices);
+        return CalculateTotals(orderedServices, maxShiftMinutes);
+    }
+
+    public async Task<int> GetMaxShiftDurationMinutesAsync()
+    {
+        // 1. Kiểm tra WorkSchedules của Stylist
+        var scheduleTimes = await _context.WorkSchedules.AsNoTracking()
+            .Where(ws => ws.EndTime > ws.StartTime && (ws.Status == "Working" || string.IsNullOrEmpty(ws.Status)))
+            .Select(ws => new { ws.StartTime, ws.EndTime })
+            .ToListAsync();
+
+        if (scheduleTimes.Count > 0)
+        {
+            var maxMinutes = scheduleTimes
+                .Select(ws => (int)(ws.EndTime - ws.StartTime).TotalMinutes)
+                .DefaultIfEmpty(0)
+                .Max();
+
+            if (maxMinutes > 0)
+            {
+                return maxMinutes;
+            }
+        }
+
+        // 2. Nếu WorkSchedules chưa có, kiểm tra BusinessHours của tiệm
+        var openBusinessHours = await _context.BusinessHours.AsNoTracking()
+            .Where(bh => !bh.IsClosed && bh.OpensAt != null && bh.ClosesAt != null)
+            .Select(bh => new { bh.OpensAt, bh.ClosesAt })
+            .ToListAsync();
+
+        if (openBusinessHours.Count > 0)
+        {
+            var maxBhMinutes = openBusinessHours
+                .Where(bh => bh.ClosesAt > bh.OpensAt)
+                .Select(bh => (int)(bh.ClosesAt!.Value.ToTimeSpan() - bh.OpensAt!.Value.ToTimeSpan()).TotalMinutes)
+                .DefaultIfEmpty(0)
+                .Max();
+
+            if (maxBhMinutes > 0)
+            {
+                return maxBhMinutes;
+            }
+        }
+
+        // 3. Fallback giá trị mặc định 240 phút (4 giờ)
+        return IBookingService.DefaultMaxShiftDurationMinutes;
     }
 
     public async Task<BookingSelectServicesViewModel> GetSelectServicesViewModelAsync(IEnumerable<int>? preselectedServiceIds = null)
@@ -102,9 +173,17 @@ public class BookingService : IBookingService
 
         var byGroup = services.ToLookup(s => s.ServiceGroupId);
 
+        string? errorMessage = null;
+        var validPreselected = preselectedSet;
+        if (preselectedSet.Count > IBookingService.MaxServicesLimit)
+        {
+            errorMessage = $"Số lượng dịch vụ trong một lượt đặt không được vượt quá {IBookingService.MaxServicesLimit}";
+            validPreselected = preselectedSet.Take(IBookingService.MaxServicesLimit).ToHashSet();
+        }
+
         foreach (var group in groups)
         {
-            group.Services = byGroup[group.Id].Select(s => MapToItemViewModel(s, preselectedSet)).ToList();
+            group.Services = byGroup[group.Id].Select(s => MapToItemViewModel(s, validPreselected)).ToList();
         }
 
         if (byGroup[null].Any())
@@ -114,19 +193,29 @@ public class BookingService : IBookingService
                 Id = null,
                 Name = "Chưa phân nhóm",
                 DisplayOrder = int.MaxValue,
-                Services = byGroup[null].Select(s => MapToItemViewModel(s, preselectedSet)).ToList()
+                Services = byGroup[null].Select(s => MapToItemViewModel(s, validPreselected)).ToList()
             });
         }
 
+        var maxShiftMinutes = await GetMaxShiftDurationMinutesAsync();
+
         // Tính totals ban đầu cho các preselected services
-        var totals = await CalculateTotalsAsync(preselectedSet);
+        var totals = await CalculateTotalsAsync(validPreselected);
 
         return new BookingSelectServicesViewModel
         {
             Groups = groups,
-            SelectedServiceIds = preselectedSet.ToList(),
-            Totals = totals
+            SelectedServiceIds = validPreselected.ToList(),
+            Totals = totals,
+            ErrorMessage = errorMessage,
+            MaxServicesLimit = IBookingService.MaxServicesLimit,
+            MaxShiftDurationMinutes = maxShiftMinutes
         };
+    }
+
+    public static string FormatShiftWarningMessage(int totalMinutes, int maxShiftMinutes)
+    {
+        return $"Tổng thời gian các dịch vụ đã chọn ({totalMinutes} phút) vượt quá độ dài ca làm việc dài nhất của tiệm ({maxShiftMinutes} phút). Quý khách nên cân nhắc tách thành 2 lần hẹn để có trải nghiệm phục vụ tốt nhất.";
     }
 
     public static string FormatCurrency(decimal price)
