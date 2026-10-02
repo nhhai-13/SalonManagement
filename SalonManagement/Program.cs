@@ -326,6 +326,7 @@ using (var scope = app.Services.CreateScope())
     {
         var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;
         await StylistBookingDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
+        await StylistAssignmentDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
     }
 }
 

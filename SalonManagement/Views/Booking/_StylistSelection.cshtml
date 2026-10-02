@@ -1,6 +1,7 @@
 <section id="stylist-selection" class="card p-3 my-4" hidden
          data-stylists-url="@Url.Action("Stylists", "StylistAvailability")"
-         data-slots-url="@Url.Action("Slots", "StylistAvailability")">
+         data-slots-url="@Url.Action("Slots", "StylistAvailability")"
+         data-assignment-url="@Url.Action("Assignment", "StylistAvailability")">
     <h2 class="h4">Chọn thợ và giờ hẹn</h2>
     <p>Chọn một thợ hoặc “Thợ bất kỳ” để xem giờ trống của các thợ làm được toàn bộ dịch vụ.</p>
     <p id="stylist-message" role="status" aria-live="polite"></p>
@@ -11,5 +12,12 @@
     <div id="slot-options" class="d-flex flex-wrap gap-2" role="group" aria-label="Khung giờ trống"></div>
     <input type="hidden" id="selected-stylist" name="stylistId" />
     <input type="hidden" id="selected-slot" name="startTime" />
+    <button type="button" id="confirm-stylist-selection" class="btn btn-primary mt-3" disabled>Xác nhận lựa chọn</button>
+    <div id="assignment-confirmation" class="border rounded p-3 mt-3" hidden aria-live="polite">
+        <h3 class="h5">Thông tin xác nhận</h3>
+        <p id="assignment-message" role="status"></p>
+        <p id="assignment-detail"></p>
+        <p class="text-muted mb-0">Lựa chọn này chưa giữ chỗ hoặc tạo lịch hẹn.</p>
+    </div>
     <noscript>Bật JavaScript để chọn thợ và xem khung giờ trống.</noscript>
 </section>
