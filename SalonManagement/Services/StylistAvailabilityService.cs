@@ -6,6 +6,7 @@ namespace SalonManagement.Services;
 
 public sealed record BookingStylist(int Id, string Name, string? Image, string? Specialty);
 public sealed record StylistSlot(string Start, string End);
+public sealed record StylistAssignment(int StylistId, string Name, DateOnly Date, string Start, string End);
 
 public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProvider clock)
 {
@@ -38,6 +39,36 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     }
 
     public async Task<List<StylistSlot>> GetSlotsAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date)
+        => (await GetStylistSlotsAsync(serviceIds, stylistId, date))
+            .Select(s => new StylistSlot(s.Start, s.End)).Distinct()
+            .OrderBy(s => s.Start, StringComparer.Ordinal).ThenBy(s => s.End, StringComparer.Ordinal).ToList();
+
+    // Read-only assignment decision. The eventual appointment writer must revalidate under its transaction.
+    public async Task<StylistAssignment?> AssignAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date, TimeOnly start)
+    {
+        var startText = start.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+        if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerMinute != 0) return null;
+        var candidates = (await GetStylistSlotsAsync(serviceIds, stylistId, date)).Where(s => s.Start == startText).ToList();
+        if (candidates.Count == 0) return null;
+        var candidateIds = candidates.Select(s => s.StylistId).Distinct().ToArray();
+        var day = date.ToDateTime(TimeOnly.MinValue);
+        var nextDay = day.AddDays(1);
+        // Proposed PO policy: appointment count, Pending + Confirmed, stable ID tie-break.
+        var ranked = await db.Stylists.AsNoTracking().Where(s => candidateIds.Contains(s.StylistId) && s.IsActive)
+            .Select(s => new
+            {
+                s.StylistId, s.FullName,
+                Count = s.Appointments.Count(a => a.AppointmentDate >= day && a.AppointmentDate < nextDay &&
+                    (a.Status == "Pending" || a.Status == "Confirmed"))
+            }).OrderBy(s => s.Count).ThenBy(s => s.StylistId).FirstOrDefaultAsync();
+        if (ranked == null) return null;
+        var slot = candidates.First(s => s.StylistId == ranked.StylistId);
+        return new(ranked.StylistId, ranked.FullName, date, slot.Start, slot.End);
+    }
+
+    private sealed record AvailableStylistSlot(int StylistId, string Start, string End);
+
+    private async Task<List<AvailableStylistSlot>> GetStylistSlotsAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date)
     {
         var services = await SelectedServices(serviceIds);
         var ids = services.Select(s => s.ServiceId).ToArray();
@@ -70,7 +101,7 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         if (duration > 24 * 60) return [];
         var length = TimeSpan.FromMinutes(duration);
         var busyByStylist = busy.ToLookup(a => a.StylistId);
-        var slots = new HashSet<StylistSlot>();
+        var slots = new HashSet<AvailableStylistSlot>();
         // Calculate each stylist independently: never stitch two people's free time together.
         foreach (var stylistShifts in shifts.GroupBy(s => s.StylistId))
         {
@@ -95,7 +126,7 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
                 {
                     var end = start + length;
                     if (day + start <= now || stylistBusy.Any(a => start < a.EndTime && end > a.StartTime)) continue;
-                    slots.Add(new(start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
+                    slots.Add(new(stylistShifts.Key, start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
                 }
             }
         }

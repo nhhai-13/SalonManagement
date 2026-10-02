@@ -8,6 +8,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const date = document.getElementById('booking-date');
     const selected = document.getElementById('selected-stylist');
     const selectedSlot = document.getElementById('selected-slot');
+    const confirm = document.getElementById('confirm-stylist-selection');
+    const confirmation = document.getElementById('assignment-confirmation');
+    const assignmentMessage = document.getElementById('assignment-message');
+    const assignmentDetail = document.getElementById('assignment-detail');
+    let assignmentVersion = 0, assignmentRequest;
+    function clearAssignment() {
+        assignmentVersion++;
+        assignmentRequest?.abort();
+        confirmation.hidden = true;
+        assignmentMessage.textContent = assignmentDetail.textContent = '';
+        confirm.disabled = true;
+    }
     const parts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
     const part = type => parts.find(p => p.type === type).value;
     date.value = date.min = `${part('year')}-${part('month')}-${part('day')}`;
@@ -17,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ids = () => [...document.querySelectorAll('.service-checkbox:checked')].map(e => e.value);
     const query = () => { const q = new URLSearchParams(); ids().forEach(id => q.append('serviceIds', id)); return q; };
     function clearSlots() {
+        clearAssignment();
         slotVersion++;
         slotRequest?.abort();
         selectedSlot.value = '';
@@ -60,7 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 : 'Thợ đã chọn không còn khung giờ phù hợp trong ngày này. Hãy đổi ngày hoặc đổi thợ.';
             for (const slot of data) {
                 const b = button(`${slot.start} – ${slot.end}`);
-                b.addEventListener('click', () => { selectedSlot.value = slot.start; choose(slots, b); });
+                b.addEventListener('click', () => {
+                    clearAssignment(); selectedSlot.value = slot.start; choose(slots, b); confirm.disabled = false;
+                });
                 slots.append(b);
             }
         } catch (e) {
@@ -105,6 +120,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     date.addEventListener('change', loadSlots);
+    confirm.addEventListener('click', async () => {
+        if (!selected.value || !selectedSlot.value || !date.value) return;
+        clearAssignment();
+        const current = assignmentVersion;
+        assignmentRequest = new AbortController();
+        confirmation.hidden = false;
+        assignmentMessage.textContent = 'Đang kiểm tra và chọn thợ phù hợp…';
+        const q = query(); q.set('stylistId', selected.value); q.set('date', date.value); q.set('start', selectedSlot.value);
+        try {
+            const data = await json(`${panel.dataset.assignmentUrl}?${q}`, assignmentRequest.signal);
+            if (current !== assignmentVersion) return;
+            assignmentMessage.textContent = `Thợ được gán: ${data.name}`;
+            assignmentDetail.textContent = `Ngày ${data.date} · ${data.start} – ${data.end}`;
+            confirm.disabled = false;
+        } catch (e) {
+            if (current !== assignmentVersion || e.name === 'AbortError') return;
+            selectedSlot.value = '';
+            choose(slots, null);
+            assignmentMessage.textContent = e.message;
+        }
+    });
     document.getElementById('btn-submit-booking')?.addEventListener('click', () => {
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         (options.querySelector('button') || date).focus({ preventScroll: true });

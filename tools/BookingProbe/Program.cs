@@ -27,6 +27,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var now = scope.ServiceProvider.GetRequiredService<StylistAvailabilityService>().SalonNow;
     await StylistBookingDemoSeed.SeedAsync(db, now.Date.AddDays(1));
+    await StylistAssignmentDemoSeed.SeedAsync(db, now.Date.AddDays(1));
     // Extra active service without a matching stylist exercises the empty state.
     db.Services.Add(new() { ServiceName = "Demo Không có thợ", DurationMinutes = 30, Price = 50000 });
     await db.SaveChangesAsync();
