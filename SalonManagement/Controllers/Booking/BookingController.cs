@@ -97,7 +97,17 @@ public class BookingController : Controller
         var limit = limiter.TryReserve(ipAddress);
         if (!limit.Allowed) return StatusCode(StatusCodes.Status429TooManyRequests, new { code = "ip_rate_limited", message = $"Bạn đã đạt giới hạn 5 lượt đặt trong một giờ. Vui lòng thử lại sau {limit.RetryAt!.Value.LocalDateTime:HH:mm}." });
         var result = await _appointmentBookingService.CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, input.Phone, input.Email, input.Notes));
-        if (result.Confirmation is null) { limiter.Release(ipAddress); return Conflict(new { code = result.ErrorCode, message = result.Message, errors = result.FieldErrors }); }
+        if (result.Confirmation is null)
+        {
+            limiter.Release(ipAddress);
+            return Conflict(new
+            {
+                code = result.ErrorCode,
+                message = result.Message,
+                errors = result.FieldErrors,
+                reloadSlots = result.ErrorCode == "slot_unavailable"
+            });
+        }
         var confirmation = result.Confirmation;
         return Ok(new { confirmation.Reference, confirmation.StylistName, confirmation.Services, date = confirmation.Date.ToString("dd/MM/yyyy"), startTime = confirmation.StartTime.ToString(@"hh\:mm"), endTime = confirmation.EndTime.ToString(@"hh\:mm") });
     }
