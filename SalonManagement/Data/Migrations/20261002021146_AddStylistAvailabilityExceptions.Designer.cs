@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SalonManagement.Data;
 
@@ -11,9 +12,11 @@ using SalonManagement.Data;
 namespace SalonManagement.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261002021146_AddStylistAvailabilityExceptions")]
+    partial class AddStylistAvailabilityExceptions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -632,32 +635,6 @@ namespace SalonManagement.Data.Migrations
                     b.ToTable("ServiceGroups");
                 });
 
-            modelBuilder.Entity("SalonManagement.Models.ShopHoliday", b =>
-                {
-                    b.Property<int>("ShopHolidayId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ShopHolidayId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateOnly>("HolidayDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)");
-
-                    b.HasKey("ShopHolidayId");
-
-                    b.HasIndex("HolidayDate")
-                        .IsUnique();
-
-                    b.ToTable("ShopHolidays");
-                });
-
             modelBuilder.Entity("SalonManagement.Models.Stylist", b =>
                 {
                     b.Property<int>("StylistId")
@@ -771,43 +748,6 @@ namespace SalonManagement.Data.Migrations
                     b.HasIndex("ServiceId");
 
                     b.ToTable("StylistServices");
-                });
-
-            modelBuilder.Entity("SalonManagement.Models.StylistTimeOff", b =>
-                {
-                    b.Property<int>("StylistTimeOffId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("StylistTimeOffId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<TimeOnly?>("EndTime")
-                        .HasColumnType("time");
-
-                    b.Property<bool>("IsFullDay")
-                        .HasColumnType("bit");
-
-                    b.Property<DateOnly>("OffDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)");
-
-                    b.Property<TimeOnly?>("StartTime")
-                        .HasColumnType("time");
-
-                    b.Property<int>("StylistId")
-                        .HasColumnType("int");
-
-                    b.HasKey("StylistTimeOffId");
-
-                    b.HasIndex("StylistId", "OffDate");
-
-                    b.ToTable("StylistTimeOffs");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.WorkSchedule", b =>
@@ -1017,17 +957,6 @@ namespace SalonManagement.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Service");
-
-                    b.Navigation("Stylist");
-                });
-
-            modelBuilder.Entity("SalonManagement.Models.StylistTimeOff", b =>
-                {
-                    b.HasOne("SalonManagement.Models.Stylist", "Stylist")
-                        .WithMany()
-                        .HasForeignKey("StylistId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("Stylist");
                 });

@@ -196,6 +196,7 @@ builder.Services.AddSingleton<
 builder.Services.AddScoped<IBookingService, BookingService>();
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
+builder.Services.AddScoped<AvailabilityService>();
 builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
 
 // =====================================

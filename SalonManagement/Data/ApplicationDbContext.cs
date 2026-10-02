@@ -30,6 +30,8 @@ public ApplicationDbContext(
         public DbSet<ServiceGroup> ServiceGroups => Set<ServiceGroup>();
 
         public DbSet<WorkSchedule> WorkSchedules => Set<WorkSchedule>();
+        public DbSet<StylistBreak> StylistBreaks => Set<StylistBreak>();
+        public DbSet<StylistDayOff> StylistDaysOff => Set<StylistDayOff>();
 
         public DbSet<Appointment> Appointments => Set<Appointment>();
 
@@ -316,6 +318,19 @@ private class AuditEntry
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(schedule => new { schedule.StylistId, schedule.WorkDate });
+            });
+
+            builder.Entity<StylistBreak>(entity =>
+            {
+                entity.HasKey(item => item.StylistBreakId);
+                entity.HasIndex(item => new { item.StylistId, item.BreakDate });
+                entity.HasOne(item => item.Stylist).WithMany(stylist => stylist.Breaks).HasForeignKey(item => item.StylistId).OnDelete(DeleteBehavior.Cascade);
+            });
+            builder.Entity<StylistDayOff>(entity =>
+            {
+                entity.HasKey(item => item.StylistDayOffId);
+                entity.HasIndex(item => new { item.StylistId, item.OffDate }).IsUnique();
+                entity.HasOne(item => item.Stylist).WithMany(stylist => stylist.DaysOff).HasForeignKey(item => item.StylistId).OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<Appointment>(entity =>

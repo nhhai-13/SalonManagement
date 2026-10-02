@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SalonManagement.Data;
 using SalonManagement.Models.ViewModels.Booking;
 using SalonManagement.Services;
 
@@ -10,10 +11,14 @@ namespace SalonManagement.Controllers.Booking;
 public class BookingController : Controller
 {
     private readonly IBookingService _bookingService;
+    private readonly AvailabilityService _availability;
+    private readonly TimeProvider _timeProvider;
 
-    public BookingController(IBookingService bookingService)
+    public BookingController(IBookingService bookingService, AvailabilityService availability, TimeProvider timeProvider)
     {
         _bookingService = bookingService;
+        _availability = availability;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>
@@ -45,6 +50,31 @@ public class BookingController : Controller
 
         var viewModel = await _bookingService.GetSelectServicesViewModelAsync(preselected);
         return View("~/Views/Booking/Index.cshtml", viewModel);
+    }
+
+    [HttpGet("slots")]
+    public async Task<IActionResult> Slots(DateTime date, [FromQuery] int[] serviceIds)
+    {
+        if (date.Date < SalonClock.GetLocalNow(_timeProvider).Date || serviceIds.Length == 0)
+            return BadRequest(new { message = "Vui lòng chọn ngày hợp lệ và ít nhất một dịch vụ." });
+
+        var result = await _availability.GetSlotsAsync(date.Date, serviceIds);
+        var suggestions = result.Slots.Count == 0
+            ? await _availability.GetSuggestedDatesAsync(date.Date, serviceIds)
+            : [];
+
+        return Ok(new
+        {
+            result.TotalDurationMinutes,
+            slots = result.Slots.Select(time => time.ToString(@"hh\:mm")),
+            suggestions = suggestions.Select(item => new
+            {
+                date = item.Date.ToString("yyyy-MM-dd"),
+                label = item.Date.ToString("dd/MM/yyyy"),
+                item.SlotCount,
+                earliestSlot = item.EarliestSlot.ToString(@"hh\:mm")
+            })
+        });
     }
 
     /// <summary>
