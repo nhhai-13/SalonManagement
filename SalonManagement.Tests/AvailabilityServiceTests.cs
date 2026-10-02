@@ -90,5 +90,39 @@ public sealed class AvailabilityServiceTests
         Assert.Empty((await new AvailabilityService(db).GetSlotsAsync(date, [service.ServiceId])).Slots);
     }
 
+    [Fact]
+    public async Task GetSlots_TodayShowsOnlySlotsAtLeastSixtyMinutesAhead()
+    {
+        await using var db = CreateDb(); var date = new DateTime(2026, 10, 6);
+        var service = new Service { ServiceName = "Cắt", DurationMinutes = 30, Price = 1 }; db.Services.Add(service); await db.SaveChangesAsync();
+        var stylist = new Stylist { FullName = "A", Phone = "0900000001", Services = [new StylistService { ServiceId = service.ServiceId }] }; db.Stylists.Add(stylist); await db.SaveChangesAsync();
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(13) }); await db.SaveChangesAsync();
+        var clock = new FixedTimeProvider(new DateTimeOffset(2026, 10, 6, 2, 0, 0, TimeSpan.Zero)); // 09:00 in Ho Chi Minh City
+
+        var result = await new AvailabilityService(db, clock).GetSlotsAsync(date, [service.ServiceId]);
+
+        Assert.DoesNotContain(TimeSpan.FromHours(9.75), result.Slots);
+        Assert.Contains(TimeSpan.FromHours(10), result.Slots);
+    }
+
+    [Fact]
+    public async Task GetSlots_FutureDateIsNotAffectedBySixtyMinuteRule()
+    {
+        await using var db = CreateDb(); var date = new DateTime(2026, 10, 7);
+        var service = new Service { ServiceName = "Cắt", DurationMinutes = 30, Price = 1 }; db.Services.Add(service); await db.SaveChangesAsync();
+        var stylist = new Stylist { FullName = "A", Phone = "0900000001", Services = [new StylistService { ServiceId = service.ServiceId }] }; db.Stylists.Add(stylist); await db.SaveChangesAsync();
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(10) }); await db.SaveChangesAsync();
+        var clock = new FixedTimeProvider(new DateTimeOffset(2026, 10, 6, 2, 0, 0, TimeSpan.Zero));
+
+        var result = await new AvailabilityService(db, clock).GetSlotsAsync(date, [service.ServiceId]);
+
+        Assert.Contains(TimeSpan.FromHours(8), result.Slots);
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
+    }
 }

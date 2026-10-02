@@ -6,8 +6,10 @@ namespace SalonManagement.Services;
 
 public sealed record AvailabilityResult(int TotalDurationMinutes, IReadOnlyList<TimeSpan> Slots);
 
-public sealed class AvailabilityService(ApplicationDbContext db)
+public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider timeProvider)
 {
+    public AvailabilityService(ApplicationDbContext db) : this(db, TimeProvider.System) { }
+
     public async Task<AvailabilityResult> GetSlotsAsync(DateTime date, IReadOnlyCollection<int> serviceIds)
     {
         var services = await db.Services.AsNoTracking().Where(s => s.IsActive && serviceIds.Contains(s.ServiceId)).ToListAsync();
@@ -28,6 +30,11 @@ public sealed class AvailabilityService(ApplicationDbContext db)
         var slots = eligible.SelectMany(stylist => stylist.WorkSchedules.SelectMany(shift => SlotsForShift(shift, duration, opensAt, closesAt)
                 .Where(slot => !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime) && !breaks.Where(b => b.StylistId == stylist.StylistId).Any(b => b.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < b.EndTime))))
             .Distinct().OrderBy(time => time).ToList();
+
+        var now = SalonClock.GetLocalNow(timeProvider);
+        if (date.Date == now.Date)
+            slots = slots.Where(slot => slot >= now.TimeOfDay.Add(TimeSpan.FromHours(1))).ToList();
+
         return new AvailabilityResult(duration, slots);
     }
 
