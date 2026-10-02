@@ -39,17 +39,17 @@ const path = require('node:path');
       const clipped = await page.locator('.card h3, .card p').evaluateAll(elements => elements.some(e =>
         e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1));
       if (clipped) throw Error('Clipped service name, description, duration or price');
-      if (await page.getByText('Duration: 240 min', { exact: true }).count() !== result.cards ||
-          await page.getByText('Price: 20.000.000 VND', { exact: true }).count() !== result.cards) throw Error('Missing price/duration');
+      if (await page.getByText('Thời lượng: 240 phút', { exact: true }).count() !== result.cards ||
+          await page.getByText('Giá: 20.000.000 VND', { exact: true }).count() !== result.cards) throw Error('Missing price/duration');
       if (responses.some(r => r.status >= 400 || !r.url.startsWith('http://127.0.0.1:5183/'))) throw Error('Unexpected resource: ' + JSON.stringify(responses));
       if (run === 0) {
         await page.screenshot({ path: path.join(out, '360px.png'), fullPage: false });
         await page.locator('.card').first().screenshot({ path: path.join(out, 'long-name.png') });
-        await page.getByLabel('Search by service name').fill('cat toc');
-        await Promise.all([page.waitForURL('**/*search=cat*'), page.getByRole('button', { name: 'Search' }).click()]);
+        await page.getByLabel('Tìm theo tên dịch vụ').fill('cat toc');
+        await Promise.all([page.waitForURL('**/*search=cat*'), page.getByRole('button', { name: 'Tìm kiếm' }).click()]);
         if (await page.locator('.card').count() !== 1) throw Error('Search failed');
         if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw Error('Search overflow');
-        await page.getByRole('link', { name: 'Clear search' }).click();
+        await page.getByRole('link', { name: 'Xóa từ khóa' }).click();
         await page.waitForURL(url => !url.searchParams.has('search'));
         if (await page.locator('.card').count() !== result.cards) throw Error('Clear failed');
         result.searchAndClear = 'passed';

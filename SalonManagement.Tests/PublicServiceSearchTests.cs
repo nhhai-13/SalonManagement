@@ -34,7 +34,7 @@ public class PublicServiceSearchTests
             Assert.Equal(expected, model.Groups.SelectMany(g => g.Services).Select(s => s.ServiceName));
             Assert.All(model.Groups, group => Assert.NotEmpty(group.Services));
             if (expected.Length == 0) Assert.Empty(model.Groups);
-            if (keyword == "goi") Assert.Equal(new[] { "Gội", "Ungrouped" }, model.Groups.Select(g => g.Name));
+            if (keyword == "goi") Assert.Equal(new[] { "Gội", "Chưa phân nhóm" }, model.Groups.Select(g => g.Name));
         }
     }
 

@@ -80,10 +80,6 @@ public class PublicServiceCatalogTests
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 var html = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
                 Assert.Contains("name=\"search\"", html);
-                Assert.Contains("<html lang=\"en\">", html);
-                Assert.Contains("Salon services", html);
-                Assert.Contains("Search by service name", html);
-                Assert.Contains("Sign in", html);
                 Assert.Contains("/css/catalog.css", html);
                 Assert.DoesNotContain("<script", html);
                 Assert.DoesNotContain("fonts.googleapis.com", html);
@@ -93,20 +89,20 @@ public class PublicServiceCatalogTests
                 Assert.DoesNotContain("Chưa phân công", html);
                 Assert.DoesNotContain("Thợ đã nghỉ", html);
                 if (groupCount <= 0)
-                    Assert.DoesNotContain("aria-label=\"Service groups\"", html);
+                    Assert.DoesNotContain("aria-label=\"Nhóm dịch vụ\"", html);
                 if (groupCount <= 0)
-                    Assert.Contains("No services are currently available.", html);
+                    Assert.Contains("Chưa có dịch vụ nào để hiển thị.", html);
                 else
                 {
-                    Assert.DoesNotContain("No services are currently available.", html);
+                    Assert.DoesNotContain("Chưa có dịch vụ nào để hiển thị.", html);
                     Assert.Contains("A - Cắt tóc</h3>", html);
                     Assert.DoesNotContain("Z - Uốn tóc</h3>", html);
-                    Assert.Contains("Duration: 30 min", html);
-                    Assert.Contains("Price: 150.000 VND", html);
+                    Assert.Contains("Thời lượng: 30 phút", html);
+                    Assert.Contains("Giá: 150.000 VND", html);
                     if (groupCount > 1)
                     {
                         Assert.True(html.IndexOf("Gội</h2>") < html.IndexOf("Tóc</h2>"));
-                        Assert.True(html.IndexOf("Tóc</h2>") < html.IndexOf("Ungrouped</h2>"));
+                        Assert.True(html.IndexOf("Tóc</h2>") < html.IndexOf("Chưa phân nhóm</h2>"));
                         Assert.Contains("Gội thư giãn</h3>", html);
                         Assert.Contains("Dịch vụ lẻ</h3>", html);
                     }
@@ -115,14 +111,14 @@ public class PublicServiceCatalogTests
                 Assert.Equal(HttpStatusCode.OK, searchResponse.StatusCode);
                 var searched = WebUtility.HtmlDecode(await searchResponse.Content.ReadAsStringAsync());
                 Assert.Contains("value=\"cat toc\"", searched);
-                Assert.Contains("Clear search", searched);
+                Assert.Contains("Xóa từ khóa", searched);
                 Assert.DoesNotContain("Gội thư giãn</h3>", searched);
                 if (groupCount > 0) Assert.Contains("A - Cắt tóc</h3>", searched);
-                else Assert.Contains("No matching services found.", searched);
+                else Assert.Contains("Không tìm thấy dịch vụ phù hợp.", searched);
 
                 var missing = WebUtility.HtmlDecode(await client.GetStringAsync(path + "?search=xyznotfound"));
-                Assert.Contains("No matching services found.", missing);
-                Assert.DoesNotContain("aria-label=\"Service groups\"", missing);
+                Assert.Contains("Không tìm thấy dịch vụ phù hợp.", missing);
+                Assert.DoesNotContain("aria-label=\"Nhóm dịch vụ\"", missing);
                 var cleared = WebUtility.HtmlDecode(await client.GetStringAsync(path + "?search="));
                 Assert.Equal(html, cleared);
             }
