@@ -14,6 +14,11 @@ public class BookingController : Controller
     private readonly AvailabilityService _availability;
     private readonly TimeProvider _timeProvider;
 
+    public BookingController(IBookingService bookingService)
+        : this(bookingService, null!, TimeProvider.System)
+    {
+    }
+
     public BookingController(IBookingService bookingService, AvailabilityService availability, TimeProvider timeProvider)
     {
         _bookingService = bookingService;
