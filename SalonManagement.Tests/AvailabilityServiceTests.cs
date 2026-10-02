@@ -150,7 +150,7 @@ public sealed class AvailabilityServiceTests
         db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) }); await db.SaveChangesAsync();
         var booking = new BookingService(db, new FixedTimeProvider(new DateTimeOffset(2026, 10, 2, 2, 0, 0, TimeSpan.Zero)));
 
-        var created = await booking.CreateAsync(new BookingRequest(date, TimeSpan.FromHours(9), [service.ServiceId], "Khách A", "0900000002"));
+        var created = await booking.CreateAsync(new BookingRequest(date, TimeSpan.FromHours(9), [service.ServiceId], "Khách A", "+84 900 000 002", "khach@example.com", "Gọi trước khi đến"));
         var rejected = await booking.CreateAsync(new BookingRequest(date, TimeSpan.FromHours(9), [service.ServiceId], "Khách B", "0900000003"));
 
         Assert.NotNull(created.Confirmation);
@@ -159,6 +159,22 @@ public sealed class AvailabilityServiceTests
         Assert.Equal(TimeSpan.FromHours(10), created.Confirmation.EndTime);
         Assert.Equal("slot_unavailable", rejected.ErrorCode);
         Assert.Single(db.Appointments);
+        Assert.Equal("0900000002", db.Customers.Single().Phone);
+        Assert.Equal("khach@example.com", db.Customers.Single().Email);
+        Assert.Equal("Gọi trước khi đến", db.Appointments.Single().Notes);
+    }
+
+    [Fact]
+    public async Task CreateBooking_RejectsInvalidCustomerFields()
+    {
+        await using var db = CreateDb();
+        var result = await new BookingService(db, TimeProvider.System).CreateAsync(new BookingRequest(new DateTime(2026, 10, 10), TimeSpan.FromHours(9), [], "", "123456789", "not-an-email", new string('x', 301)));
+
+        Assert.NotNull(result.FieldErrors);
+        Assert.Contains("fullName", result.FieldErrors!.Keys);
+        Assert.Contains("phone", result.FieldErrors.Keys);
+        Assert.Contains("email", result.FieldErrors.Keys);
+        Assert.Contains("notes", result.FieldErrors.Keys);
     }
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());

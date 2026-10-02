@@ -1,14 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace SalonManagement.Services;
 
-public sealed record BookingRequest(DateTime Date, TimeSpan StartTime, IReadOnlyCollection<int> ServiceIds, string FullName, string Phone);
+public sealed record BookingRequest(DateTime Date, TimeSpan StartTime, IReadOnlyCollection<int> ServiceIds, string FullName, string Phone, string? Email = null, string? Notes = null);
 public sealed record BookingConfirmation(string Reference, string StylistName, IReadOnlyList<string> Services, DateTime Date, TimeSpan StartTime, TimeSpan EndTime);
-public sealed record BookingCreationResult(BookingConfirmation? Confirmation, string? ErrorCode, string? Message)
+public sealed record BookingCreationResult(BookingConfirmation? Confirmation, string? ErrorCode, string? Message, IReadOnlyDictionary<string, string>? FieldErrors = null)
 {
     public static BookingCreationResult Rejected(string code, string message) => new(null, code, message);
+    public static BookingCreationResult Invalid(IReadOnlyDictionary<string, string> errors) => new(null, "invalid_details", "Vui lòng kiểm tra lại thông tin đã nhập.", errors);
 }
 
 public sealed class BookingService(ApplicationDbContext db, TimeProvider timeProvider)
@@ -17,8 +19,15 @@ public sealed class BookingService(ApplicationDbContext db, TimeProvider timePro
 
     public async Task<BookingCreationResult> CreateAsync(BookingRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.FullName) || string.IsNullOrWhiteSpace(request.Phone) || request.ServiceIds.Count == 0)
-            return BookingCreationResult.Rejected("invalid_details", "Vui lòng nhập họ tên, số điện thoại và dịch vụ.");
+        var errors = new Dictionary<string, string>();
+        var name = request.FullName?.Trim() ?? string.Empty;
+        if (name.Length is < 1 or > 100) errors["fullName"] = "Họ tên phải có từ 1 đến 100 ký tự.";
+        var phone = NormalizePhone(request.Phone);
+        if (phone is null) errors["phone"] = "Số điện thoại phải gồm đúng 10 chữ số.";
+        if (!string.IsNullOrWhiteSpace(request.Email) && !new EmailAddressAttribute().IsValid(request.Email.Trim())) errors["email"] = "Email không đúng định dạng.";
+        if ((request.Notes?.Length ?? 0) > 300) errors["notes"] = "Ghi chú không được vượt quá 300 ký tự.";
+        if (request.ServiceIds.Count == 0) errors["services"] = "Vui lòng chọn ít nhất một dịch vụ.";
+        if (errors.Count > 0) return BookingCreationResult.Invalid(errors);
         if (request.Date.Date < SalonClock.GetLocalNow(timeProvider).Date)
             return BookingCreationResult.Rejected("past_date", "Ngày hẹn không hợp lệ.");
         var now = SalonClock.GetLocalNow(timeProvider);
@@ -48,9 +57,9 @@ public sealed class BookingService(ApplicationDbContext db, TimeProvider timePro
         if (stylist is null)
             return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác.");
 
-        var customer = await db.Customers.FirstOrDefaultAsync(item => item.Phone == request.Phone.Trim())
-            ?? new Customer { FullName = request.FullName.Trim(), Phone = request.Phone.Trim() };
-        if (customer.CustomerId == 0) db.Customers.Add(customer); else customer.FullName = request.FullName.Trim();
+        var customer = await db.Customers.FirstOrDefaultAsync(item => item.Phone == phone)
+            ?? new Customer { FullName = name, Phone = phone!, Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim() };
+        if (customer.CustomerId == 0) db.Customers.Add(customer); else { customer.FullName = name; customer.Email = string.IsNullOrWhiteSpace(request.Email) ? customer.Email : request.Email.Trim(); }
         var reference = await CreateReferenceAsync();
         var appointment = new Appointment
         {
@@ -61,6 +70,7 @@ public sealed class BookingService(ApplicationDbContext db, TimeProvider timePro
             EndTime = endTime,
             Status = "Confirmed",
             BookingReference = reference,
+            Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
             AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList()
         };
         db.Appointments.Add(appointment);
@@ -77,5 +87,12 @@ public sealed class BookingService(ApplicationDbContext db, TimeProvider timePro
             if (!await db.Appointments.AnyAsync(item => item.BookingReference == reference)) return reference;
         }
         throw new InvalidOperationException("Unable to generate a unique booking reference.");
+    }
+
+    public static string? NormalizePhone(string? value)
+    {
+        var digits = new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("84") && digits.Length == 11) digits = "0" + digits[2..];
+        return digits.Length == 10 ? digits : null;
     }
 }

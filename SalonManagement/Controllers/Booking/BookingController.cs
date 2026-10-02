@@ -8,7 +8,7 @@ namespace SalonManagement.Controllers;
 
 [AllowAnonymous]
 [Route("booking")]
-public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, string FullName, string Phone);
+public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, string FullName, string Phone, string? Email, string? Notes);
 
 public sealed class BookingController(ApplicationDbContext db, AvailabilityService availability, TimeProvider timeProvider) : Controller
 {
@@ -46,9 +46,9 @@ public sealed class BookingController(ApplicationDbContext db, AvailabilityServi
     {
         if (!TimeSpan.TryParse(input.StartTime, out var startTime))
             return BadRequest(new { message = "Giờ hẹn không hợp lệ." });
-        var result = await new BookingService(db, timeProvider).CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, input.Phone));
+        var result = await new BookingService(db, timeProvider).CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, input.Phone, input.Email, input.Notes));
         if (result.Confirmation is null)
-            return Conflict(new { code = result.ErrorCode, message = result.Message });
+            return Conflict(new { code = result.ErrorCode, message = result.Message, errors = result.FieldErrors });
         var confirmation = result.Confirmation;
         return Ok(new
         {
