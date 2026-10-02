@@ -27,6 +27,9 @@
         public ICollection<WorkSchedule> WorkSchedules { get; set; }
             = new List<WorkSchedule>();
 
+        public ICollection<StylistBreak> Breaks { get; set; } = new List<StylistBreak>();
+        public ICollection<StylistDayOff> DaysOff { get; set; } = new List<StylistDayOff>();
+
         public ICollection<Appointment> Appointments { get; set; }
             = new List<Appointment>();
 
