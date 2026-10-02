@@ -5,6 +5,7 @@ using SalonManagement.Models;
 namespace SalonManagement.Services;
 
 public sealed record AvailabilityResult(int TotalDurationMinutes, IReadOnlyList<TimeSpan> Slots);
+public sealed record SuggestedAvailability(DateTime Date, int SlotCount, TimeSpan EarliestSlot);
 
 public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider timeProvider)
 {
@@ -36,6 +37,20 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
             slots = slots.Where(slot => slot >= now.TimeOfDay.Add(TimeSpan.FromHours(1))).ToList();
 
         return new AvailabilityResult(duration, slots);
+    }
+
+    public async Task<IReadOnlyList<SuggestedAvailability>> GetSuggestedDatesAsync(DateTime selectedDate, IReadOnlyCollection<int> serviceIds, int maximumDaysToSearch = 14)
+    {
+        var suggestions = new List<SuggestedAvailability>();
+        for (var offset = 1; offset <= maximumDaysToSearch && suggestions.Count < 2; offset++)
+        {
+            var candidate = selectedDate.Date.AddDays(offset);
+            var availability = await GetSlotsAsync(candidate, serviceIds);
+            if (availability.Slots.Count > 0)
+                suggestions.Add(new SuggestedAvailability(candidate, availability.Slots.Count, availability.Slots[0]));
+        }
+
+        return suggestions;
     }
 
     private static IEnumerable<TimeSpan> SlotsForShift(WorkSchedule shift, int duration, TimeSpan opensAt, TimeSpan closesAt)

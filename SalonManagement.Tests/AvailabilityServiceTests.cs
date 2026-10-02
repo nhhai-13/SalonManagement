@@ -119,6 +119,28 @@ public sealed class AvailabilityServiceTests
         Assert.Contains(TimeSpan.FromHours(8), result.Slots);
     }
 
+    [Fact]
+    public async Task GetSuggestedDates_SkipsClosedAndFullyBookedDays()
+    {
+        await using var db = CreateDb(); var selectedDate = new DateTime(2026, 10, 10);
+        var service = new Service { ServiceName = "Cắt", DurationMinutes = 60, Price = 1 }; db.Services.Add(service); await db.SaveChangesAsync();
+        var stylist = new Stylist { FullName = "A", Phone = "0900000001", Services = [new StylistService { ServiceId = service.ServiceId }] }; db.Stylists.Add(stylist); await db.SaveChangesAsync();
+        var closedDate = selectedDate.AddDays(1); var bookedDate = selectedDate.AddDays(2); var firstAvailable = selectedDate.AddDays(3); var secondAvailable = selectedDate.AddDays(4);
+        db.BusinessHours.Add(new BusinessHour { DayOfWeek = closedDate.DayOfWeek, IsClosed = true });
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = bookedDate, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(9) },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = firstAvailable, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(10) },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = secondAvailable, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(10) });
+        db.Appointments.Add(new Appointment { StylistId = stylist.StylistId, CustomerId = 1, AppointmentDate = bookedDate, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(9), Status = "Confirmed" }); await db.SaveChangesAsync();
+
+        var suggestions = await new AvailabilityService(db).GetSuggestedDatesAsync(selectedDate, [service.ServiceId]);
+
+        Assert.Equal([firstAvailable, secondAvailable], suggestions.Select(item => item.Date));
+        Assert.All(suggestions, item => Assert.True(item.SlotCount > 0));
+        Assert.Equal([firstAvailable], (await new AvailabilityService(db).GetSuggestedDatesAsync(selectedDate, [service.ServiceId], maximumDaysToSearch: 3)).Select(item => item.Date));
+        Assert.Empty(await new AvailabilityService(db).GetSuggestedDatesAsync(selectedDate, [service.ServiceId], maximumDaysToSearch: 2));
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
