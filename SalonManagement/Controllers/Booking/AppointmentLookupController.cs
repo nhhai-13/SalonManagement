@@ -16,6 +16,6 @@ public sealed class AppointmentLookupController(ApplicationDbContext db) : Contr
     public async Task<IActionResult> Search(string? query)
     {
         var result = await new AppointmentLookupService(db).SearchAsync(query);
-        return Ok(new { error = result.Error, appointments = result.Items.Select(item => new { item.Reference, date = item.Date.ToString("dd/MM/yyyy"), startTime = item.StartTime.ToString(@"hh\:mm") }) });
+        return Ok(new { error = result.Error, appointments = result.Items.Select(item => new { item.Reference, date = item.Date.ToString("dd/MM/yyyy"), startTime = item.StartTime.ToString(@"hh\:mm"), endTime = item.EndTime.ToString(@"hh\:mm"), item.Services, item.StylistName, item.DurationMinutes, item.Status }) });
     }
 }
