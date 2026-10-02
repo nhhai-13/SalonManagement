@@ -207,6 +207,24 @@ public sealed class AvailabilityServiceTests
         Assert.True(new BookingRateLimiter(new FixedTimeProvider(now.AddHours(1).AddMinutes(1))).TryReserve(ip).Allowed);
     }
 
+    [Fact]
+    public async Task AppointmentLookup_FindsReferenceAndOnlyUnfinishedAppointmentsForNormalizedPhone()
+    {
+        await using var db = CreateDb(); var customer = new Customer { FullName = "Khách A", Phone = "0900000002" }; var other = new Customer { FullName = "Khách B", Phone = "0900000003" }; db.AddRange(customer, other); await db.SaveChangesAsync();
+        db.Appointments.AddRange(
+            new Appointment { CustomerId = customer.CustomerId, StylistId = 1, AppointmentDate = new DateTime(2026, 10, 12), StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(11), Status = "Confirmed", BookingReference = "ABCD2345" },
+            new Appointment { CustomerId = customer.CustomerId, StylistId = 1, AppointmentDate = new DateTime(2026, 10, 11), StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(10), Status = "Pending", BookingReference = "EFGH2345" },
+            new Appointment { CustomerId = customer.CustomerId, StylistId = 1, AppointmentDate = new DateTime(2026, 10, 10), StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(9), Status = "Completed", BookingReference = "JKLM2345" },
+            new Appointment { CustomerId = other.CustomerId, StylistId = 1, AppointmentDate = new DateTime(2026, 10, 9), StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(9), Status = "Confirmed", BookingReference = "NPQR2345" }); await db.SaveChangesAsync();
+        var lookup = new AppointmentLookupService(db);
+
+        var byReference = await lookup.SearchAsync("abcd2345");
+        var byPhone = await lookup.SearchAsync("+84 900 000 002");
+
+        Assert.Single(byReference.Items); Assert.Equal("ABCD2345", byReference.Items[0].Reference);
+        Assert.Equal(["EFGH2345", "ABCD2345"], byPhone.Items.Select(item => item.Reference));
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
