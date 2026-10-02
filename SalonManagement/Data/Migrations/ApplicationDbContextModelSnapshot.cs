@@ -171,12 +171,34 @@ namespace SalonManagement.Data.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
+
+                    b.Property<DateTime?>("EmailVerificationCodeExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EmailVerificationCodeHash")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("EmailVerificationCodeSentAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EmailVerificationFailedAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -186,6 +208,9 @@ namespace SalonManagement.Data.Migrations
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
@@ -302,6 +327,42 @@ namespace SalonManagement.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("AppointmentServices");
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.AuditLog", b =>
+                {
+                    b.Property<int>("AuditLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AuditLogId"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Changes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EntityId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("AuditLogId");
+
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.BusinessHour", b =>
@@ -582,6 +643,10 @@ namespace SalonManagement.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -602,6 +667,10 @@ namespace SalonManagement.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("ProfileImagePath")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<string>("Specialty")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -612,6 +681,21 @@ namespace SalonManagement.Data.Migrations
                     b.HasKey("StylistId");
 
                     b.ToTable("Stylists");
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.StylistService", b =>
+                {
+                    b.Property<int>("StylistId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("StylistId", "ServiceId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.ToTable("StylistServices");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.WorkSchedule", b =>
@@ -784,6 +868,25 @@ namespace SalonManagement.Data.Migrations
                     b.Navigation("ServiceGroup");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.StylistService", b =>
+                {
+                    b.HasOne("SalonManagement.Models.Service", "Service")
+                        .WithMany("Stylists")
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SalonManagement.Models.Stylist", "Stylist")
+                        .WithMany("Services")
+                        .HasForeignKey("StylistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Service");
+
+                    b.Navigation("Stylist");
+                });
+
             modelBuilder.Entity("SalonManagement.Models.WorkSchedule", b =>
                 {
                     b.HasOne("SalonManagement.Models.Stylist", "Stylist")
@@ -820,6 +923,8 @@ namespace SalonManagement.Data.Migrations
             modelBuilder.Entity("SalonManagement.Models.Service", b =>
                 {
                     b.Navigation("AppointmentServices");
+
+                    b.Navigation("Stylists");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.ServiceGroup", b =>
@@ -830,6 +935,8 @@ namespace SalonManagement.Data.Migrations
             modelBuilder.Entity("SalonManagement.Models.Stylist", b =>
                 {
                     b.Navigation("Appointments");
+
+                    b.Navigation("Services");
 
                     b.Navigation("WorkSchedules");
                 });

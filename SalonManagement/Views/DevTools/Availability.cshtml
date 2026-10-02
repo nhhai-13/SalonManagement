@@ -1,0 +1,128 @@
+﻿@{
+    ViewData["Title"] = "DEV TOOL — Test S2-05";
+}
+
+<div class="alert alert-warning">
+    ⚠️ <strong>DEV TOOL</strong> — Trang này chỉ để test API. Sẽ xoá khi có UI chính thức.
+</div>
+
+<div class="container mt-4">
+    <h2>🧪 Test API Tính khung giờ trống (S2-05)</h2>
+    <!-- ... phần còn lại giữ nguyên ... -->
+</div>
+
+<div class="container mt-4">
+    <h2>🧪 Test API Tính khung giờ trống (S2-05)</h2>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ngày:</label>
+                        <input type="date" id="datePicker" class="form-control" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">ServiceIds (cách nhau dấu phẩy):</label>
+                        <input type="text" id="serviceIdsInput" class="form-control" value="1" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">StylistId (trống = bất kỳ):</label>
+                        <input type="number" id="stylistIdInput" class="form-control" />
+                    </div>
+
+                    <button id="btnSearch" class="btn btn-primary w-100">🔍 Tìm</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5>Kết quả</h5>
+                    <div id="result"><em class="text-muted">Chưa tìm</em></div>
+                    <hr />
+                    <h6>Raw JSON:</h6>
+                    <pre id="rawJson" class="bg-light p-2" style="max-height: 300px; overflow-y: auto;">—</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const datePicker = document.getElementById('datePicker');
+        const serviceIdsInput = document.getElementById('serviceIdsInput');
+        const stylistIdInput = document.getElementById('stylistIdInput');
+        const btnSearch = document.getElementById('btnSearch');
+        const result = document.getElementById('result');
+        const rawJson = document.getElementById('rawJson');
+
+        // Set ngày mai
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        datePicker.value = tomorrow.toISOString().split('T')[0];
+
+        btnSearch.addEventListener('click', async () => {
+            const date = datePicker.value;
+            const serviceIds = serviceIdsInput.value.split(',')
+                .map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+            const stylistId = stylistIdInput.value ? parseInt(stylistIdInput.value) : null;
+
+            result.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Đang tìm...';
+
+            let url = `/api/availability?date=${date}`;
+            serviceIds.forEach(id => url += `&serviceIds=${id}`);
+            if (stylistId) url += `&stylistId=${stylistId}`;
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                rawJson.textContent = JSON.stringify(data, null, 2);
+
+                if (!res.ok) {
+                    result.innerHTML = `<div class="alert alert-danger">Lỗi ${res.status}: ${data.error || 'Unknown'}</div>`;
+                    return;
+                }
+
+                if (data.totalSlots === 0) {
+                    let html = `<div class="alert alert-warning">
+                        <strong>Ngày ${data.date} đã hết chỗ!</strong>`;
+                    if (data.nextAvailableDates && data.nextAvailableDates.length > 0) {
+                        html += `<p class="mt-2 mb-1">Gợi ý ngày gần nhất:</p>`;
+                        data.nextAvailableDates.forEach(d => {
+                            html += `<button class="btn btn-sm btn-outline-primary me-2 btn-suggest"
+                                             data-date="${d}">📅 ${d}</button>`;
+                        });
+                    } else {
+                        html += `<p class="mt-2">Không có ngày nào trống trong 30 ngày tới.</p>`;
+                    }
+                    html += '</div>';
+                    result.innerHTML = html;
+                    document.querySelectorAll('.btn-suggest').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            datePicker.value = btn.dataset.date;
+                            btnSearch.click();
+                        });
+                    });
+                    return;
+                }
+
+                let html = `<p class="text-success">✅ <strong>${data.totalSlots}</strong> khung giờ trống:</p><div class="row g-2">`;
+                data.slots.forEach(s => {
+                    html += `<div class="col-3">
+                        <span class="badge bg-primary w-100 p-2">${s.startTime} → ${s.endTime}</span>
+                    </div>`;
+                });
+                html += '</div>';
+                result.innerHTML = html;
+
+            } catch (err) {
+                result.innerHTML = `<div class="alert alert-danger">Lỗi: ${err.message}</div>`;
+            }
+        });
+    </script>
+}
