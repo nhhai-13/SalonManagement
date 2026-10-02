@@ -47,6 +47,8 @@ public override int SaveChanges()
     return SaveChangesAsync().GetAwaiter().GetResult();
 }
 
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
+
 public override int SaveChanges(bool acceptAllChangesOnSuccess)
 {
     if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
@@ -363,6 +365,16 @@ private class AuditEntry
                     .WithMany(invoice => invoice.Payments)
                     .HasForeignKey(payment => payment.InvoiceId);
             });
+               // Cấu hình lịch nghỉ riêng của thợ
+        builder.Entity<StylistTimeOff>(entity =>
+            {
+                entity.HasKey(timeOff => timeOff.StylistTimeOffId);
+
+                entity.HasOne(timeOff => timeOff.Stylist)
+                    .WithMany()
+                    .HasForeignKey(timeOff => timeOff.StylistId)
+                    .OnDelete(DeleteBehavior.Cascade);
+           });
         }
     }
 }

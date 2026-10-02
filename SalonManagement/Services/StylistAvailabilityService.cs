@@ -65,17 +65,31 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var busy = await db.Appointments.AsNoTracking().Where(a => qualifiedIds.Contains(a.StylistId) &&
             a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
-
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking()
+            .Where(t => qualifiedIds.Contains(t.StylistId) &&
+                t.OffDate == date)
+            .Select(t => new
+            {
+                t.StylistId,
+                t.IsFullDay,
+                t.StartTime,
+                t.EndTime
+           })
+           .ToListAsync();
         var duration = services.Sum(s => (long)s.DurationMinutes);
         if (duration > 24 * 60) return [];
         var length = TimeSpan.FromMinutes(duration);
         var busyByStylist = busy.ToLookup(a => a.StylistId);
+        var timeOffByStylist = timeOffs.ToLookup(t => t.StylistId);
         var slots = new HashSet<StylistSlot>();
         // Calculate each stylist independently: never stitch two people's free time together.
         foreach (var stylistShifts in shifts.GroupBy(s => s.StylistId))
         {
             var stylistBusy = busyByStylist[stylistShifts.Key].ToList();
+            var stylistTimeOffs = timeOffByStylist[stylistShifts.Key].ToList();
 
+            if (stylistTimeOffs.Any(t => t.IsFullDay))
+                continue;
             // Union overlapping/adjacent shifts, but never bridge a break.
             var windows = new List<(TimeSpan Start, TimeSpan End)>();
             foreach (var shift in stylistShifts)
@@ -94,7 +108,16 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
                 for (var start = first; start + length <= window.End; start += TimeSpan.FromMinutes(15))
                 {
                     var end = start + length;
-                    if (day + start <= now || stylistBusy.Any(a => start < a.EndTime && end > a.StartTime)) continue;
+                    var overlapsTimeOff = stylistTimeOffs.Any(t =>
+                        !t.IsFullDay &&
+                        t.StartTime.HasValue &&
+                        t.EndTime.HasValue &&
+                        start < t.EndTime.Value.ToTimeSpan() &&
+                        end > t.StartTime.Value.ToTimeSpan());
+                   if (day + start <= now ||
+                       stylistBusy.Any(a => start < a.EndTime && end > a.StartTime) ||
+                       overlapsTimeOff)
+                       continue;
                     slots.Add(new(start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
                 }
             }
