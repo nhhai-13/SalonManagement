@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using SalonManagement.Data;
 using SalonManagement.Models.ViewModels.Booking;
 using SalonManagement.Services;
@@ -22,6 +23,7 @@ public class BookingController : Controller
     {
     }
 
+    [ActivatorUtilitiesConstructor]
     public BookingController(IBookingService bookingService, AvailabilityService availability, TimeProvider timeProvider, AppointmentBookingService? appointmentBookingService = null)
     {
         _bookingService = bookingService;
