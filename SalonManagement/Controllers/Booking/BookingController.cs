@@ -8,7 +8,7 @@ namespace SalonManagement.Controllers;
 
 [AllowAnonymous]
 [Route("booking")]
-public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, string FullName, string Phone, string? Email, string? Notes);
+public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, string FullName, string Phone, string? Email, string? Notes, string? Website);
 
 public sealed class BookingController(ApplicationDbContext db, AvailabilityService availability, TimeProvider timeProvider) : Controller
 {
@@ -44,11 +44,19 @@ public sealed class BookingController(ApplicationDbContext db, AvailabilityServi
     [HttpPost("confirm")]
     public async Task<IActionResult> Confirm([FromBody] ConfirmBookingInput input)
     {
+        if (!string.IsNullOrWhiteSpace(input.Website)) return Conflict(new { code = "bot_detected", message = "Yêu cầu đặt lịch không hợp lệ." });
         if (!TimeSpan.TryParse(input.StartTime, out var startTime))
             return BadRequest(new { message = "Giờ hẹn không hợp lệ." });
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "unknown";
+        var limiter = new BookingRateLimiter(timeProvider);
+        var limit = limiter.TryReserve(ipAddress);
+        if (!limit.Allowed) return StatusCode(StatusCodes.Status429TooManyRequests, new { code = "ip_rate_limited", message = $"Bạn đã đạt giới hạn 5 lượt đặt trong một giờ. Vui lòng thử lại sau {limit.RetryAt!.Value.LocalDateTime:HH:mm}." });
         var result = await new BookingService(db, timeProvider).CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, input.Phone, input.Email, input.Notes));
         if (result.Confirmation is null)
+        {
+            limiter.Release(ipAddress);
             return Conflict(new { code = result.ErrorCode, message = result.Message, errors = result.FieldErrors });
+        }
         var confirmation = result.Confirmation;
         return Ok(new
         {

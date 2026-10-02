@@ -193,6 +193,20 @@ public sealed class AvailabilityServiceTests
         Assert.NotNull((await new BookingService(db, TimeProvider.System).CreateAsync(new BookingRequest(date, TimeSpan.FromHours(10), [service.ServiceId], "Khách", "0900000002"))).Confirmation);
     }
 
+    [Fact]
+    public void BookingRateLimiter_AllowsFiveBookingsThenResetsAfterOneHour()
+    {
+        const string ip = "203.0.113.104";
+        var now = new DateTimeOffset(2026, 10, 2, 2, 0, 0, TimeSpan.Zero);
+        var limiter = new BookingRateLimiter(new FixedTimeProvider(now));
+
+        Assert.All(Enumerable.Range(0, 5), _ => Assert.True(limiter.TryReserve(ip).Allowed));
+        var denied = limiter.TryReserve(ip);
+        Assert.False(denied.Allowed);
+        Assert.Equal(now.AddHours(1), denied.RetryAt);
+        Assert.True(new BookingRateLimiter(new FixedTimeProvider(now.AddHours(1).AddMinutes(1))).TryReserve(ip).Allowed);
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
