@@ -194,6 +194,7 @@ builder.Services.AddSingleton<
     PasswordResetRateLimiter>();
 
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<AppointmentBookingService>();
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
 builder.Services.AddScoped<AvailabilityService>();

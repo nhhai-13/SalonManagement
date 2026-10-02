@@ -6,6 +6,8 @@ using SalonManagement.Services;
 
 namespace SalonManagement.Controllers.Booking;
 
+public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, string FullName, string Phone, string? Email, string? Notes, string? Website);
+
 [AllowAnonymous]
 [Route("booking")]
 public class BookingController : Controller
@@ -13,17 +15,19 @@ public class BookingController : Controller
     private readonly IBookingService _bookingService;
     private readonly AvailabilityService _availability;
     private readonly TimeProvider _timeProvider;
+    private readonly AppointmentBookingService? _appointmentBookingService;
 
     public BookingController(IBookingService bookingService)
         : this(bookingService, null!, TimeProvider.System)
     {
     }
 
-    public BookingController(IBookingService bookingService, AvailabilityService availability, TimeProvider timeProvider)
+    public BookingController(IBookingService bookingService, AvailabilityService availability, TimeProvider timeProvider, AppointmentBookingService? appointmentBookingService = null)
     {
         _bookingService = bookingService;
         _availability = availability;
         _timeProvider = timeProvider;
+        _appointmentBookingService = appointmentBookingService;
     }
 
     /// <summary>
@@ -80,6 +84,22 @@ public class BookingController : Controller
                 earliestSlot = item.EarliestSlot.ToString(@"hh\:mm")
             })
         });
+    }
+
+    [HttpPost("confirm")]
+    public async Task<IActionResult> Confirm([FromBody] ConfirmBookingInput input)
+    {
+        if (!string.IsNullOrWhiteSpace(input.Website)) return Conflict(new { code = "bot_detected", message = "Yêu cầu đặt lịch không hợp lệ." });
+        if (!TimeSpan.TryParse(input.StartTime, out var startTime)) return BadRequest(new { message = "Giờ hẹn không hợp lệ." });
+        if (_appointmentBookingService is null) return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Dịch vụ đặt lịch chưa sẵn sàng." });
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "unknown";
+        var limiter = new BookingRateLimiter(_timeProvider);
+        var limit = limiter.TryReserve(ipAddress);
+        if (!limit.Allowed) return StatusCode(StatusCodes.Status429TooManyRequests, new { code = "ip_rate_limited", message = $"Bạn đã đạt giới hạn 5 lượt đặt trong một giờ. Vui lòng thử lại sau {limit.RetryAt!.Value.LocalDateTime:HH:mm}." });
+        var result = await _appointmentBookingService.CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, input.Phone, input.Email, input.Notes));
+        if (result.Confirmation is null) { limiter.Release(ipAddress); return Conflict(new { code = result.ErrorCode, message = result.Message, errors = result.FieldErrors }); }
+        var confirmation = result.Confirmation;
+        return Ok(new { confirmation.Reference, confirmation.StylistName, confirmation.Services, date = confirmation.Date.ToString("dd/MM/yyyy"), startTime = confirmation.StartTime.ToString(@"hh\:mm"), endTime = confirmation.EndTime.ToString(@"hh\:mm") });
     }
 
     /// <summary>
