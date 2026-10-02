@@ -20,6 +20,19 @@ CREATE TABLE IF NOT EXISTS services (
 );
 CREATE INDEX IF NOT EXISTS services_group_index ON services(group_id);
 
+-- A stylist qualifies only when they are linked to every selected active service.
+CREATE TABLE IF NOT EXISTS stylists (
+  id uuid PRIMARY KEY,
+  name varchar(120) NOT NULL UNIQUE,
+  is_active boolean NOT NULL DEFAULT true
+);
+CREATE TABLE IF NOT EXISTS stylist_services (
+  stylist_id uuid NOT NULL REFERENCES stylists(id) ON DELETE CASCADE,
+  service_id uuid NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+  PRIMARY KEY (stylist_id, service_id)
+);
+CREATE INDEX IF NOT EXISTS stylist_services_service_index ON stylist_services(service_id, stylist_id);
+
 -- PostgreSQL delivers NOTIFY only after COMMIT, including changes from other API instances.
 CREATE OR REPLACE FUNCTION notify_salon_catalog_changed() RETURNS trigger AS $$
 BEGIN

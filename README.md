@@ -10,6 +10,7 @@ Triển khai phạm vi quản lý nhóm dịch vụ bằng **Node.js + NestJS (R
 - Xoá nhóm chỉ có dịch vụ ngừng bán: giữ nguyên dịch vụ, chuyển chúng sang chưa phân nhóm.
 - Có trạng thái tải, lỗi, danh sách trống, phản hồi thành công và giao diện cho điện thoại.
 - Trang công khai `/dat-lich` không cần đăng nhập, hiển thị dịch vụ đang bán theo nhóm và thứ tự Chủ tiệm đã lưu; ẩn nhóm rỗng hoặc chỉ có dịch vụ ngừng bán.
+- Khách có thể chọn nhiều dịch vụ và xem/chọn thợ có khả năng thực hiện **tất cả** dịch vụ đã chọn; có lựa chọn “Thợ bất kỳ” và trạng thái không có thợ phù hợp.
 - Trang khách đang mở tự cập nhật qua Server-Sent Events và PostgreSQL LISTEN/NOTIFY sau khi thay đổi được commit. Có tự kết nối lại, tải lại khi quay về tab và kiểm tra dự phòng mỗi 30 giây.
 
 ## Quy tắc cần PO xác nhận
@@ -53,6 +54,13 @@ $env:TEST_DATABASE_URL='postgresql://salon:salon_local@localhost:5432/salon_test
 pnpm test:e2e
 ```
 
+Kiểm tra giao diện chọn thợ bằng dữ liệu API mô phỏng, không cần PostgreSQL:
+
+```powershell
+pnpm exec playwright install chromium
+pnpm test:booking-ui
+```
+
 ### Lát 4 — kiểm thử xuyên suốt bằng trình duyệt
 
 ```powershell
@@ -83,6 +91,7 @@ Các tình huống kiểm thử: đăng nhập sai/đúng, JWT thiếu/giả/h�
 | GET | `/api/service-groups/:id/deletion-check` | Chủ tiệm: kiểm tra tổng số dịch vụ, số đang bán và quyền xoá hiện tại |
 | GET | `/api/public/service-groups` | Công khai: nhóm và các dịch vụ đang bán, theo thứ tự hiển thị |
 | GET | `/api/public/catalog-events` | Công khai: luồng SSE báo danh mục thay đổi |
+| GET | `/api/public/stylists?serviceIds=<uuid>,<uuid>` | Công khai: thợ đang hoạt động làm được toàn bộ dịch vụ đang bán được yêu cầu |
 
 Các API nhóm yêu cầu `Authorization: Bearer <accessToken>`. Mã lỗi: 400 dữ liệu không hợp lệ, 401 chưa đăng nhập, 403 không có quyền, 404 không tồn tại, 409 tên trùng/nhóm còn dịch vụ đang bán, 429 quá giới hạn.
 
@@ -106,6 +115,10 @@ node scripts/seed-booking-demo.cjs
 ```
 
 Script thêm tám dịch vụ mẫu vào Chăm sóc da (1), Tóc (2), Gội dưỡng (3), không thêm lại dịch vụ cùng tên đã có trong nhóm. Không chạy tự động khi khởi động ứng dụng.
+
+Để thử chọn thợ, chạy `node scripts/seed-stylist-demo.cjs` sau script dịch vụ mẫu. Lệnh này thêm/cập nhật Linh Nguyễn (được gán mọi dịch vụ đang bán) và Mai Trần (chỉ được gán một dịch vụ để minh hoạ trường hợp không đủ năng lực). Thao tác seed được chạy riêng, không tự động lúc khởi động.
+
+Quy tắc lát chọn thợ: với tập dịch vụ được chọn `S`, thợ xuất hiện khi thợ đang hoạt động và có liên kết năng lực với mọi phần tử của `S`; dịch vụ phải còn đang bán. Tập rỗng không truy vấn API. “Thợ bất kỳ” là một lựa chọn giao diện riêng, không đại diện cho một bản ghi thợ. Lát này chưa lọc khung giờ theo thợ, chưa tự động phân thợ và chưa tạo/lưu yêu cầu đặt lịch.
 
 1. Mở `http://localhost:5173/dat-lich` trong cửa sổ khách không đăng nhập.
 2. Mở trang Chủ tiệm ở cửa sổ khác, đổi thứ tự rồi lưu.

@@ -22,7 +22,7 @@ test('S106 full story: owner UI ↔ PostgreSQL ↔ independent anonymous custome
     try { await pool.query('DELETE FROM owners WHERE email=$1',[process.env.OWNER_EMAIL]); }
     finally { await app.close();await pool.end(); }
   });
-  await app.listen(0,'127.0.0.1');await pool.query('TRUNCATE services,service_groups');
+  await app.listen(0,'127.0.0.1');await pool.query('TRUNCATE stylist_services,stylists,services,service_groups');
   const apiBase=await app.getUrl();
   const port=await new Promise((res,rej)=>{const server=createServer();server.on('error',rej);server.listen(0,'127.0.0.1',()=>{const p=server.address().port;server.close(()=>res(p));});});
   const frontend=resolve(__dirname,'../../frontend');
@@ -54,10 +54,30 @@ test('S106 full story: owner UI ↔ PostgreSQL ↔ independent anonymous custome
     return data;
   };
   // Service management UI is outside this story: fixtures assign services using real PostgreSQL.
-  const hairServices=await batch(hair,'Tóc',5);await batch(wash,'Gội',5);await batch(skin,'Da',5);
+  const hairServices=await batch(hair,'Tóc',5);await batch(wash,'Gội',5);const skinServices=await batch(skin,'Da',5);
+  const fullStylist=randomUUID(),partialStylist=randomUUID();
+  await pool.query('INSERT INTO stylists(id,name,is_active) VALUES($1,$2,true),($3,$4,true)',[fullStylist,'Linh Nguyễn',partialStylist,'Mai Trần']);
+  await pool.query('INSERT INTO stylist_services(stylist_id,service_id) SELECT $1,id FROM services WHERE is_active=true AND id<>$2',[fullStylist,skinServices[4].id]);
+  await pool.query('INSERT INTO stylist_services(stylist_id,service_id) VALUES($1,$2)',[partialStylist,hairServices[0].id]);
   await guest.waitForFunction(()=>document.querySelectorAll('.public-services li').length===15,{}, {timeout:5000});
   await owner.waitForFunction(()=>[...document.querySelectorAll('tbody tr')].filter(row=>row.textContent.includes('5 đang bán')).length===3,{}, {timeout:5000});
   assert.equal(await guest.getByRole('heading',{name:'Nhóm trống',exact:true}).count(),0);
+  await guest.getByRole('button',{name:/Tóc 0001 Chọn dịch vụ/}).click();
+  await guest.getByRole('button',{name:/Linh Nguyễn/}).waitFor();
+  assert.equal(await guest.getByRole('button',{name:/Mai Trần/}).count(),1);
+  await guest.getByRole('button',{name:/Tóc 0002 Chọn dịch vụ/}).click();
+  await guest.getByRole('button',{name:/Mai Trần/}).waitFor({state:'detached'});
+  await guest.getByRole('button',{name:/Linh Nguyễn/}).waitFor();
+  await guest.getByRole('button',{name:/Linh Nguyễn/}).click();
+  assert.equal(await guest.getByRole('button',{name:/Linh Nguyễn/}).getAttribute('aria-pressed'),'true');
+  await guest.getByRole('button',{name:/Thợ bất kỳ/}).click();
+  assert.equal(await guest.getByRole('button',{name:/Thợ bất kỳ/}).getAttribute('aria-pressed'),'true');
+  await guest.getByRole('button',{name:/Da 0005 Chọn dịch vụ/}).click();
+  await guest.getByText('Chưa có thợ nào có thể thực hiện toàn bộ dịch vụ đã chọn.').waitFor();
+  await guest.getByRole('button',{name:/Da 0005 Đã chọn/}).click();
+  await guest.getByRole('button',{name:/Tóc 0002 Đã chọn/}).click();
+  await guest.getByRole('button',{name:/Tóc 0001 Đã chọn/}).click();
+  passed('Booking: one service includes partial-capability stylist; multiple services exclude them; specific/any selection and no-match empty state work.');
   const consistency=async()=>{
     const login=await owner.evaluate(()=>JSON.parse(sessionStorage.getItem('salon-session')));
     const management=await (await fetch(`${apiBase}/api/service-groups`,{headers:{Authorization:`Bearer ${login.accessToken}`}})).json();

@@ -3,12 +3,18 @@ import { ArrowDown, ArrowRight, Flower2, Layers3, Leaf, RefreshCw, Search, Spark
 import './booking.css';
 
 type PublicGroup = { id: string; name: string; displayOrder: number; services: { id: string; name: string }[] };
+type PublicStylist = { id: string; name: string };
 
 export function BookingPage() {
   const [groups, setGroups] = useState<PublicGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [stylists, setStylists] = useState<PublicStylist[]>([]);
+  const [stylistLoading, setStylistLoading] = useState(false);
+  const [stylistError, setStylistError] = useState('');
+  const [selectedStylist, setSelectedStylist] = useState('any');
   const reload = useRef<() => void>(() => undefined);
 
   useEffect(() => {
@@ -57,6 +63,21 @@ export function BookingPage() {
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
+  useEffect(() => {
+    if (!selectedServices.length) { setStylists([]); setStylistError(''); setStylistLoading(false); setSelectedStylist('any'); return; }
+    const controller = new AbortController();
+    setStylistLoading(true); setStylistError('');
+    const query = new URLSearchParams({ serviceIds: selectedServices.join(',') });
+    fetch(`/api/public/stylists?${query}`, { cache: 'no-store', signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error('Chưa thể tải danh sách thợ phù hợp. Vui lòng thử lại.');
+        return response.json() as Promise<PublicStylist[]>;
+      })
+      .then(data => { setStylists(data); setSelectedStylist('any'); })
+      .catch(error => { if (error.name !== 'AbortError') setStylistError(error.message); })
+      .finally(() => { if (!controller.signal.aborted) setStylistLoading(false); });
+    return () => controller.abort();
+  }, [selectedServices]);
   const retry = useCallback(() => reload.current(), []);
   const term = search.trim().normalize('NFC').toLocaleLowerCase('vi');
   const visible = groups.map(group => ({ ...group, services: group.name.toLocaleLowerCase('vi').includes(term)
@@ -76,7 +97,11 @@ export function BookingPage() {
         {error && <div className="catalog-error" role="alert"><span>{error} {groups.length > 0 && 'Danh sách đang hiển thị có thể chưa phải phiên bản mới nhất.'}</span><button className="secondary" onClick={retry}><RefreshCw size={15}/> Thử lại</button></div>}
         {loading ? <div className="catalog-state" role="status"><Layers3 size={32}/><p>Đang tải dịch vụ…</p></div> : groups.length === 0 ? <div className="catalog-state"><Flower2 size={44} strokeWidth={1}/><h3>{error ? 'Danh sách dịch vụ chưa sẵn sàng' : 'Tiệm đang chuẩn bị những dịch vụ mới'}</h3><p>{error ? 'Bạn có thể thử tải lại danh sách.' : 'Hiện chưa có dịch vụ đang bán. Mời bạn quay lại sau nhé.'}</p></div> : visible.length === 0 ? <div className="catalog-state"><Search size={32}/><h3>Chưa tìm thấy dịch vụ phù hợp</h3><p>Thử một tên nhóm hoặc tên dịch vụ khác.</p><button className="secondary" onClick={() => setSearch('')}>Xem tất cả dịch vụ</button></div> : <div className="catalog-layout">
           <nav className="category-nav" aria-label="Nhóm dịch vụ"><span>KHÁM PHÁ THEO NHÓM</span>{visible.map(group => <a key={group.id} href={`#nhom-${group.id}`}><span>{group.name}</span><small>{group.services.length}</small></a>)}<div className="catalog-aside-note"><Leaf size={23} strokeWidth={1.2}/><p>Mỗi dịch vụ,<br/>một chút nâng niu.</p></div></nav>
-          <div className="public-groups">{visible.map((group, index) => <section className="public-group" key={group.id} id={`nhom-${group.id}`} aria-labelledby={`title-${group.id}`}><header><div className={`public-group-icon tone-${index % 3}`}><Flower2 size={24} strokeWidth={1.4}/></div><div><h3 id={`title-${group.id}`}>{group.name}</h3><p>{group.services.length} dịch vụ</p></div><span className="group-sequence">{String(index + 1).padStart(2, '0')}</span></header><ul className="public-services">{group.services.map(service => <li key={service.id}><span className="service-dot"/><span>{service.name}</span><span className="service-available">Đang phục vụ</span></li>)}</ul></section>)}</div>
+          <div className="public-groups">{visible.map((group, index) => <section className="public-group" key={group.id} id={`nhom-${group.id}`} aria-labelledby={`title-${group.id}`}><header><div className={`public-group-icon tone-${index % 3}`}><Flower2 size={24} strokeWidth={1.4}/></div><div><h3 id={`title-${group.id}`}>{group.name}</h3><p>{group.services.length} dịch vụ</p></div><span className="group-sequence">{String(index + 1).padStart(2, '0')}</span></header><ul className="public-services">{group.services.map(service => { const chosen = selectedServices.includes(service.id); return <li key={service.id}><button type="button" className={`service-select ${chosen ? 'selected' : ''}`} aria-pressed={chosen} onClick={() => setSelectedServices(current => chosen ? current.filter(id => id !== service.id) : [...current, service.id])}><span className="service-dot"/><span>{service.name}</span><span className="service-available">{chosen ? 'Đã chọn' : 'Chọn dịch vụ'}</span></button></li>; })}</ul></section>)}
+            <section className="stylist-picker" aria-labelledby="stylist-title"><div className="eyebrow">BƯỚC TIẾP THEO</div><h2 id="stylist-title">Chọn thợ phù hợp</h2><p>{selectedServices.length ? `Đã chọn ${selectedServices.length} dịch vụ. Danh sách chỉ gồm thợ làm được tất cả dịch vụ bạn chọn.` : 'Chọn dịch vụ phía trên để xem thợ có thể thực hiện.'}</p>
+              {selectedServices.length > 0 && <>{stylistError && <div className="catalog-error" role="alert">{stylistError}</div>}{stylistLoading ? <div role="status" className="stylist-state">Đang tìm thợ phù hợp…</div> : stylistError ? null : stylists.length === 0 ? <div className="stylist-state" role="status">Chưa có thợ nào có thể thực hiện toàn bộ dịch vụ đã chọn. Bạn có thể bỏ bớt dịch vụ hoặc chọn lại sau.</div> : <div className="stylist-options" role="group" aria-label="Chọn thợ"><button type="button" aria-pressed={selectedStylist === 'any'} className={selectedStylist === 'any' ? 'stylist-option chosen' : 'stylist-option'} onClick={() => setSelectedStylist('any')}><strong>Thợ bất kỳ</strong><span>Để tiệm sắp xếp thợ phù hợp</span></button>{stylists.map(stylist => <button type="button" aria-pressed={selectedStylist === stylist.id} className={selectedStylist === stylist.id ? 'stylist-option chosen' : 'stylist-option'} key={stylist.id} onClick={() => setSelectedStylist(stylist.id)}><strong>{stylist.name}</strong><span>Có thể thực hiện toàn bộ dịch vụ</span></button>)}</div>}</>}
+            </section>
+          </div>
         </div>}
       </section>
     </main>

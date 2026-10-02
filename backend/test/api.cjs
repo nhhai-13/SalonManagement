@@ -17,7 +17,7 @@ test('PostgreSQL API: owner authentication, validation, CRUD, service constraint
   const pool=new Pool({connectionString:url});
   t.after(async()=>{await app.close();await pool.end();});
   await app.listen(0,'127.0.0.1');
-  await pool.query('TRUNCATE services,service_groups,owners');
+  await pool.query('TRUNCATE stylist_services,stylists,services,service_groups,owners');
   const ownerId=randomUUID();
   await pool.query('INSERT INTO owners(id,email,password_hash,role) VALUES($1,$2,$3,$4)',[ownerId,process.env.OWNER_EMAIL,await bcrypt.hash(process.env.OWNER_PASSWORD,12),'owner']);
   const base=await app.getUrl(); let token='';
@@ -102,6 +102,23 @@ test('PostgreSQL API: owner authentication, validation, CRUD, service constraint
     assert.deepEqual((await publicRead()).data,[]);
     await call(`/service-groups/${inactiveGroup.data.id}`,'DELETE');
     await call(`/service-groups/${emptyGroup.data.id}`,'DELETE');
+  });
+  await t.test('Public stylist lookup requires every selected active service',async()=>{
+    const serviceOne=randomUUID(),serviceTwo=randomUUID(),inactiveService=randomUUID();
+    await pool.query('INSERT INTO services(id,group_id,name,is_active) VALUES($1,NULL,$2,true),($3,NULL,$4,true),($5,NULL,$6,false)',[serviceOne,'Thử dịch vụ một',serviceTwo,'Thử dịch vụ hai',inactiveService,'Dịch vụ ngừng bán']);
+    const allId=randomUUID(), partialId=randomUUID(), inactiveId=randomUUID();
+    await pool.query('INSERT INTO stylists(id,name,is_active) VALUES($1,$2,true),($3,$4,true),($5,$6,false)',[allId,'Thợ đủ dịch vụ',partialId,'Thợ chỉ làm một phần',inactiveId,'Thợ ngừng hoạt động']);
+    await pool.query('INSERT INTO stylist_services(stylist_id,service_id) VALUES($1,$3),($1,$4),($2,$3),($5,$3),($5,$4)',[allId,partialId,serviceOne,serviceTwo,inactiveId]);
+    const lookup=async(ids)=>call(`/public/stylists?serviceIds=${ids.join(',')}`,'GET',undefined,'');
+    let result=await lookup([serviceOne]);
+    assert.deepEqual(result.data.map(stylist=>stylist.id).sort(),[allId,partialId].sort());
+    result=await lookup([serviceOne,serviceTwo]);
+    assert.deepEqual(result.data.map(stylist=>stylist.id),[allId]);
+    assert.deepEqual((await lookup([inactiveService])).data,[]);
+    const noMatch=await lookup([randomUUID()]);assert.deepEqual(noMatch.data,[]);
+    assert.equal((await lookup(['invalid'])).status,400);
+    assert.equal((await call('/public/stylists','GET',undefined,'')).status,400);
+    assert.equal((await fetch(`${base}/api/public/stylists?serviceIds=${serviceOne}`)).headers.get('cache-control'),'no-store');
   });
   await t.test('Edit name and order persists in PostgreSQL',async()=>{
     assert.equal((await call(`/service-groups/${ids[0]}`,'PUT',{name:'Tóc cao cấp',displayOrder:0})).status,200);

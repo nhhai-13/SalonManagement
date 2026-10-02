@@ -9,11 +9,12 @@ import { Database } from './database';
 import { AuthController, OwnerGuard } from './auth';
 import { GroupsController, GroupsService } from './groups';
 import { CatalogController, CatalogService } from './catalog';
+import { StylistsController, StylistsService } from './stylists';
 
 @Module({
   imports: [JwtModule.registerAsync({ useFactory: () => ({ secret: process.env.JWT_SECRET, signOptions: { expiresIn: '8h', issuer: 'salon-api', audience: 'salon-owner' }, verifyOptions: { issuer: 'salon-api', audience: 'salon-owner', algorithms: ['HS256'] } }) }), ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }])],
-  controllers: [AuthController, GroupsController, CatalogController],
-  providers: [Database, GroupsService, OwnerGuard, CatalogService, { provide: APP_GUARD, useClass: ThrottlerGuard }]
+  controllers: [AuthController, GroupsController, CatalogController, StylistsController],
+  providers: [Database, GroupsService, OwnerGuard, CatalogService, StylistsService, { provide: APP_GUARD, useClass: ThrottlerGuard }]
 })
 class AppModule {}
 export async function createApp() {
