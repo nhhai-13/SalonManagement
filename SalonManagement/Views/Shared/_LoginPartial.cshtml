@@ -2,26 +2,27 @@
 @using SalonManagement.Models
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
+@{ var englishInterface = ViewData["EnglishInterface"] is true; }
 
 <ul class="navbar-nav">
 @if (User.Identity?.IsAuthenticated == true || SignInManager.IsSignedIn(User))
 {
     <li class="nav-item">
-        <a  class="nav-link text-dark" asp-area="Identity" asp-page="/Account/Manage/Index" title="Manage">Xin chào @(User.Identity?.Name ?? User.FindFirst("email")?.Value)!</a>
+        <a  class="nav-link text-dark" asp-area="Identity" asp-page="/Account/Manage/Index" title="Manage">@(englishInterface ? "Hello" : "Xin chào") @(User.Identity?.Name ?? User.FindFirst("email")?.Value)!</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link text-dark" asp-controller="Account" asp-action="ChangePassword">Đổi mật khẩu</a>
+        <a class="nav-link text-dark" asp-controller="Account" asp-action="ChangePassword">@(englishInterface ? "Change password" : "Đổi mật khẩu")</a>
     </li>
     <li class="nav-item">
         <form  class="form-inline" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })">
-            <button  type="submit" class="nav-link btn btn-link text-dark">Đăng xuất</button>
+            <button  type="submit" class="nav-link btn btn-link text-dark">@(englishInterface ? "Sign out" : "Đăng xuất")</button>
         </form>
     </li>
 }
 else
 {
     <li class="nav-item">
-        <a class="nav-link text-dark" asp-controller="Account" asp-action="Login">Đăng nhập</a>
+        <a class="nav-link text-dark" asp-controller="Account" asp-action="Login">@(englishInterface ? "Sign in" : "Đăng nhập")</a>
     </li>
 }
 </ul>

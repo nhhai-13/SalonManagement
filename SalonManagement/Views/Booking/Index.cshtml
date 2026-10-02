@@ -1,6 +1,7 @@
 @model SalonManagement.Models.ViewModels.Booking.BookingSelectServicesViewModel
 @{
-    ViewData["Title"] = "Đặt lịch - Chọn dịch vụ";
+    ViewData["Title"] = "Booking - Select services";
+    ViewData["EnglishInterface"] = true;
 }
 
 <div class="container py-4">
@@ -12,21 +13,21 @@
                     <div class="rounded-circle bg-primary text-white d-inline-flex justify-content-center align-items-center mb-1 shadow-sm" style="width: 36px; height: 36px;">
                         <span class="fw-bold">1</span>
                     </div>
-                    <div class="small fw-bold text-primary">Chọn dịch vụ</div>
+                    <div class="small fw-bold text-primary">Select services</div>
                 </div>
                 <div class="border-top border-2 flex-fill position-relative" style="top: -12px;"></div>
                 <div class="text-center flex-fill">
                     <div class="rounded-circle bg-light text-muted border d-inline-flex justify-content-center align-items-center mb-1" style="width: 36px; height: 36px;">
                         <span>2</span>
                     </div>
-                    <div class="small text-muted">Thời gian &amp; Thợ</div>
+                    <div class="small text-muted">Time &amp; Stylist</div>
                 </div>
                 <div class="border-top border-2 flex-fill position-relative" style="top: -12px;"></div>
                 <div class="text-center flex-fill">
                     <div class="rounded-circle bg-light text-muted border d-inline-flex justify-content-center align-items-center mb-1" style="width: 36px; height: 36px;">
                         <span>3</span>
                     </div>
-                    <div class="small text-muted">Xác nhận</div>
+                    <div class="small text-muted">Confirmation</div>
                 </div>
             </div>
         </div>
@@ -36,10 +37,10 @@
     <div class="row mb-4">
         <div class="col-12">
             <span class="badge bg-primary-subtle text-primary mb-2 px-3 py-2 rounded-pill fw-semibold">
-                <i class="bi bi-stars me-1"></i> Bước 1 trong 3 bước
+                <i class="bi bi-stars me-1"></i> Step 1 of 3
             </span>
-            <h1 class="h2 fw-bold text-dark mb-1">Chọn dịch vụ bạn muốn trải nghiệm</h1>
-            <p class="text-muted">Chọn một hoặc nhiều dịch vụ để xem tổng thời lượng và giá tiền tạm tính.</p>
+            <h1 class="h2 fw-bold text-dark mb-1">Choose your services</h1>
+            <p class="text-muted">Select one or more services to see the total duration and estimated price.</p>
         </div>
     </div>
 
@@ -47,8 +48,8 @@
     {
         <div class="alert alert-info py-4 text-center">
             <i class="bi bi-info-circle fs-3 d-block mb-2 text-primary"></i>
-            <h5>Hiện tại chưa có dịch vụ nào đang kinh doanh</h5>
-            <p class="text-muted mb-0">Vui lòng quay lại sau hoặc liên hệ salon để được hỗ trợ.</p>
+            <h5>No services are currently available</h5>
+            <p class="text-muted mb-0">Please check back later or contact the salon for assistance.</p>
         </div>
     }
     else
@@ -87,7 +88,7 @@
 
                             @if (group.Services.Count == 0)
                             {
-                                <p class="text-muted small italic">Nhóm này chưa có dịch vụ nào.</p>
+                                <p class="text-muted small italic">This group has no services.</p>
                             }
                             else
                             {
@@ -132,7 +133,7 @@
                                                         else
                                                         {
                                                             <p class="text-muted small mb-3 fst-italic" style="min-height: 38px;">
-                                                                Dịch vụ cao cấp chuẩn Lumière.
+                                                                Premium service by Lumière.
                                                             </p>
                                                         }
                                                     </div>
@@ -160,10 +161,10 @@
                     <div class="card shadow-sm border-0 rounded-3 sticky-top" style="top: 90px;">
                         <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
                             <h3 class="h6 fw-bold mb-0 text-dark">
-                                <i class="bi bi-cart-check text-primary me-2"></i>Dịch vụ đã chọn
+                                <i class="bi bi-cart-check text-primary me-2"></i>Selected services
                             </h3>
                             <span id="selected-count-badge" class="badge bg-primary rounded-pill px-2">
-                                @Model.Totals.SelectedServices.Count dịch vụ
+                                @Model.Totals.SelectedServices.Count services
                             </span>
                         </div>
 
@@ -173,8 +174,8 @@
                                 <!-- Empty state -->
                                 <div id="empty-state" class="text-center py-4 @(Model.Totals.SelectedServices.Count > 0 ? "d-none" : "")">
                                     <i class="bi bi-hand-index-thumb fs-2 text-muted d-block mb-2"></i>
-                                    <p class="text-muted small mb-0">Chưa chọn dịch vụ nào.</p>
-                                    <small class="text-secondary">Hãy tích chọn các dịch vụ bạn muốn từ danh sách bên cạnh.</small>
+                                    <p class="text-muted small mb-0">No services selected.</p>
+                                    <small class="text-secondary">Choose the services you want from the list.</small>
                                 </div>
 
                                 <!-- Items list -->
@@ -188,7 +189,7 @@
                                                     <i class="bi bi-clock"></i> @item.FormattedDuration · <span class="text-primary">@item.FormattedPrice</span>
                                                 </div>
                                             </div>
-                                            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 remove-service-btn" data-service-id="@item.ServiceId" title="Bỏ chọn dịch vụ này">
+                                            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 remove-service-btn" data-service-id="@item.ServiceId" title="Remove this service">
                                                 <i class="bi bi-x-circle"></i>
                                             </button>
                                         </li>
@@ -202,7 +203,7 @@
                             <div class="bg-light p-3 rounded-3 mb-3">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="text-muted small">
-                                        <i class="bi bi-clock-history me-1"></i>Tổng thời lượng:
+                                        <i class="bi bi-clock-history me-1"></i>Total duration:
                                     </span>
                                     <span id="summary-total-duration" class="fw-bold text-dark">
                                         @Model.Totals.FormattedTotalDuration
@@ -210,7 +211,7 @@
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="text-muted small">
-                                        <i class="bi bi-cash-stack me-1"></i>Tổng tiền tạm tính:
+                                        <i class="bi bi-cash-stack me-1"></i>Estimated total:
                                     </span>
                                     <span id="summary-total-price" class="fw-bold text-primary fs-5">
                                         @Model.Totals.FormattedTotalPrice
@@ -222,17 +223,17 @@
                             <div class="alert alert-warning py-2 px-3 small mb-3 border-0 d-flex align-items-start" role="note">
                                 <i class="bi bi-info-circle-fill text-warning me-2 fs-6 flex-shrink-0 mt-1"></i>
                                 <div>
-                                    <strong>Ghi chú:</strong> Giá trên là giá tạm tính, giá cuối do tiệm chốt khi thanh toán.
+                                    <strong>Note:</strong> This is an estimate. The salon confirms the final price at checkout.
                                 </div>
                             </div>
 
                             <!-- Submit / Continue Button -->
                             <div class="d-grid gap-2">
                                 <button type="button" id="btn-submit-booking" class="btn btn-primary btn-lg fw-semibold" @(Model.Totals.SelectedServices.Count == 0 ? "disabled" : "")>
-                                    Chọn thợ và giờ <i class="bi bi-arrow-right ms-1"></i>
+                                    Choose stylist and time <i class="bi bi-arrow-right ms-1"></i>
                                 </button>
                                 <button type="button" id="btn-clear-all" class="btn btn-sm btn-link text-muted text-decoration-none @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
-                                    <i class="bi bi-trash3 me-1"></i>Bỏ chọn tất cả
+                                    <i class="bi bi-trash3 me-1"></i>Clear all
                                 </button>
                             </div>
                         </div>
@@ -263,16 +264,16 @@
 
             // Formatters
             function formatVND(amount) {
-                return new Intl.NumberFormat("vi-VN").format(amount) + " đ";
+                return new Intl.NumberFormat("vi-VN").format(amount) + " VND";
             }
 
             function formatDuration(minutes) {
-                if (minutes <= 0) return "0 phút";
-                if (minutes < 60) return minutes + " phút";
+                if (minutes <= 0) return "0 min";
+                if (minutes < 60) return minutes + " min";
                 const hours = Math.floor(minutes / 60);
                 const rem = minutes % 60;
-                if (rem === 0) return `${hours} giờ (${minutes} phút)`;
-                return `${hours} giờ ${rem} phút (${minutes} phút)`;
+                if (rem === 0) return `${hours} hr (${minutes} min)`;
+                return `${hours} hr ${rem} min (${minutes} min)`;
             }
 
             // Sync card styling
@@ -343,13 +344,13 @@
                         );
                     }
                 } catch (err) {
-                    console.warn("Lỗi đồng bộ giá server, dùng kết quả tính tạm thời client:", err);
+                    console.warn("Unable to sync prices; showing the local estimate:", err);
                 }
             }
 
             function renderSummary(count, totalMin, totalPrice, items, serverFormattedDuration, serverFormattedPrice) {
                 // Count badge
-                if (badgeCount) badgeCount.textContent = count + " dịch vụ";
+                if (badgeCount) badgeCount.textContent = count + " services";
 
                 // Empty state toggle
                 if (count === 0) {
@@ -357,8 +358,8 @@
                     if (selectedList) selectedList.classList.add("d-none");
                     if (btnSubmit) btnSubmit.disabled = true;
                     if (btnClearAll) btnClearAll.classList.add("d-none");
-                    if (summaryDuration) summaryDuration.textContent = "0 phút";
-                    if (summaryPrice) summaryPrice.textContent = "0 đ";
+                    if (summaryDuration) summaryDuration.textContent = "0 min";
+                    if (summaryPrice) summaryPrice.textContent = "0 VND";
                     if (selectedList) selectedList.innerHTML = "";
                     return;
                 }
@@ -386,7 +387,7 @@
                                     <i class="bi bi-clock"></i> ${escapeHtml(item.formattedDuration || formatDuration(item.durationMinutes))} · <span class="text-primary">${escapeHtml(item.formattedPrice || formatVND(item.price))}</span>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 remove-service-btn" data-service-id="${item.serviceId}" title="Bỏ chọn dịch vụ này">
+                            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 remove-service-btn" data-service-id="${item.serviceId}" title="Remove this service">
                                 <i class="bi bi-x-circle"></i>
                             </button>
                         `;

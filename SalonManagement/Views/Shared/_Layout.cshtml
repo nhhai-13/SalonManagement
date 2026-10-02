@@ -1,10 +1,11 @@
+@{ var englishInterface = ViewData["EnglishInterface"] is true; }
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="@(englishInterface ? "en" : "vi")">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Luminol Salon &amp; Spa</title>
-    <meta name="description" content="Luminol Salon & Spa - Không gian chăm sóc tóc cao cấp, đặt lịch nhanh chóng và thuận tiện." />
+    <meta name="description" content="@(englishInterface ? "Luminol Salon & Spa - Hair care and convenient appointments." : "Luminol Salon & Spa - Không gian chăm sóc tóc cao cấp, đặt lịch nhanh chóng và thuận tiện.")" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet" />
@@ -60,7 +61,7 @@
                             <a class="nav-link text-dark"
                                asp-controller="Services"
                                asp-action="Index">
-                                Dịch vụ
+                                @(englishInterface ? "Services" : "Dịch vụ")
                             </a>
                         </li>
 
@@ -69,7 +70,7 @@
                             <a class="nav-link text-primary fw-semibold"
                                asp-controller="Booking"
                                asp-action="Index">
-                                <i class="bi bi-calendar-check me-1"></i>Đặt lịch
+                                <i class="bi bi-calendar-check me-1"></i>@(englishInterface ? "Book an appointment" : "Đặt lịch")
                             </a>
                         </li>
 

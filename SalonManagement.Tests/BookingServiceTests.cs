@@ -37,10 +37,10 @@ public class BookingServiceTests
         Assert.NotNull(result);
         Assert.Equal(0, result.TotalDurationMinutes);
         Assert.Equal(0m, result.TotalPrice);
-        Assert.Equal("0 phút", result.FormattedTotalDuration);
-        Assert.Equal("0 đ", result.FormattedTotalPrice);
+        Assert.Equal("0 min", result.FormattedTotalDuration);
+        Assert.Equal("0 VND", result.FormattedTotalPrice);
         Assert.Empty(result.SelectedServices);
-        Assert.Equal("Giá trên là giá tạm tính, giá cuối do tiệm chốt khi thanh toán", result.PriceNote);
+        Assert.Equal("This is an estimate. The salon confirms the final price at checkout", result.PriceNote);
     }
 
     [Fact]
@@ -53,8 +53,8 @@ public class BookingServiceTests
         Assert.NotNull(result);
         Assert.Equal(0, result.TotalDurationMinutes);
         Assert.Equal(0m, result.TotalPrice);
-        Assert.Equal("0 phút", result.FormattedTotalDuration);
-        Assert.Equal("0 đ", result.FormattedTotalPrice);
+        Assert.Equal("0 min", result.FormattedTotalDuration);
+        Assert.Equal("0 VND", result.FormattedTotalPrice);
         Assert.Empty(result.SelectedServices);
     }
 
@@ -77,8 +77,8 @@ public class BookingServiceTests
         // Assert
         Assert.Equal(45, result.TotalDurationMinutes);
         Assert.Equal(150000m, result.TotalPrice);
-        Assert.Equal("45 phút", result.FormattedTotalDuration);
-        Assert.Equal("150.000 đ", result.FormattedTotalPrice);
+        Assert.Equal("45 min", result.FormattedTotalDuration);
+        Assert.Equal("150.000 VND", result.FormattedTotalPrice);
         Assert.Single(result.SelectedServices);
         Assert.Equal("Cắt tóc nam Classic", result.SelectedServices[0].ServiceName);
         Assert.Equal(150000m, result.SelectedServices[0].Price);
@@ -100,16 +100,16 @@ public class BookingServiceTests
         var result = _bookingService.CalculateTotals(services);
 
         // Assert
-        // Tổng thời lượng: 45 + 30 + 90 = 165 phút (2 giờ 45 phút)
+        // Total duration: 45 + 30 + 90 = 165 min (2 hr 45 min)
         Assert.Equal(165, result.TotalDurationMinutes);
-        Assert.Equal("2 giờ 45 phút (165 phút)", result.FormattedTotalDuration);
+        Assert.Equal("2 hr 45 min (165 min)", result.FormattedTotalDuration);
 
-        // Tổng tiền: 180.000 + 120.000 + 500.000 = 800.000 đ
+        // Tổng tiền: 180.000 + 120.000 + 500.000 = 800.000 VND
         Assert.Equal(800000m, result.TotalPrice);
-        Assert.Equal("800.000 đ", result.FormattedTotalPrice);
+        Assert.Equal("800.000 VND", result.FormattedTotalPrice);
 
         Assert.Equal(3, result.SelectedServices.Count);
-        Assert.Equal("Giá trên là giá tạm tính, giá cuối do tiệm chốt khi thanh toán", result.PriceNote);
+        Assert.Equal("This is an estimate. The salon confirms the final price at checkout", result.PriceNote);
     }
 
     [Fact]
@@ -132,8 +132,8 @@ public class BookingServiceTests
         // Assert: Tổng mới phải bị trừ đúng phần của service2
         Assert.Equal(60, updatedTotals.TotalDurationMinutes);
         Assert.Equal(350000m, updatedTotals.TotalPrice);
-        Assert.Equal("1 giờ (60 phút)", updatedTotals.FormattedTotalDuration);
-        Assert.Equal("350.000 đ", updatedTotals.FormattedTotalPrice);
+        Assert.Equal("1 hr (60 min)", updatedTotals.FormattedTotalDuration);
+        Assert.Equal("350.000 VND", updatedTotals.FormattedTotalPrice);
         Assert.Equal(2, updatedTotals.SelectedServices.Count);
         Assert.DoesNotContain(updatedTotals.SelectedServices, s => s.ServiceId == 2);
     }
@@ -153,23 +153,23 @@ public class BookingServiceTests
         var result = _bookingService.CalculateTotals(services);
 
         // Assert
-        // 17 + 33 + 71 = 121 phút (2 giờ 1 phút)
+        // 17 + 33 + 71 = 121 min (2 hr 1 min)
         Assert.Equal(121, result.TotalDurationMinutes);
-        Assert.Equal("2 giờ 1 phút (121 phút)", result.FormattedTotalDuration);
+        Assert.Equal("2 hr 1 min (121 min)", result.FormattedTotalDuration);
 
-        // 123.456 + 87.654 + 99.999 = 311.109 đ
+        // 123.456 + 87.654 + 99.999 = 311.109 VND
         Assert.Equal(311109m, result.TotalPrice);
-        Assert.Equal("311.109 đ", result.FormattedTotalPrice);
+        Assert.Equal("311.109 VND", result.FormattedTotalPrice);
     }
 
     [Theory]
-    [InlineData(0, "0 phút")]
-    [InlineData(15, "15 phút")]
-    [InlineData(45, "45 phút")]
-    [InlineData(60, "1 giờ (60 phút)")]
-    [InlineData(75, "1 giờ 15 phút (75 phút)")]
-    [InlineData(120, "2 giờ (120 phút)")]
-    [InlineData(135, "2 giờ 15 phút (135 phút)")]
+    [InlineData(0, "0 min")]
+    [InlineData(15, "15 min")]
+    [InlineData(45, "45 min")]
+    [InlineData(60, "1 hr (60 min)")]
+    [InlineData(75, "1 hr 15 min (75 min)")]
+    [InlineData(120, "2 hr (120 min)")]
+    [InlineData(135, "2 hr 15 min (135 min)")]
     public void FormatDuration_VariousMinutes_FormatsCorrectly(int minutes, string expected)
     {
         var result = BookingService.FormatDuration(minutes);
@@ -233,8 +233,8 @@ public class BookingServiceTests
 
         Assert.Equal(90, totals.TotalDurationMinutes);
         Assert.Equal(350000m, totals.TotalPrice);
-        Assert.Equal("1 giờ 30 phút (90 phút)", totals.FormattedTotalDuration);
-        Assert.Equal("350.000 đ", totals.FormattedTotalPrice);
+        Assert.Equal("1 hr 30 min (90 min)", totals.FormattedTotalDuration);
+        Assert.Equal("350.000 VND", totals.FormattedTotalPrice);
         Assert.Equal(2, totals.SelectedServices.Count);
     }
 }

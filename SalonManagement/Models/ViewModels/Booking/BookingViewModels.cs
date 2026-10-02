@@ -13,10 +13,10 @@ public class SelectedServiceSummaryItem
 public class BookingTotalsDto
 {
     public int TotalDurationMinutes { get; set; }
-    public string FormattedTotalDuration { get; set; } = "0 phút";
+    public string FormattedTotalDuration { get; set; } = "0 min";
     public decimal TotalPrice { get; set; }
-    public string FormattedTotalPrice { get; set; } = "0 đ";
-    public string PriceNote { get; set; } = "Giá trên là giá tạm tính, giá cuối do tiệm chốt khi thanh toán";
+    public string FormattedTotalPrice { get; set; } = "0 VND";
+    public string PriceNote { get; set; } = "This is an estimate. The salon confirms the final price at checkout";
     public List<SelectedServiceSummaryItem> SelectedServices { get; set; } = new();
 }
 

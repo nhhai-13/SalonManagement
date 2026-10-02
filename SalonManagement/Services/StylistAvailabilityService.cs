@@ -18,11 +18,11 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     {
         var ids = serviceIds.Distinct().ToArray();
         if (ids.Length == 0 || ids.Any(id => id <= 0))
-            throw new ArgumentException("Vui lòng chọn dịch vụ hợp lệ.");
+            throw new ArgumentException("Please select valid services.");
         var services = await db.Services.AsNoTracking()
             .Where(s => ids.Contains(s.ServiceId) && s.IsActive).ToListAsync();
         if (services.Count != ids.Length || services.Any(s => s.DurationMinutes <= 0))
-            throw new ArgumentException("Dịch vụ đã thay đổi hoặc ngừng bán. Vui lòng chọn lại.");
+            throw new ArgumentException("A service has changed or is no longer available. Please select your services again.");
         return services;
     }
 
@@ -72,13 +72,13 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     {
         var services = await SelectedServices(serviceIds);
         var ids = services.Select(s => s.ServiceId).ToArray();
-        if (stylistId < AnyStylist) throw new ArgumentException("Lựa chọn thợ không hợp lệ.");
+        if (stylistId < AnyStylist) throw new ArgumentException("Invalid stylist selection.");
         var qualifiedIds = await db.Stylists.AsNoTracking()
             .Where(s => (stylistId == AnyStylist || s.StylistId == stylistId) && s.IsActive &&
                 s.Services.Count(link => ids.Contains(link.ServiceId)) == ids.Length)
             .Select(s => s.StylistId).ToListAsync();
         if (stylistId != AnyStylist && qualifiedIds.Count == 0)
-            throw new ArgumentException("Thợ đã chọn không còn phù hợp. Vui lòng chọn lại thợ.");
+            throw new ArgumentException("Your selected stylist is no longer eligible. Please choose another stylist.");
         if (qualifiedIds.Count == 0) return [];
 
         var day = date.ToDateTime(TimeOnly.MinValue);

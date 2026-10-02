@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function json(url, signal) {
         const response = await fetch(url, { signal, cache: 'no-store' });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Không thể tải dữ liệu. Vui lòng thử lại.');
+        if (!response.ok) throw new Error(data.message || 'Unable to load data. Please try again.');
         return data;
     }
     function button(text) {
@@ -58,19 +58,19 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadSlots() {
         clearSlots();
         if (!selected.value || !date.value || !date.validity.valid) {
-            slotMessage.textContent = 'Chọn thợ và ngày để xem giờ trống.';
+            slotMessage.textContent = 'Choose a stylist and date to see available times.';
             return;
         }
         const current = slotVersion;
         slotRequest = new AbortController();
         const q = query(); q.set('stylistId', selected.value); q.set('date', date.value);
-        slotMessage.textContent = 'Đang tải giờ trống…';
+        slotMessage.textContent = 'Loading available times…';
         try {
             const data = await json(`${panel.dataset.slotsUrl}?${q}`, slotRequest.signal);
             if (current !== slotVersion) return;
-            slotMessage.textContent = data.length ? 'Chọn giờ bắt đầu (giờ Việt Nam).' : selected.value === '0'
-                ? 'Không có thợ phù hợp nào còn khung giờ trống trong ngày này. Hãy đổi ngày hoặc dịch vụ.'
-                : 'Thợ đã chọn không còn khung giờ phù hợp trong ngày này. Hãy đổi ngày hoặc đổi thợ.';
+            slotMessage.textContent = data.length ? 'Choose a start time (Vietnam time).' : selected.value === '0'
+                ? 'No qualified stylists have available times on this date. Choose another date or change your services.'
+                : 'Your selected stylist has no available times on this date. Choose another date or stylist.';
             for (const slot of data) {
                 const b = button(`${slot.start} – ${slot.end}`);
                 b.addEventListener('click', () => {
@@ -91,14 +91,14 @@ document.addEventListener('DOMContentLoaded', () => {
         clearSlots(); options.replaceChildren();
         panel.hidden = ids().length === 0;
         if (panel.hidden) return;
-        message.textContent = 'Đang tìm thợ phù hợp…';
+        message.textContent = 'Finding qualified stylists…';
         try {
             const data = await json(`${panel.dataset.stylistsUrl}?${query()}`, stylistRequest.signal);
             if (current !== version) return;
             selected.value = (previous === '0' && data.length > 0) || data.some(s => String(s.id) === previous) ? previous : '';
-            message.textContent = !data.length ? 'Không có thợ nào thực hiện được toàn bộ dịch vụ. Vui lòng bỏ bớt hoặc đổi dịch vụ.'
-                : previous && !selected.value ? 'Thợ đã chọn không còn phù hợp. Vui lòng chọn lại thợ.' : 'Các thợ có thể thực hiện toàn bộ dịch vụ:';
-            const any = button('Thợ bất kỳ');
+            message.textContent = !data.length ? 'No stylist can perform all your selected services. Remove or change a service.'
+                : previous && !selected.value ? 'Your selected stylist is no longer eligible. Please choose another stylist.' : 'Stylists who can perform all your selected services:';
+            const any = button('Any stylist');
             any.dataset.anyStylist = 'true';
             any.disabled = data.length === 0;
             options.append(any);
@@ -126,13 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const current = assignmentVersion;
         assignmentRequest = new AbortController();
         confirmation.hidden = false;
-        assignmentMessage.textContent = 'Đang kiểm tra và chọn thợ phù hợp…';
+        assignmentMessage.textContent = 'Checking availability and selecting a stylist…';
         const q = query(); q.set('stylistId', selected.value); q.set('date', date.value); q.set('start', selectedSlot.value);
         try {
             const data = await json(`${panel.dataset.assignmentUrl}?${q}`, assignmentRequest.signal);
             if (current !== assignmentVersion) return;
-            assignmentMessage.textContent = `Thợ được gán: ${data.name}`;
-            assignmentDetail.textContent = `Ngày ${data.date} · ${data.start} – ${data.end}`;
+            assignmentMessage.textContent = `Assigned stylist: ${data.name}`;
+            assignmentDetail.textContent = `Date: ${data.date} · ${data.start} – ${data.end}`;
             confirm.disabled = false;
         } catch (e) {
             if (current !== assignmentVersion || e.name === 'AbortError') return;

@@ -12,7 +12,7 @@ public sealed class StylistAvailabilityController(StylistAvailabilityService ava
     [HttpGet("stylists")]
     public async Task<IActionResult> Stylists([FromQuery] int[] serviceIds)
     {
-        if (!ModelState.IsValid) return BadRequest(new { message = "Danh sách dịch vụ không hợp lệ." });
+        if (!ModelState.IsValid) return BadRequest(new { message = "Invalid service selection." });
         try { return Ok(await availability.GetStylistsAsync(serviceIds)); }
         catch (ArgumentException e) { return BadRequest(new { message = e.Message }); }
     }
@@ -21,7 +21,7 @@ public sealed class StylistAvailabilityController(StylistAvailabilityService ava
     public async Task<IActionResult> Slots([FromQuery] int[] serviceIds, int? stylistId, DateOnly date)
     {
         if (!ModelState.IsValid || date == default || stylistId == null || stylistId < 0)
-            return BadRequest(new { message = "Vui lòng chọn ngày và thợ hợp lệ." });
+            return BadRequest(new { message = "Please select a valid date and stylist." });
         try { return Ok(await availability.GetSlotsAsync(serviceIds, stylistId.Value, date)); }
         catch (ArgumentException e) { return BadRequest(new { message = e.Message }); }
     }
@@ -30,12 +30,12 @@ public sealed class StylistAvailabilityController(StylistAvailabilityService ava
     public async Task<IActionResult> Assignment([FromQuery] int[] serviceIds, int? stylistId, DateOnly date, TimeOnly? start)
     {
         if (!ModelState.IsValid || date == default || stylistId == null || stylistId < 0 || start == null)
-            return BadRequest(new { message = "Vui lòng chọn đầy đủ dịch vụ, thợ, ngày và giờ." });
+            return BadRequest(new { message = "Please select your services, stylist, date and time." });
         try
         {
             var assignment = await availability.AssignAsync(serviceIds, stylistId.Value, date, start.Value);
             return assignment == null
-                ? Conflict(new { message = "Khung giờ này không còn thợ phù hợp. Vui lòng chọn lại giờ." })
+                ? Conflict(new { message = "No qualified stylist is available at this time. Please choose another time." })
                 : Ok(assignment);
         }
         catch (ArgumentException e) { return BadRequest(new { message = e.Message }); }

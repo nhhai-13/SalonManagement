@@ -25,9 +25,9 @@ public class BookingService : IBookingService
             return new BookingTotalsDto
             {
                 TotalDurationMinutes = 0,
-                FormattedTotalDuration = "0 phút",
+                FormattedTotalDuration = "0 min",
                 TotalPrice = 0m,
-                FormattedTotalPrice = "0 đ",
+                FormattedTotalPrice = "0 VND",
                 SelectedServices = new List<SelectedServiceSummaryItem>()
             };
         }
@@ -112,7 +112,7 @@ public class BookingService : IBookingService
             groups.Add(new BookingServiceGroupViewModel
             {
                 Id = null,
-                Name = "Chưa phân nhóm",
+                Name = "Ungrouped",
                 DisplayOrder = int.MaxValue,
                 Services = byGroup[null].Select(s => MapToItemViewModel(s, preselectedSet)).ToList()
             });
@@ -131,19 +131,19 @@ public class BookingService : IBookingService
 
     public static string FormatCurrency(decimal price)
     {
-        return price.ToString("N0", VietnameseCulture) + " đ";
+        return price.ToString("N0", VietnameseCulture) + " VND";
     }
 
     public static string FormatDuration(int minutes)
     {
         if (minutes <= 0)
         {
-            return "0 phút";
+            return "0 min";
         }
 
         if (minutes < 60)
         {
-            return $"{minutes} phút";
+            return $"{minutes} min";
         }
 
         var hours = minutes / 60;
@@ -151,10 +151,10 @@ public class BookingService : IBookingService
 
         if (remainingMinutes == 0)
         {
-            return $"{hours} giờ ({minutes} phút)";
+            return $"{hours} hr ({minutes} min)";
         }
 
-        return $"{hours} giờ {remainingMinutes} phút ({minutes} phút)";
+        return $"{hours} hr {remainingMinutes} min ({minutes} min)";
     }
 
     private static BookingServiceItemViewModel MapToItemViewModel(Service s, HashSet<int> preselectedSet)
@@ -169,7 +169,7 @@ public class BookingService : IBookingService
             DurationMinutes = s.DurationMinutes,
             FormattedDuration = FormatDuration(s.DurationMinutes),
             ServiceGroupId = s.ServiceGroupId,
-            GroupName = s.ServiceGroup?.GroupName ?? "Chưa phân nhóm",
+            GroupName = s.ServiceGroup?.GroupName ?? "Ungrouped",
             IsSelected = preselectedSet.Contains(s.ServiceId)
         };
     }

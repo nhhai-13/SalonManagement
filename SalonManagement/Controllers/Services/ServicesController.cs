@@ -64,7 +64,7 @@ namespace SalonManagement.Controllers
                 group.Services = byGroup[group.Id].ToList();
             groups.RemoveAll(group => group.Services.Count == 0);
             if (byGroup[null].Any())
-                groups.Add(new() { Name = "Chưa phân nhóm", Services = byGroup[null].ToList() });
+                groups.Add(new() { Name = "Ungrouped", Services = byGroup[null].ToList() });
 
             return View("Public", new SalonManagement.Models.ViewModels.PublicServiceCatalog { Groups = groups, Search = search });
         }
