@@ -92,6 +92,35 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         });
     }
 }
+        var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
+        var nextDay = appointmentDay.AddDays(1);
+        var affectedAppointments = await dbContext.Appointments.AsNoTracking()
+            .Where(appointment => appointment.StylistId == request.StylistId &&
+                appointment.AppointmentDate >= appointmentDay && appointment.AppointmentDate < nextDay &&
+                appointment.Status != "Cancelled")
+            .Where(appointment => request.IsFullDay ||
+                (request.StartTime.HasValue && request.EndTime.HasValue &&
+                 appointment.StartTime < request.EndTime.Value.ToTimeSpan() &&
+                 appointment.EndTime > request.StartTime.Value.ToTimeSpan()))
+            .OrderBy(appointment => appointment.StartTime)
+            .Select(appointment => new
+            {
+                appointment.AppointmentId,
+                appointment.AppointmentDate,
+                appointment.StartTime,
+                appointment.EndTime,
+                appointment.Status
+            }).ToListAsync();
+
+        if (affectedAppointments.Count > 0)
+        {
+            return Conflict(new
+            {
+                message = "Thời gian nghỉ trùng với lịch hẹn đã có.",
+                affectedAppointments
+            });
+        }
+
         var timeOff = new StylistTimeOff
         {
             StylistId = request.StylistId,
