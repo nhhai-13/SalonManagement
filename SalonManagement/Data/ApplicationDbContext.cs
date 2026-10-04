@@ -335,6 +335,7 @@ private class AuditEntry
 
             builder.Entity<Appointment>(entity =>
             {
+                entity.ToTable("Appointments", table => table.HasTrigger("TR_Appointments_PreventOverlap"));
                 entity.HasKey(appointment => appointment.AppointmentId);
                 entity.Property(appointment => appointment.Status).HasMaxLength(30);
 

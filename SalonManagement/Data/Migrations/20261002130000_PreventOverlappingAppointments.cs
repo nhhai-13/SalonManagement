@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 #nullable disable
 
 namespace SalonManagement.Data.Migrations;
 
+[DbContext(typeof(ApplicationDbContext))]
+[Migration("20261002130000_PreventOverlappingAppointments")]
 public partial class PreventOverlappingAppointments : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -8,6 +9,17 @@ namespace SalonManagement.Tests;
 [TestClass]
 public class Sprint2AuditTests
 {
+    [TestMethod]
+    public void SqlServer_MustDiscoverOverlapMigrationAndTrigger()
+    {
+        using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlServer("Server=localhost;Database=MetadataOnly;Integrated Security=true;TrustServerCertificate=true")
+            .Options, new HttpContextAccessor());
+        CollectionAssert.Contains(db.Database.GetMigrations().ToArray(), "20261002130000_PreventOverlappingAppointments");
+        var entity = db.GetService<Microsoft.EntityFrameworkCore.Metadata.IDesignTimeModel>().Model
+            .FindEntityType(typeof(Appointment))!;
+        Assert.IsTrue(entity.GetDeclaredTriggers().Any(t => t.ModelName == "TR_Appointments_PreventOverlap"));
+    }
     private static ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
     private static async Task<int[]> Seed(ApplicationDbContext db, int count = 1)
     {

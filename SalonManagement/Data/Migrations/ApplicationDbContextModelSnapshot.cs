@@ -303,7 +303,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("StylistId", "AppointmentDate", "StartTime");
 
-                    b.ToTable("Appointments");
+                    b.ToTable("Appointments", t => t.HasTrigger("TR_Appointments_PreventOverlap"));
                 });
 
             modelBuilder.Entity("SalonManagement.Models.AppointmentService", b =>
