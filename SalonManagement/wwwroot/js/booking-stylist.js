@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function validateTime() {
         clearAssignment();
         if (!selected.value || !date.value || !selectedSlot.value || !date.validity.valid || !selectedSlot.validity.valid) {
-            slotMessage.textContent = 'Chọn thợ, ngày và nhập giờ hẹn hợp lệ.';
+            slotMessage.textContent = 'Chọn thợ, ngày và nhập giờ theo dạng HH:mm, ví dụ 14:30.';
             return;
         }
         const current = assignmentVersion;

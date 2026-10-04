@@ -3,14 +3,14 @@
          data-slots-url="@Url.Action("Slots", "StylistAvailability")"
          data-assignment-url="@Url.Action("Assignment", "StylistAvailability")">
     <h2 class="h4">Chọn thợ và giờ hẹn</h2>
-    <p>Chọn một thợ hoặc “Thợ bất kỳ” để xem giờ trống của các thợ làm được toàn bộ dịch vụ.</p>
+    <p>Chọn một thợ hoặc “Thợ bất kỳ”, sau đó nhập ngày và giờ hẹn mong muốn.</p>
     <p id="stylist-message" role="status" aria-live="polite"></p>
     <div id="stylist-options" class="d-flex flex-wrap gap-2" role="group" aria-label="Thợ phù hợp"></div>
     <label for="booking-date" class="form-label mt-3">Ngày hẹn</label>
     <input id="booking-date" type="date" class="form-control" />
     <p id="slot-message" role="status" aria-live="polite" class="mt-3"></p>
     <label for="selected-slot" class="form-label">Giờ hẹn (giờ Việt Nam)</label>
-    <input type="time" id="selected-slot" name="startTime" class="form-control" step="60" disabled aria-describedby="slot-message" />
+    <input type="text" id="selected-slot" name="startTime" class="form-control" placeholder="HH:mm, ví dụ 14:30" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" maxlength="5" autocomplete="off" disabled aria-describedby="slot-message" />
     <div id="slot-options" hidden></div>
     <input type="hidden" id="selected-stylist" name="stylistId" />
     <button type="button" id="confirm-stylist-selection" class="btn btn-primary mt-3" disabled>Xác nhận lựa chọn</button>
@@ -20,5 +20,5 @@
         <p id="assignment-detail"></p>
         <p class="text-muted mb-0">Lựa chọn này chưa giữ chỗ hoặc tạo lịch hẹn.</p>
     </div>
-    <noscript>Bật JavaScript để chọn thợ và xem khung giờ trống.</noscript>
+    <noscript>Bật JavaScript để chọn thợ và kiểm tra giờ hẹn.</noscript>
 </section>
