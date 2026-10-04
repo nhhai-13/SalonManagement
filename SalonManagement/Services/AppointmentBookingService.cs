@@ -55,7 +55,7 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
         {
             // The availability query above is only a preview. Re-check after taking the
             // booking lock so a competing request cannot commit the same interval.
-            var validSlots = await new AvailabilityService(db, timeProvider).GetSlotsAsync(request.Date.Date, request.ServiceIds);
+            var validSlots = await new AvailabilityService(db, timeProvider).GetSlotsAsync(request.Date.Date, request.ServiceIds, request.StartTime);
             if (!validSlots.Slots.Contains(request.StartTime))
                 return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ không còn khả dụng. Vui lòng chọn giờ khác.");
             var timeOffs = await db.StylistTimeOffs.Where(t => t.StylistId == stylist.StylistId && t.OffDate == DateOnly.FromDateTime(request.Date)).ToListAsync();

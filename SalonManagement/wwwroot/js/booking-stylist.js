@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         slotVersion++;
         slotRequest?.abort();
         selectedSlot.value = '';
+        selectedSlot.disabled = true;
         slots.replaceChildren();
         slotMessage.textContent = '';
     }
@@ -58,33 +59,33 @@ document.addEventListener('DOMContentLoaded', () => {
             b.classList.toggle('active', b === target);
         });
     }
-    async function loadSlots() {
-        clearSlots();
-        if (!selected.value || !date.value || !date.validity.valid) {
-            slotMessage.textContent = 'Chọn thợ và ngày để xem giờ trống.';
+    async function validateTime() {
+        clearAssignment();
+        if (!selected.value || !date.value || !selectedSlot.value || !date.validity.valid || !selectedSlot.validity.valid) {
+            slotMessage.textContent = 'Chọn thợ, ngày và nhập giờ hẹn hợp lệ.';
             return;
         }
-        const current = slotVersion;
-        slotRequest = new AbortController();
-        const q = query(); q.set('stylistId', selected.value); q.set('date', date.value);
-        slotMessage.textContent = 'Đang tải giờ trống…';
+        const current = assignmentVersion;
+        assignmentRequest = new AbortController();
+        slotMessage.textContent = 'Đang kiểm tra giờ hẹn…';
+        const q = query(); q.set('stylistId', selected.value); q.set('date', date.value); q.set('start', selectedSlot.value);
         try {
-            const data = await json(`${panel.dataset.slotsUrl}?${q}`, slotRequest.signal);
-            if (current !== slotVersion) return;
-            slotMessage.textContent = data.length ? 'Chọn giờ bắt đầu (giờ Việt Nam).' : selected.value === '0'
-                ? 'Không có thợ phù hợp nào còn khung giờ trống trong ngày này. Hãy đổi ngày hoặc dịch vụ.'
-                : 'Thợ đã chọn không còn khung giờ phù hợp trong ngày này. Hãy đổi ngày hoặc đổi thợ.';
-            for (const slot of data) {
-                const b = button(`${slot.start} – ${slot.end}`);
-                b.addEventListener('click', () => {
-                    clearAssignment(); selectedSlot.value = slot.start; choose(slots, b); confirm.disabled = false;
-                });
-                slots.append(b);
-            }
+            const data = await json(`${panel.dataset.assignmentUrl}?${q}`, assignmentRequest.signal);
+            if (current !== assignmentVersion) return;
+            slotMessage.textContent = `Giờ hợp lệ: ${data.start} – ${data.end}. Thợ phù hợp: ${data.name}.`;
+            confirm.disabled = false;
         } catch (e) {
-            if (current === slotVersion && e.name !== 'AbortError') slotMessage.textContent = e.message;
+            if (current === assignmentVersion && e.name !== 'AbortError') slotMessage.textContent = e.message;
         }
     }
+    async function loadSlots() {
+        clearSlots();
+        selectedSlot.disabled = !selected.value || !date.value || !date.validity.valid;
+        slotMessage.textContent = selectedSlot.disabled
+            ? 'Chọn thợ và ngày trước khi nhập giờ hẹn.'
+            : 'Nhập giờ hẹn. Dịch vụ phải hoàn tất trong giờ mở cửa và ca làm của thợ.';
+    }
+    selectedSlot.addEventListener('input', validateTime);
     async function loadStylists() {
         const current = ++version;
         stylistRequest?.abort();

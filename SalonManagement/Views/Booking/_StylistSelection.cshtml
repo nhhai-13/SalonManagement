@@ -9,9 +9,10 @@
     <label for="booking-date" class="form-label mt-3">Ngày hẹn</label>
     <input id="booking-date" type="date" class="form-control" />
     <p id="slot-message" role="status" aria-live="polite" class="mt-3"></p>
-    <div id="slot-options" class="d-flex flex-wrap gap-2" role="group" aria-label="Khung giờ trống"></div>
+    <label for="selected-slot" class="form-label">Giờ hẹn (giờ Việt Nam)</label>
+    <input type="time" id="selected-slot" name="startTime" class="form-control" step="60" disabled aria-describedby="slot-message" />
+    <div id="slot-options" hidden></div>
     <input type="hidden" id="selected-stylist" name="stylistId" />
-    <input type="hidden" id="selected-slot" name="startTime" />
     <button type="button" id="confirm-stylist-selection" class="btn btn-primary mt-3" disabled>Xác nhận lựa chọn</button>
     <div id="assignment-confirmation" class="border rounded p-3 mt-3" hidden aria-live="polite">
         <h3 class="h5">Thông tin xác nhận</h3>

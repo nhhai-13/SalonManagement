@@ -33,6 +33,8 @@ public sealed class StylistAvailabilityController(StylistAvailabilityService ava
             return BadRequest(new { message = "Vui lòng chọn đầy đủ dịch vụ, thợ, ngày và giờ." });
         try
         {
+            var openingError = await availability.ValidateOpeningTimeAsync(serviceIds, date, start.Value);
+            if (openingError != null) return Conflict(new { message = openingError });
             var assignment = await availability.AssignAsync(serviceIds, stylistId.Value, date, start.Value);
             return assignment == null
                 ? Conflict(new { message = "Khung giờ này không còn thợ phù hợp. Vui lòng chọn lại giờ." })

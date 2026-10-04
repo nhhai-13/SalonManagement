@@ -11,6 +11,19 @@ namespace SalonManagement.Tests;
 
 public class StylistAssignmentTests
 {
+    [Fact]
+    public async Task ManualTimeRespectsOpeningHoursAndServiceEnd()
+    {
+        await using var db = Db(); await Seed(db);
+        var service = Service(db);
+        Assert.NotNull(await service.ValidateOpeningTimeAsync([1], Date, new(8, 59)));
+        Assert.Null(await service.ValidateOpeningTimeAsync([1], Date, new(16, 30)));
+        Assert.NotNull(await service.ValidateOpeningTimeAsync([1], Date, new(16, 31)));
+        Assert.NotNull(await service.ValidateOpeningTimeAsync([1], Date, new(17, 0)));
+        Assert.NotNull(await service.AssignAsync([1], 1, Date, new(14, 7)));
+        db.ShopHolidays.Add(new() { HolidayDate = Date, Reason = "Holiday" }); await db.SaveChangesAsync();
+        Assert.NotNull(await service.ValidateOpeningTimeAsync([1], Date, new(14, 0)));
+    }
     private static readonly DateOnly Date = new(2030, 1, 7);
     private sealed class Clock : TimeProvider
     {
@@ -112,7 +125,7 @@ public class StylistAssignmentTests
         (await db.Stylists.FindAsync(2))!.IsActive = false; Book(db, 3, 9); await db.SaveChangesAsync();
         Assert.Equal(3, (await Service(db).AssignAsync([1, 2], 0, Date, new(14, 0)))!.StylistId);
         Assert.Null(await Service(db).AssignAsync([1, 2], 0, Date, new(16, 30)));
-        Assert.Null(await Service(db).AssignAsync([1, 2], 0, Date, new(14, 1)));
+        Assert.NotNull(await Service(db).AssignAsync([1, 2], 0, Date, new(14, 1)));
         Assert.Null(await Service(db).AssignAsync([1, 2], 0, Date, new(14, 0, 1)));
         Assert.Null(await Service(db).AssignAsync([1, 2], 0, Date.AddDays(-1), new(14, 0)));
     }

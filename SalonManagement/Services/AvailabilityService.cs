@@ -11,7 +11,7 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
 {
     public AvailabilityService(ApplicationDbContext db) : this(db, TimeProvider.System) { }
 
-    public async Task<AvailabilityResult> GetSlotsAsync(DateTime date, IReadOnlyCollection<int> serviceIds)
+    public async Task<AvailabilityResult> GetSlotsAsync(DateTime date, IReadOnlyCollection<int> serviceIds, TimeSpan? requestedStart = null)
     {
         var services = await db.Services.AsNoTracking().Where(s => s.IsActive && serviceIds.Contains(s.ServiceId)).ToListAsync();
         if (services.Count != serviceIds.Distinct().Count()) return new AvailabilityResult(0, []);
@@ -31,7 +31,7 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
         var breaks = await db.StylistBreaks.AsNoTracking().Where(item => item.BreakDate == date.Date).ToListAsync();
         var eligible = candidates.Where(s => !daysOff.Contains(s.StylistId) && requiredIds.All(id => s.Services.Any(skill => skill.ServiceId == id))).ToList();
         var appointments = await db.Appointments.AsNoTracking().Where(a => a.AppointmentDate == date.Date && a.Status != "Cancelled" && a.Status != "NoShow").ToListAsync();
-        var slots = eligible.SelectMany(stylist => stylist.WorkSchedules.SelectMany(shift => SlotsForShift(shift, duration, opensAt, closesAt)
+        var slots = eligible.SelectMany(stylist => stylist.WorkSchedules.SelectMany(shift => SlotsForShift(shift, duration, opensAt, closesAt, requestedStart)
                 .Where(slot => !timeOffs.Any(t => t.StylistId == stylist.StylistId && (t.IsFullDay || (t.StartTime.HasValue && t.EndTime.HasValue && t.StartTime.Value.ToTimeSpan() < slot + TimeSpan.FromMinutes(duration) && slot < t.EndTime.Value.ToTimeSpan()))) && !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime) && !breaks.Where(b => b.StylistId == stylist.StylistId).Any(b => b.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < b.EndTime))))
             .Distinct().OrderBy(time => time).ToList();
 
@@ -56,11 +56,11 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
         return suggestions;
     }
 
-    private static IEnumerable<TimeSpan> SlotsForShift(WorkSchedule shift, int duration, TimeSpan opensAt, TimeSpan closesAt)
+    private static IEnumerable<TimeSpan> SlotsForShift(WorkSchedule shift, int duration, TimeSpan opensAt, TimeSpan closesAt, TimeSpan? requestedStart)
     {
         var earliest = shift.StartTime < opensAt ? opensAt : shift.StartTime;
         var latest = shift.EndTime > closesAt ? closesAt : shift.EndTime;
-        for (var start = earliest; start + TimeSpan.FromMinutes(duration) <= latest; start += TimeSpan.FromMinutes(15))
+        for (var start = requestedStart ?? earliest; start >= earliest && start + TimeSpan.FromMinutes(duration) <= latest; start += requestedStart.HasValue ? TimeSpan.FromDays(1) : TimeSpan.FromMinutes(15))
             yield return start;
     }
 }

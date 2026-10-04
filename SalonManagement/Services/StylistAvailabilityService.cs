@@ -48,7 +48,7 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     {
         var startText = start.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerMinute != 0) return null;
-        var candidates = (await GetStylistSlotsAsync(serviceIds, stylistId, date)).Where(s => s.Start == startText).ToList();
+        var candidates = (await GetStylistSlotsAsync(serviceIds, stylistId, date, start)).Where(s => s.Start == startText).ToList();
         if (candidates.Count == 0) return null;
         var candidateIds = candidates.Select(s => s.StylistId).Distinct().ToArray();
         var day = date.ToDateTime(TimeOnly.MinValue);
@@ -68,7 +68,20 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
 
     private sealed record AvailableStylistSlot(int StylistId, string Start, string End);
 
-    private async Task<List<AvailableStylistSlot>> GetStylistSlotsAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date)
+    public async Task<string?> ValidateOpeningTimeAsync(IEnumerable<int> serviceIds, DateOnly date, TimeOnly start)
+    {
+        var services = await SelectedServices(serviceIds);
+        var hours = await db.BusinessHours.AsNoTracking().SingleOrDefaultAsync(h => h.DayOfWeek == date.DayOfWeek);
+        if (await db.ShopHolidays.AnyAsync(h => h.HolidayDate == date) || hours == null || hours.IsClosed ||
+            hours.OpensAt == null || hours.ClosesAt == null || hours.OpensAt >= hours.ClosesAt)
+            return "Tiệm đóng cửa ngày này. Vui lòng chọn ngày khác.";
+        var end = start.ToTimeSpan() + TimeSpan.FromMinutes(services.Sum(s => (long)s.DurationMinutes));
+        if (start < hours.OpensAt.Value || end > hours.ClosesAt.Value.ToTimeSpan())
+            return $"Giờ này ngoài giờ hoạt động hoặc dịch vụ kết thúc sau khi tiệm đóng cửa. Tiệm mở {hours.OpensAt:HH:mm}–{hours.ClosesAt:HH:mm}; vui lòng chọn giờ để hoàn tất dịch vụ trước giờ đóng cửa.";
+        return null;
+    }
+
+    private async Task<List<AvailableStylistSlot>> GetStylistSlotsAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date, TimeOnly? requestedStart = null)
     {
         var services = await SelectedServices(serviceIds);
         var ids = services.Select(s => s.ServiceId).ToArray();
@@ -138,8 +151,8 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
             foreach (var window in windows)
             {
                 // Quarter-hour starts; an appointment ending exactly at start does not overlap.
-                var first = TimeSpan.FromMinutes(Math.Ceiling(window.Start.TotalMinutes / 15) * 15);
-                for (var start = first; start + length <= window.End; start += TimeSpan.FromMinutes(15))
+                var first = requestedStart?.ToTimeSpan() ?? TimeSpan.FromMinutes(Math.Ceiling(window.Start.TotalMinutes / 15) * 15);
+                for (var start = first; start >= window.Start && start + length <= window.End; start += requestedStart.HasValue ? TimeSpan.FromDays(1) : TimeSpan.FromMinutes(15))
                 {
                     var end = start + length;
                     var overlapsTimeOff = stylistTimeOffs.Any(timeOff =>
