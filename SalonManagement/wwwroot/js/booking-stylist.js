@@ -12,11 +12,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmation = document.getElementById('assignment-confirmation');
     const assignmentMessage = document.getElementById('assignment-message');
     const assignmentDetail = document.getElementById('assignment-detail');
+    const customerDetails = document.getElementById('booking-customer-details');
+    const submitAppointment = document.getElementById('submit-appointment');
+    const bookingResult = document.getElementById('booking-result');
+    let confirmedStylistId = null, submitting = false;
     let assignmentVersion = 0, assignmentRequest;
     function clearAssignment() {
         assignmentVersion++;
         assignmentRequest?.abort();
         confirmation.hidden = true;
+        customerDetails.hidden = true;
+        confirmedStylistId = null;
+        bookingResult.textContent = '';
+        bookingResult.classList.remove('text-success');
         assignmentMessage.textContent = assignmentDetail.textContent = '';
         confirm.disabled = true;
     }
@@ -137,12 +145,52 @@ document.addEventListener('DOMContentLoaded', () => {
             if (current !== assignmentVersion) return;
             assignmentMessage.textContent = `Thợ được gán: ${data.name}`;
             assignmentDetail.textContent = `Ngày ${data.date} · ${data.start} – ${data.end}`;
+            confirmedStylistId = data.stylistId;
+            customerDetails.hidden = false;
             confirm.disabled = false;
         } catch (e) {
             if (current !== assignmentVersion || e.name === 'AbortError') return;
             selectedSlot.value = '';
             choose(slots, null);
             assignmentMessage.textContent = e.message;
+        }
+    });
+    submitAppointment.addEventListener('click', async () => {
+        if (submitting || confirmedStylistId == null) return;
+        const fields = ['booking-full-name', 'booking-phone', 'booking-email', 'booking-notes'].map(id => document.getElementById(id));
+        fields[0].value = fields[0].value.trim();
+        if (fields.some(field => !field.reportValidity())) return;
+        const payload = { date: date.value, startTime: selectedSlot.value, serviceIds: ids().map(Number),
+            stylistId: confirmedStylistId, fullName: fields[0].value, phone: fields[1].value,
+            email: fields[2].value || null, notes: fields[3].value || null };
+        submitting = true;
+        const controls = [...document.getElementById('booking-form').querySelectorAll('input, button, textarea')];
+        const disabledStates = controls.map(control => control.disabled);
+        controls.forEach(control => control.disabled = true);
+        bookingResult.textContent = 'Đang gửi yêu cầu đặt lịch…';
+        let succeeded = false;
+        try {
+            const response = await fetch(panel.dataset.confirmUrl, { method: 'POST',
+                headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const data = await response.json();
+            if (!response.ok) {
+                bookingResult.textContent = [data.message, ...Object.values(data.errors || {})].filter(Boolean).join(' ');
+                if (data.reloadSlots) { confirmedStylistId = null; customerDetails.hidden = true; }
+                return;
+            }
+            succeeded = true;
+            customerDetails.hidden = true;
+            confirmedStylistId = null;
+            assignmentMessage.textContent = `Thợ: ${data.stylistName}`;
+            assignmentDetail.textContent = `${data.date} · ${data.startTime} – ${data.endTime}`;
+            bookingResult.textContent = `Đặt lịch thành công! Mã lịch hẹn: ${data.reference}. Vui lòng lưu mã để tra cứu lịch hẹn.`;
+            bookingResult.classList.add('text-success');
+        } catch {
+            bookingResult.textContent = 'Chưa nhận được kết quả từ máy chủ. Vui lòng tra cứu lịch hẹn bằng số điện thoại trước khi gửi lại.';
+        } finally {
+            submitting = false;
+            controls.forEach((control, index) => control.disabled = disabledStates[index]);
+            if (succeeded) confirm.disabled = true;
         }
     });
     document.getElementById('btn-submit-booking')?.addEventListener('click', () => {
