@@ -1,0 +1,18 @@
+@{ ViewData["Title"] = "Ngày nghỉ của salon"; }
+<div class="sl-body">
+    <header class="sl-hero-card sl-hero-owner"><div><span class="sl-hero-kicker">Vận hành salon · S2-02</span><h1>Ngày nghỉ của salon</h1><p>Chủ động thông báo thời gian đóng cửa và kiểm tra những lịch hẹn cần sắp xếp lại.</p></div></header>
+    <div class="row g-4 mt-1">
+        <section class="col-lg-5"><div class="card p-4 h-100"><h2 class="h5">Thiết lập khoảng nghỉ</h2><p class="text-muted">Áp dụng cho toàn tiệm, bao gồm ngày bắt đầu và ngày kết thúc.</p>
+            <form id="holiday-form">
+                <div class="mb-3"><label for="holiday-start" class="form-label">Từ ngày</label><input id="holiday-start" type="date" class="form-control" required /></div>
+                <div class="mb-3"><label for="holiday-end" class="form-label">Đến ngày</label><input id="holiday-end" type="date" class="form-control" required /></div>
+                <div class="mb-3"><label for="holiday-reason" class="form-label">Lý do nghỉ</label><textarea id="holiday-reason" class="form-control" rows="3" maxlength="500" required placeholder="Ví dụ: Nghỉ lễ, bảo trì hoặc đào tạo nhân viên"></textarea><small class="text-muted">Tối đa 500 ký tự.</small></div>
+                <div id="holiday-warning" class="alert alert-warning" hidden><strong>Lịch hẹn cần xử lý</strong><p>Các lịch dưới đây vẫn được giữ nguyên. Hãy liên hệ khách để sắp xếp lại.</p><ul id="affected-list" class="ps-3"></ul><label><input id="holiday-confirm" type="checkbox" /> Tôi đã kiểm tra và xác nhận lưu khoảng nghỉ.</label></div>
+                <p id="holiday-feedback" role="status" aria-live="polite"></p>
+                <button id="holiday-save" class="btn btn-primary w-100" type="submit">Kiểm tra và lưu ngày nghỉ</button>
+            </form>
+        </div></section>
+        <section class="col-lg-7"><div class="card p-4"><div class="d-flex justify-content-between align-items-center gap-2"><h2 class="h5 mb-0">Ngày nghỉ đã thiết lập</h2><button id="holiday-refresh" class="btn btn-outline-primary btn-sm" type="button">Làm mới</button></div><p class="text-muted mt-2">Khách không thể đặt lịch mới trong những ngày này.</p><div id="holiday-list" aria-live="polite">Đang tải…</div></div></section>
+    </div>
+</div>
+@section Scripts { <script src="~/js/owner-holidays.js" asp-append-version="true"></script> }

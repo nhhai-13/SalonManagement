@@ -24,3 +24,9 @@ Các kết luận phía trên là bản đối chiếu trước khi bổ sung co
 - S2-08: xác nhận lịch trong transaction SQL Server, khóa dòng thợ bằng `UPDLOCK, HOLDLOCK`, kiểm tra lại tính khả dụng và trùng lịch trước khi lưu. Giữ trigger chống trùng ở database. Thử 20 yêu cầu đồng thời chia đều qua hai tiến trình web dùng chung database kiểm thử: 1 HTTP 200, 9 HTTP 409, 10 HTTP 429; database chỉ có một lịch tại giờ được thử. HTTP 429 là giới hạn IP hiện có.
 
 Kiểm thử tự động: **235/235 đạt**, gồm cả test ngoài Sprint 2. Bằng chứng local: `TestResults/sprint2-supplements-verified.trx`, `TestResults/s208-two-process-sql.json` và log hai tiến trình. Database kiểm thử riêng: `SalonManagement_S206_Test_20261004`; không thay dữ liệu production. Các file TestResults không đưa lên GitHub.
+
+## Form S2-02 (05/10/2026)
+
+Đã bổ sung `/owner/holidays`, chỉ tài khoản Owner truy cập, có lối vào từ khu vực chủ tiệm và menu quản lý salon. Form gồm khoảng ngày, lý do, danh sách ngày nghỉ và danh sách lịch bị ảnh hưởng với checkbox xác nhận. Thay đổi ngày/lý do xóa xác nhận cũ; khóa nhập và nút lưu trong lúc gửi yêu cầu. Dữ liệu từ API hiển thị bằng textContent.
+
+Build thành công, không warning/error. Kiểm tra trình duyệt với tài khoản Owner trên database riêng: cảnh báo bảy lịch ngày 05/10 trước khi lưu; đổi sang 01–02/01/2031 xóa cảnh báo cũ; lưu thành công hai ngày và danh sách cập nhật. Truy cập khi chưa đăng nhập chuyển đến trang đăng nhập. Đây là kiểm tra form bổ sung; không chạy lại toàn bộ 235 test vì backend nghiệp vụ không đổi.

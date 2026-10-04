@@ -108,6 +108,7 @@ else
                 {
                     <div class="sl-nav-section">
                         <div class="sl-nav-label">Quản lý salon</div>
+                        <a class="sl-nav-link @(NavActive("HolidayManagement") ? "active" : "")" href="/owner/holidays"><i class="bi bi-calendar-x"></i> Ngày nghỉ salon</a>
                         <a class="sl-nav-link @(NavActive("Services","Index") ? "active" : "")"
                            asp-controller="Services" asp-action="Index">
                             <i class="bi bi-bag"></i> Dịch vụ
