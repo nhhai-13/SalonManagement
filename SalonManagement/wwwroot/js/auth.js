@@ -427,6 +427,58 @@ window.SalonAuth = (() => {
             });
             this.loadStaffAccounts();
         },
+        async bindRoleManagement() {
+            const target = document.getElementById("role-account-list");
+            if (!target) return;
+            const message = document.getElementById("role-management-message");
+            const showMessage = (text, success) => {
+                message.textContent = text;
+                message.className = `alert ${success ? "alert-success" : "alert-danger"}`;
+            };
+            try {
+                const response = await authenticatedFetch("/api/admin/staff");
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) return showMessage(result.message || "Không thể tải danh sách tài khoản.", false);
+                this.roleAccounts = result.items || [];
+                target.innerHTML = this.roleAccounts.length ? this.roleAccounts.map(account => `
+                    <tr data-id="${account.id}">
+                        <td><strong>${this.escapeHtml(account.fullName)}</strong><small class="d-block">${this.escapeHtml(account.email)}</small></td>
+                        <td><span class="badge ${account.isActive ? "bg-success" : "bg-secondary"}">${account.isActive ? "Đang hoạt động" : "Ngừng hoạt động"}</span></td>
+                        <td><select class="sl-select role-select" aria-label="Vai trò của ${this.escapeHtml(account.email)}">
+                            ${["Admin", "Owner", "Receptionist", "Stylist"].map(role => `<option value="${role}" ${account.role === role ? "selected" : ""}>${role === "Receptionist" ? "Lễ tân" : role === "Stylist" ? "Thợ" : role === "Owner" ? "Chủ tiệm" : "Quản trị"}</option>`).join("")}
+                        </select></td>
+                        <td class="text-end"><button class="sl-btn sl-btn-outline sl-btn-sm role-save" type="button">Lưu vai trò</button></td>
+                    </tr>`).join("") : '<tr><td colspan="4" class="sl-table-empty">Chưa có tài khoản nội bộ.</td></tr>';
+            } catch {
+                showMessage("Không thể kết nối đến hệ thống.", false);
+                return;
+            }
+            target.addEventListener("click", async event => {
+                const button = event.target.closest(".role-save");
+                const row = event.target.closest("tr[data-id]");
+                if (!button || !row) return;
+                const account = this.roleAccounts.find(item => item.id === row.dataset.id);
+                if (!account) return;
+                const role = row.querySelector(".role-select").value;
+                if (role === account.role) return showMessage("Vai trò chưa thay đổi.", true);
+                button.disabled = true;
+                try {
+                    const response = await authenticatedFetch(`/api/admin/staff/${encodeURIComponent(account.id)}/role`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ role })
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) return showMessage(result.message || "Không thể cập nhật vai trò.", false);
+                    account.role = role;
+                    showMessage("Đã cập nhật vai trò. Quyền mới có hiệu lực ở lần gọi API tiếp theo.", true);
+                } catch {
+                    showMessage("Không thể kết nối đến hệ thống.", false);
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        },
         async requireSession(options = {}) {
             const endpoint = options.endpoint || "/api/admin/session";
             const contentId = options.contentId || "admin-content";
@@ -450,7 +502,8 @@ window.SalonAuth = (() => {
                 this.bindStaffAccountForm();
                 this.bindStaffManagement();
             }
-            document.getElementById("logout")?.addEventListener("click", async () => {
+            document.getElementById("logout")?.addEventListener("click", async event => {
+                event.preventDefault();
                 const refreshToken = activeStorage().getItem(refreshKey);
                 if (refreshToken) {
                     await fetch("/api/auth/logout", {

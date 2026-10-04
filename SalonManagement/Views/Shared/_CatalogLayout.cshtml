@@ -3,18 +3,50 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#3B5BDB" />
     <title>@ViewData["Title"] - Luminol Salon &amp; Spa</title>
+    <link rel="stylesheet" href="~/css/salon-design.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/catalog.css" asp-append-version="true" />
 </head>
-<body>
-    <header class="catalog-header">
-        <nav aria-label="Điều hướng chính" class="catalog-nav">
-            <a class="brand" asp-controller="Home" asp-action="Index">Luminol</a>
-            <a asp-controller="Services" asp-action="Public">Dịch vụ</a>
-            <partial name="_LoginPartial" />
+<body class="sl-body">
+    <header class="sl-catalog-header">
+        <nav class="sl-catalog-nav" aria-label="Điều hướng chính">
+            <a class="sl-catalog-brand" asp-controller="Home" asp-action="Index">
+                <span style="display:grid;width:36px;height:36px;place-items:center;border:1.5px solid var(--sl-primary);border-radius:50%;color:var(--sl-primary);font-family:var(--sl-font-display);font-size:19px;" aria-hidden="true">L</span>
+                Luminol
+            </a>
+            <div class="sl-catalog-nav-links">
+                <a asp-controller="Home" asp-action="Index">Trang chủ</a>
+                <a asp-controller="Services" asp-action="Public">Dịch vụ</a>
+                <a asp-controller="Booking" asp-action="Index">Đặt lịch</a>
+                <a asp-controller="AppointmentLookup" asp-action="Index">Tra cứu lịch</a>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a class="sl-btn sl-btn-ghost sl-btn-sm" asp-controller="Account" asp-action="ChangePassword">Đổi mật khẩu</a>
+                    <form asp-area="Identity" asp-page="/Account/Logout"
+                          asp-route-returnUrl="@Url.Action("Index","Home",new{area=""})"
+                          method="post" style="margin:0;">
+                        <button type="submit" class="sl-btn sl-btn-outline sl-btn-sm">Đăng xuất</button>
+                    </form>
+                }
+                else
+                {
+                    <a class="sl-btn sl-btn-outline sl-btn-sm" href="/admin/login">Đăng nhập</a>
+                }
+            </div>
         </nav>
     </header>
-    <main id="catalog">@RenderBody()</main>
-    <footer class="container">&copy; 2026 - Luminol Salon &amp; Spa · <a asp-controller="Home" asp-action="Privacy">Quyền riêng tư</a></footer>
+
+    <main id="catalog" class="sl-catalog-main">
+        @RenderBody()
+    </main>
+
+    <footer style="background:var(--sl-surface);border-top:1px solid var(--sl-border);padding:20px 24px;text-align:center;color:var(--sl-text-muted);font-size:12px;">
+        &copy; @DateTime.Now.Year Luminol Salon &amp; Spa ·
+        <a asp-controller="Home" asp-action="Privacy" style="color:var(--sl-text-muted);">Quyền riêng tư</a>
+    </footer>
+
 </body>
 </html>

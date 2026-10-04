@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SalonManagement.Controllers;
 using SalonManagement.Controllers.Booking;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -105,6 +106,42 @@ public class StylistAvailabilityTests
         foreach (var shift in await db.WorkSchedules.Where(s => s.StylistId == x.c).ToListAsync()) shift.Status = "Off";
         await db.SaveChangesAsync();
         Assert.Empty(await service.GetSlotsAsync([x.cut], x.c, date));
+    }
+
+    [Fact]
+    public async Task StylistTimeOff_RemovesFullDayAndOverlappingBookingSlots()
+    {
+        await using var db = Db(); var x = await Seed(db); var date = DateOnly.FromDateTime(Day);
+        db.StylistTimeOffs.AddRange(
+            new StylistTimeOff { StylistId = x.a, OffDate = date, IsFullDay = true },
+            new StylistTimeOff
+            {
+                StylistId = x.b, OffDate = date, IsFullDay = false,
+                StartTime = new TimeOnly(10, 0), EndTime = new TimeOnly(11, 0)
+            });
+        await db.SaveChangesAsync();
+
+        Assert.Empty(await Service(db).GetSlotsAsync([x.cut], x.a, date));
+        var partialDaySlots = await Service(db).GetSlotsAsync([x.cut], x.b, date);
+        Assert.DoesNotContain(partialDaySlots, slot =>
+            slot.Start is "10:00" or "10:15" or "10:30" or "10:45");
+    }
+
+    [Fact]
+    public async Task TimeOffThatWouldDisruptAnAppointment_ReturnsAffectedAppointmentWarning()
+    {
+        await using var db = Db(); var x = await Seed(db); var date = DateOnly.FromDateTime(Day);
+        var controller = new StylistTimeOffsController(db);
+
+        var result = await controller.Create(new StylistTimeOffRequest
+        {
+            StylistId = x.a,
+            OffDate = date,
+            IsFullDay = true
+        });
+
+        Assert.IsType<ConflictObjectResult>(result);
+        Assert.Empty(await db.StylistTimeOffs.ToListAsync());
     }
 
     [Fact]

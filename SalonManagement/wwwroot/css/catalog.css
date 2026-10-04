@@ -1,36 +1,49 @@
-/* Public catalog: system fonts, no framework, icon font or JavaScript required. */
-* { box-sizing: border-box; }
-html { color-scheme: light; }
-body { margin: 0; color: #242d32; background: #faf9f6; font: 16px/1.5 system-ui, sans-serif; }
-a { color: #225c4e; overflow-wrap: anywhere; }
-button, input { font: inherit; }
-:focus-visible { outline: 3px solid #a35d1e; outline-offset: 3px; }
-.container, .catalog-nav { width: min(100%, 1120px); margin-inline: auto; padding-inline: 16px; }
-.catalog-header { background: white; border-bottom: 1px solid #dedfd9; }
-.catalog-nav, .navbar-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.catalog-nav { padding-block: 12px; }
-.catalog-nav > *, .navbar-nav > * { min-width: 0; max-width: 100%; }
-.navbar-nav { list-style: none; padding: 0; margin: 0 0 0 auto; }
-.brand { font-size: 24px; font-weight: 700; text-decoration: none; }
-.nav-link { display: inline-block; padding-block: 8px; }
-h1 { font-size: clamp(1.6rem, 5vw, 2.2rem); }
-h2 { font-size: 1.4rem; }
-h3 { font-size: 1.1rem; margin: 0 0 12px; }
-h1, h2, h3, p, .btn { overflow-wrap: anywhere; }
-.my-4 { margin-block: 24px; }
-.mb-4 { margin-bottom: 24px; }
-.d-flex { display: flex; }
-.flex-wrap { flex-wrap: wrap; }
-.gap-2 { gap: 8px; }
-.form-label { display: block; margin-bottom: 8px; font-weight: 600; }
-.form-control { flex: 1 1 240px; width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #757e78; border-radius: 8px; background: white; }
-.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; max-width: 100%; padding: 9px 14px; border: 1px solid #557568; border-radius: 8px; text-decoration: none; cursor: pointer; background: white; color: #225c4e; white-space: normal; }
-.btn-primary { color: white; background: #225c4e; }
-.row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.row > * { min-width: 0; }
-.card { height: 100%; border: 1px solid #d9ddd6; border-radius: 12px; background: white; }
-.card-body { padding: 16px; }
-.card p { margin: 8px 0; }
-footer { padding-block: 24px; border-top: 1px solid #dedfd9; overflow-wrap: anywhere; }
-@media (min-width: 640px) { .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 960px) { .row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* ============================================================
+   Luminol Catalog CSS – Public Service Listing
+   Used by _CatalogLayout.cshtml
+   ============================================================ */
+
+/* Ensures the catalog body has good defaults */
+body.sl-body .catalog-header,
+.sl-catalog-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255, 255, 255, .96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid #E5E7EB;
+    box-shadow: 0 1px 4px rgba(30, 41, 59, .06);
+}
+
+/* Legacy catalog nav (kept for _CatalogLayout compatibility) */
+.catalog-nav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    height: 64px;
+}
+
+.catalog-nav .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1A1A2E;
+    font-weight: 700;
+    font-size: 17px;
+    font-family: 'Playfair Display', Georgia, serif;
+    text-decoration: none;
+}
+
+.catalog-nav a:not(.brand) {
+    color: #6B7280;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color .18s;
+}
+
+.catalog-nav a:not(.brand):hover { color: #3B5BDB; }

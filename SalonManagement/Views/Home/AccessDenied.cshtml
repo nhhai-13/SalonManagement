@@ -1,0 +1,15 @@
+@{
+    ViewData["Title"] = "Không có quyền truy cập";
+}
+
+<section class="sl-page-shell">
+    <div class="sl-card sl-empty-state">
+        <div class="sl-empty-icon"><i class="bi bi-shield-lock"></i></div>
+        <p class="sl-eyebrow">Quyền truy cập</p>
+        <h1>Trang này không dành cho tài khoản của bạn</h1>
+        <p>Tài khoản hiện tại không có quyền sử dụng chức năng này. Hãy quay về trang phù hợp với vai trò của bạn hoặc liên hệ quản trị viên nếu cần hỗ trợ.</p>
+        <a class="sl-btn sl-btn-primary" asp-controller="Home" asp-action="Index">
+            <i class="bi bi-house-door"></i> Về trang chủ
+        </a>
+    </div>
+</section>

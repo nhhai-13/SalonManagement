@@ -1,24 +1,17 @@
 html {
-  font-size: 14px;
-}
-
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
+  font-size: 15px;
   position: relative;
   min-height: 100%;
 }
 
-body {
+/* Only apply bottom margin on legacy pages (public home uses its own layout) */
+body:not(.sl-body):not(.auth-page) {
   margin-bottom: 60px;
+}
+
+/* Focus states (accessible) */
+.btn:focus, .btn:active:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 3px rgba(59,91,219,.15);
 }
 
 /* Sprint 1 role portals */

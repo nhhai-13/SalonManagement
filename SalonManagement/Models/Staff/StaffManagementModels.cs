@@ -16,6 +16,8 @@ public sealed record StaffAccountResponse(
 
 public sealed record ChangeStaffStatusRequest(bool IsActive);
 
+public sealed record ChangeStaffRoleRequest([Required] string Role);
+
 public sealed record UpdateStaffAccountRequest(
     [Required, StringLength(120)] string FullName,
     [Required, EmailAddress] string Email,

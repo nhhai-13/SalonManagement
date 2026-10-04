@@ -94,6 +94,21 @@ public sealed class SprintOneAcceptanceTests
     }
 
     [Fact]
+    public async Task RoleOnlyChange_DoesNotRequireACompleteProfile()
+    {
+        await using var f = new Fixture();
+        var user = await f.CreateUser(UserRoles.Stylist);
+        user.FullName = string.Empty;
+        await f.Users.UpdateAsync(user);
+
+        var result = await new StaffAccountService(f.Users, f.Db, TimeProvider.System)
+            .ChangeRoleAsync(user.Id, new ChangeStaffRoleRequest(UserRoles.Owner));
+
+        Assert.True(result.Success);
+        Assert.True(await f.Users.IsInRoleAsync(user, UserRoles.Owner));
+    }
+
+    [Fact]
     public async Task Deactivate_ImmediatelyRejectsPrincipalAndRevokesRefreshTokens()
     {
         await using var f = new Fixture();

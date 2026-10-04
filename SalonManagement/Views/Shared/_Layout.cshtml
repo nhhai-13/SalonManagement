@@ -4,106 +4,304 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Luminol Salon &amp; Spa</title>
-    <meta name="description" content="Luminol Salon & Spa - Không gian chăm sóc tóc cao cấp, đặt lịch nhanh chóng và thuận tiện." />
+    <meta name="description" content="Luminol Salon &amp; Spa - Không gian chăm sóc tóc cao cấp, đặt lịch nhanh chóng và thuận tiện." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/salon-design.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/SalonManagement.styles.css" asp-append-version="true" />
 </head>
-<body>
-    @{ var isHome = ViewContext.RouteData.Values["controller"]?.ToString() == "Home" && ViewContext.RouteData.Values["action"]?.ToString() == "Index"; }
-    @if (!isHome)
-    {
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
-                    Luminol
-                </a>
+<body class="sl-body">
+@{
+    var isHome = ViewContext.RouteData.Values["controller"]?.ToString() == "Home"
+                 && ViewContext.RouteData.Values["action"]?.ToString() == "Index";
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var action     = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+    var isAdmin    = User.IsInRole("Admin");
 
-                <button class="navbar-toggler"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target=".navbar-collapse"
-                        aria-controls="navbarSupportedContent"
-                        aria-expanded="false"
-                        aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
+    bool NavActive(string ctrl, string act = "") =>
+        controller.Equals(ctrl, StringComparison.OrdinalIgnoreCase) &&
+        (string.IsNullOrEmpty(act) || action.Equals(act, StringComparison.OrdinalIgnoreCase));
+}
+
+@if (isHome)
+{
+    @RenderBody()
+}
+else
+{
+    @* ── Sidebar overlay (mobile) ─────────────────────── *@
+    <div class="sl-overlay" id="sl-overlay" onclick="closeSidebar()" aria-hidden="true"></div>
+
+    @* ── Sidebar ──────────────────────────────────────── *@
+    <aside class="sl-sidebar" id="sl-sidebar" aria-label="Điều hướng chính">
+        <a class="sl-sidebar-brand" asp-controller="Home" asp-action="Index">
+            <span class="sl-sidebar-brand-mark" aria-hidden="true">L</span>
+            <span class="sl-sidebar-brand-text">
+                <strong>Luminol</strong>
+                <small>Salon &amp; Spa</small>
+            </span>
+        </a>
+
+        <nav class="sl-sidebar-nav">
+            @* Public navigation is intentionally kept out of the Admin workspace. *@
+            @if (!isAdmin)
+            {
+                <div class="sl-nav-section">
+                    <div class="sl-nav-label">Công khai</div>
+                    <a class="sl-nav-link @(NavActive("Home","Index") ? "active" : "")"
+                       asp-controller="Home" asp-action="Index">
+                        <i class="bi bi-house"></i> Trang chủ
+                    </a>
+                    <a class="sl-nav-link @(NavActive("Services","Public") ? "active" : "")"
+                       asp-controller="Services" asp-action="Public">
+                        <i class="bi bi-scissors"></i> Danh mục dịch vụ
+                    </a>
+                    <a class="sl-nav-link @(NavActive("Booking") ? "active" : "")"
+                       asp-controller="Booking" asp-action="Index">
+                        <i class="bi bi-calendar-check"></i> Đặt lịch
+                    </a>
+                    <a class="sl-nav-link @(NavActive("AppointmentLookup") ? "active" : "")"
+                       asp-controller="AppointmentLookup" asp-action="Index">
+                        <i class="bi bi-search"></i> Tra cứu lịch hẹn
+                    </a>
+                </div>
+            }
+
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                @* ── Quản trị ─── *@
+                @if (isAdmin)
+                {
+                    <div class="sl-nav-section">
+                        <div class="sl-nav-label">Quản trị</div>
+                        <a class="sl-nav-link @(NavActive("Admin","Index") ? "active" : "")"
+                           href="/admin">
+                            <i class="bi bi-shield-lock"></i> Trung tâm quản trị
+                        </a>
+                        <a class="sl-nav-link"
+                           href="/admin#staff-accounts">
+                            <i class="bi bi-people"></i> Quản lý tài khoản
+                        </a>
+                        <a class="sl-nav-link @(NavActive("Admin","Roles") ? "active" : "")"
+                           href="/admin/roles">
+                            <i class="bi bi-person-gear"></i> Vai trò &amp; phân quyền
+                        </a>
+                        <a class="sl-nav-link @(NavActive("AuditLogs") ? "active" : "")"
+                           asp-controller="AuditLogs" asp-action="Index">
+                            <i class="bi bi-clock-history"></i> Nhật ký hệ thống
+                        </a>
+                    </div>
+                    <div class="sl-nav-section">
+                        <div class="sl-nav-label">Liên kết phụ</div>
+                        <a class="sl-nav-link" asp-controller="Home" asp-action="Index">
+                            <i class="bi bi-box-arrow-up-right"></i> Xem trang công khai
+                        </a>
+                    </div>
+                }
+
+                @* ── Chủ tiệm ─── *@
+                @if (User.IsInRole("Owner"))
+                {
+                    <div class="sl-nav-section">
+                        <div class="sl-nav-label">Quản lý salon</div>
+                        <a class="sl-nav-link @(NavActive("Services","Index") ? "active" : "")"
+                           asp-controller="Services" asp-action="Index">
+                            <i class="bi bi-bag"></i> Dịch vụ
+                        </a>
+                        <a class="sl-nav-link @(NavActive("ServiceGroups") ? "active" : "")"
+                           asp-controller="ServiceGroups" asp-action="Index">
+                            <i class="bi bi-collection"></i> Nhóm dịch vụ
+                        </a>
+                        <a class="sl-nav-link @(NavActive("StylistManagement") ? "active" : "")"
+                           asp-controller="StylistManagement" asp-action="Index">
+                            <i class="bi bi-person-badge"></i> Hồ sơ thợ
+                        </a>
+                        <a class="sl-nav-link @(NavActive("WorkSchedules") ? "active" : "")"
+                           asp-controller="WorkSchedules" asp-action="Index">
+                            <i class="bi bi-calendar-week"></i> Lịch làm việc
+                        </a>
+                        <a class="sl-nav-link @(NavActive("Admin","BusinessHours") ? "active" : "")"
+                           href="/owner/business-hours">
+                            <i class="bi bi-clock"></i> Giờ hoạt động
+                        </a>
+                    </div>
+                }
+
+                @* ── Nhân viên ─── *@
+                @if (User.IsInRole("Receptionist"))
+                {
+                    <div class="sl-nav-section">
+                        <div class="sl-nav-label">Nhân viên</div>
+                        <a class="sl-nav-link @(NavActive("StaffPortal","Reception") ? "active" : "")"
+                           asp-controller="StaffPortal" asp-action="Reception">
+                            <i class="bi bi-headset"></i> Cổng lễ tân
+                        </a>
+                    </div>
+                }
+
+                @if (User.IsInRole("Stylist"))
+                {
+                    <div class="sl-nav-section">
+                        <div class="sl-nav-label">Thợ</div>
+                        <a class="sl-nav-link @(NavActive("StaffPortal","Stylist") ? "active" : "")"
+                           asp-controller="StaffPortal" asp-action="Stylist">
+                            <i class="bi bi-person-workspace"></i> Cổng thợ
+                        </a>
+                    </div>
+                }
+
+            }
+        </nav>
+
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <div class="sl-sidebar-footer">
+                <button id="user-menu-toggle" class="sl-sidebar-user" type="button"
+                        aria-expanded="false" aria-controls="user-menu">
+                    <span class="sl-sidebar-avatar" aria-hidden="true">
+                        @((User.Identity?.Name ?? "?").FirstOrDefault().ToString().ToUpper())
+                    </span>
+                    <div class="sl-sidebar-user-info">
+                        <strong data-session-email>@(User.Identity?.Name ?? "Người dùng")</strong>
+                        <small>
+                            @if (User.IsInRole("Admin")) { <text>Quản trị viên</text> }
+                            else if (User.IsInRole("Owner")) { <text>Chủ tiệm</text> }
+                            else if (User.IsInRole("Receptionist")) { <text>Lễ tân</text> }
+                            else if (User.IsInRole("Stylist")) { <text>Thợ</text> }
+                            else { <text>Nhân viên</text> }
+                        </small>
+                    </div>
+                    <i class="bi bi-chevron-up sl-sidebar-user-chevron" aria-hidden="true"></i>
                 </button>
 
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-
-                        <li class="nav-item">
-                            <a class="nav-link text-dark"
-                               asp-area=""
-                               asp-controller="Home"
-                               asp-action="Index">
-                                Home
-                            </a>
-                        </li>
-
-                        <li class="nav-item">
-                            <a class="nav-link text-dark"
-                               asp-area=""
-                               asp-controller="Home"
-                               asp-action="Privacy">
-                                Privacy
-                            </a>
-                        </li>
-
-                        <!-- Menu Dịch vụ -->
-                        <li class="nav-item">
-                            <a class="nav-link text-dark"
-                               asp-controller="Services"
-                               asp-action="Index">
-                                Dịch vụ
-                            </a>
-                        </li>
-
-                        <!-- Menu Đặt lịch -->
-                        <li class="nav-item">
-                            <a class="nav-link text-primary fw-semibold"
-                               asp-controller="Booking"
-                               asp-action="Index">
-                                <i class="bi bi-calendar-check me-1"></i>Đặt lịch
-                            </a>
-                        </li>
-
-                    </ul>
-
-                    <partial name="_LoginPartial" />
+                <div id="user-menu" class="sl-user-menu" hidden>
+                    <div class="sl-user-menu-profile">
+                        <span class="sl-user-menu-avatar" aria-hidden="true">
+                            @((User.Identity?.Name ?? "?").FirstOrDefault().ToString().ToUpper())
+                        </span>
+                        <div>
+                            <strong data-session-email>@(User.Identity?.Name ?? "Người dùng")</strong>
+                            <small>
+                                @if (User.IsInRole("Admin")) { <text>Quản trị viên</text> }
+                                else if (User.IsInRole("Owner")) { <text>Chủ tiệm</text> }
+                                else if (User.IsInRole("Receptionist")) { <text>Lễ tân</text> }
+                                else if (User.IsInRole("Stylist")) { <text>Thợ</text> }
+                                else { <text>Nhân viên</text> }
+                            </small>
+                        </div>
+                    </div>
+                    <div class="sl-user-menu-actions">
+                        <a class="sl-user-menu-action" asp-controller="Account" asp-action="ChangePassword">
+                            <i class="bi bi-key"></i> Đổi mật khẩu
+                        </a>
+                        <form asp-area="Identity" asp-page="/Account/Logout"
+                              asp-route-returnUrl="@Url.Action("Index","Home",new{area=""})" method="post">
+                            <button id="logout" class="sl-user-menu-action sl-user-menu-logout" type="submit">
+                                <i class="bi bi-box-arrow-right"></i> Đăng xuất
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </nav>
-    </header>
-    }
+        }
+    </aside>
 
-    <div class="@(isHome ? "" : "container")">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
+    @* ── Main wrapper ─────────────────────────────────── *@
+    <div class="sl-main">
+        @* ── Top bar ─────────────────────────────────── *@
+        <header class="sl-topbar" role="banner">
+            <div class="sl-topbar-left">
+                <button class="sl-menu-toggle" type="button" id="sl-menu-btn"
+                        onclick="toggleSidebar()" aria-label="Mở/đóng menu"
+                        aria-controls="sl-sidebar" aria-expanded="false">
+                    <i class="bi bi-list"></i>
+                </button>
 
-    @if (!isHome)
-    {
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - Luminol Salon &amp; Spa -
-            <a asp-area="" asp-controller="Home" asp-action="Privacy">
-                Privacy
-            </a>
+                <nav class="sl-breadcrumb" aria-label="Breadcrumb">
+                    <a href="/">Trang chủ</a>
+                    @if (!string.IsNullOrEmpty(ViewData["Title"]?.ToString()))
+                    {
+                        <span class="sl-breadcrumb-sep" aria-hidden="true">›</span>
+                        <span class="sl-breadcrumb-current">@ViewData["Title"]</span>
+                    }
+                </nav>
+            </div>
+
+            <div class="sl-topbar-right">
+                @if (User.Identity?.IsAuthenticated != true)
+                {
+                    <a class="sl-btn sl-btn-outline sl-btn-sm" asp-controller="Account" asp-action="Login">
+                        <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
+                    </a>
+                }
+            </div>
+        </header>
+
+        @* ── Page body ───────────────────────────────── *@
+        <div class="sl-content">
+            <main role="main">
+                @RenderBody()
+            </main>
         </div>
-    </footer>
+
+        <footer style="padding:16px 28px;border-top:1px solid var(--sl-border);color:var(--sl-text-muted);font-size:12px;">
+            &copy; @DateTime.Now.Year Luminol Salon &amp; Spa ·
+            <a asp-controller="Home" asp-action="Privacy" style="color:var(--sl-text-muted);">Quyền riêng tư</a>
+        </footer>
+    </div>
+}
+
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+
+<script>
+    // Sidebar toggle
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sl-sidebar');
+        const overlay = document.getElementById('sl-overlay');
+        const btn     = document.getElementById('sl-menu-btn');
+        const open    = sidebar.classList.toggle('open');
+        overlay.classList.toggle('show', open);
+        btn.setAttribute('aria-expanded', open);
     }
+    function closeSidebar() {
+        const sidebar = document.getElementById('sl-sidebar');
+        const overlay = document.getElementById('sl-overlay');
+        const btn     = document.getElementById('sl-menu-btn');
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+    function closeUserMenu() {
+        const menu = document.getElementById('user-menu');
+        const toggle = document.getElementById('user-menu-toggle');
+        if (!menu || !toggle) return;
+        menu.hidden = true;
+        toggle.setAttribute('aria-expanded', 'false');
+    }
+    const userMenuToggle = document.getElementById('user-menu-toggle');
+    const userMenu = document.getElementById('user-menu');
+    userMenuToggle?.addEventListener('click', () => {
+        const isOpen = userMenu.hidden;
+        userMenu.hidden = !isOpen;
+        userMenuToggle.setAttribute('aria-expanded', isOpen.toString());
+    });
+    document.addEventListener('click', event => {
+        if (userMenu && !userMenu.hidden && !userMenu.contains(event.target) && !userMenuToggle?.contains(event.target)) closeUserMenu();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            closeSidebar();
+            closeUserMenu();
+        }
+    });
+</script>
 
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
-
-    @await RenderSectionAsync("Scripts", required: false)
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

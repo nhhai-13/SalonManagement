@@ -86,7 +86,6 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         if (day < now.Date || date == DateOnly.MaxValue) return [];
         var nextDay = day.AddDays(1);
         if (await db.ShopHolidays.AnyAsync(h => h.HolidayDate == date)) return [];
-        var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(t => t.OffDate == date).ToListAsync();
         var daysOff = await db.StylistDaysOff.Where(t => t.OffDate == day).Select(t => t.StylistId).ToListAsync();
         var breaks = await db.StylistBreaks.AsNoTracking().Where(t => t.BreakDate == day).ToListAsync();
         var hours = await db.BusinessHours.AsNoTracking().SingleOrDefaultAsync(h => h.DayOfWeek == day.DayOfWeek);
@@ -100,17 +99,30 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var busy = await db.Appointments.AsNoTracking().Where(a => qualifiedIds.Contains(a.StylistId) &&
             a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled" && a.Status != "NoShow" && a.Status != "Completed")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
+                qualifiedIds.Contains(timeOff.StylistId) && timeOff.OffDate == date)
+            .Select(timeOff => new
+            {
+                timeOff.StylistId,
+                timeOff.IsFullDay,
+                timeOff.StartTime,
+                timeOff.EndTime
+            }).ToListAsync();
 
         var duration = services.Sum(s => (long)s.DurationMinutes);
         if (duration > 24 * 60) return [];
         var length = TimeSpan.FromMinutes(duration);
         var busyByStylist = busy.ToLookup(a => a.StylistId);
+        var timeOffByStylist = timeOffs.ToLookup(timeOff => timeOff.StylistId);
         var slots = new HashSet<AvailableStylistSlot>();
         // Calculate each stylist independently: never stitch two people's free time together.
         foreach (var stylistShifts in shifts.GroupBy(s => s.StylistId))
         {
             if (daysOff.Contains(stylistShifts.Key)) continue;
             var stylistBusy = busyByStylist[stylistShifts.Key].ToList();
+            var stylistTimeOffs = timeOffByStylist[stylistShifts.Key].ToList();
+
+            if (stylistTimeOffs.Any(timeOff => timeOff.IsFullDay)) continue;
 
             // Union overlapping/adjacent shifts, but never bridge a break.
             var windows = new List<(TimeSpan Start, TimeSpan End)>();
@@ -130,9 +142,12 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
                 for (var start = first; start + length <= window.End; start += TimeSpan.FromMinutes(15))
                 {
                     var end = start + length;
-                    if (day + start < now.AddHours(1) || stylistBusy.Any(a => start < a.EndTime && end > a.StartTime)) continue;
+                    var overlapsTimeOff = stylistTimeOffs.Any(timeOff =>
+                        timeOff.StartTime.HasValue && timeOff.EndTime.HasValue &&
+                        start < timeOff.EndTime.Value.ToTimeSpan() && end > timeOff.StartTime.Value.ToTimeSpan());
+                    if (day + start < now.AddHours(1) ||
+                        stylistBusy.Any(a => start < a.EndTime && end > a.StartTime) || overlapsTimeOff) continue;
                     if (breaks.Any(b => b.StylistId == stylistShifts.Key && b.StartTime < end && start < b.EndTime)) continue;
-                    if (timeOffs.Any(t => t.StylistId == stylistShifts.Key && (t.IsFullDay || (t.StartTime.HasValue && t.EndTime.HasValue && t.StartTime.Value.ToTimeSpan() < end && start < t.EndTime.Value.ToTimeSpan())))) continue;
                     slots.Add(new(stylistShifts.Key, start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
                 }
             }
@@ -140,3 +155,4 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         return slots.OrderBy(s => s.Start, StringComparer.Ordinal).ThenBy(s => s.End, StringComparer.Ordinal).ToList();
     }
 }
+
