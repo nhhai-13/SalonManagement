@@ -149,6 +149,13 @@ builder.Services.AddAuthentication(options =>
         OnChallenge = async context =>
         {
             context.HandleResponse();
+            if (context.Request.Headers.Accept.ToString()
+                    .Contains("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Redirect("/admin/login");
+                return;
+            }
+
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             context.Response.ContentType = "application/json; charset=utf-8";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new
@@ -159,6 +166,13 @@ builder.Services.AddAuthentication(options =>
         },
         OnForbidden = async context =>
         {
+            if (context.Request.Headers.Accept.ToString()
+                    .Contains("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Redirect("/access-denied");
+                return;
+            }
+
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             context.Response.ContentType = "application/json; charset=utf-8";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new

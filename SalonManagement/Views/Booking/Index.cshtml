@@ -3,269 +3,263 @@
     ViewData["Title"] = "Đặt lịch - Chọn dịch vụ";
 }
 
-<div class="container py-4">
-    <!-- Booking Stepper -->
-    <div class="row justify-content-center mb-4">
-        <div class="col-12 col-lg-10">
-            <div class="d-flex justify-content-between align-items-center position-relative">
-                <div class="text-center flex-fill">
-                    <div class="rounded-circle bg-primary text-white d-inline-flex justify-content-center align-items-center mb-1 shadow-sm" style="width: 36px; height: 36px;">
-                        <span class="fw-bold">1</span>
-                    </div>
-                    <div class="small fw-bold text-primary">Chọn dịch vụ</div>
-                </div>
-                <div class="border-top border-2 flex-fill position-relative" style="top: -12px;"></div>
-                <div class="text-center flex-fill">
-                    <div class="rounded-circle bg-light text-muted border d-inline-flex justify-content-center align-items-center mb-1" style="width: 36px; height: 36px;">
-                        <span>2</span>
-                    </div>
-                    <div class="small text-muted">Thời gian &amp; Thợ</div>
-                </div>
-                <div class="border-top border-2 flex-fill position-relative" style="top: -12px;"></div>
-                <div class="text-center flex-fill">
-                    <div class="rounded-circle bg-light text-muted border d-inline-flex justify-content-center align-items-center mb-1" style="width: 36px; height: 36px;">
-                        <span>3</span>
-                    </div>
-                    <div class="small text-muted">Xác nhận</div>
-                </div>
+<div class="sl-page-header">
+    <div>
+        <span class="sl-eyebrow">Đặt lịch</span>
+        <h1 class="sl-page-title">Chọn dịch vụ bạn muốn trải nghiệm</h1>
+        <p class="sl-page-subtitle">Chọn một hoặc nhiều dịch vụ để xem tổng thời lượng và giá tạm tính.</p>
+    </div>
+</div>
+
+@* ── Stepper ─────────────────────────────────────────────── *@
+<div class="sl-stepper" aria-label="Tiến trình đặt lịch">
+    <div class="sl-step active">
+        <div class="sl-step-circle">1</div>
+        <div class="sl-step-label">Chọn dịch vụ</div>
+    </div>
+    <div class="sl-step">
+        <div class="sl-step-circle">2</div>
+        <div class="sl-step-label">Thời gian &amp; Thợ</div>
+    </div>
+    <div class="sl-step">
+        <div class="sl-step-circle">3</div>
+        <div class="sl-step-label">Xác nhận</div>
+    </div>
+</div>
+
+@if (!Model.HasServices)
+{
+    <div class="sl-alert sl-alert-info" role="alert">
+        <i class="bi bi-info-circle-fill"></i>
+        <div>
+            <strong>Hiện tại chưa có dịch vụ nào đang kinh doanh.</strong>
+            <p style="margin:4px 0 0;font-size:13px;">Vui lòng quay lại sau hoặc liên hệ salon để được hỗ trợ.</p>
+        </div>
+    </div>
+}
+else
+{
+    <form id="booking-form" asp-action="SelectServices" asp-controller="Booking" method="post"
+          data-max-shift-duration="@Model.Totals.MaxShiftDurationMinutes">
+        @Html.AntiForgeryToken()
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage) || !ViewData.ModelState.IsValid)
+        {
+            <div class="sl-alert sl-alert-danger alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+                <div>@(Model.ErrorMessage ?? "Số lượng dịch vụ trong một lượt đặt không được vượt quá 5.")</div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
             </div>
-        </div>
-    </div>
+        }
 
-    <!-- Page Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <span class="badge bg-primary-subtle text-primary mb-2 px-3 py-2 rounded-pill fw-semibold">
-                <i class="bi bi-stars me-1"></i> Bước 1 trong 3 bước
-            </span>
-            <h1 class="h2 fw-bold text-dark mb-1">Chọn dịch vụ bạn muốn trải nghiệm</h1>
-            <p class="text-muted">Chọn một hoặc nhiều dịch vụ để xem tổng thời lượng và giá tiền tạm tính.</p>
-        </div>
-    </div>
+        <div class="sl-booking-layout">
 
-    @if (!Model.HasServices)
-    {
-        <div class="alert alert-info py-4 text-center">
-            <i class="bi bi-info-circle fs-3 d-block mb-2 text-primary"></i>
-            <h5>Hiện tại chưa có dịch vụ nào đang kinh doanh</h5>
-            <p class="text-muted mb-0">Vui lòng quay lại sau hoặc liên hệ salon để được hỗ trợ.</p>
-        </div>
-    }
-    else
-    {
-        <!-- Main Form & Content -->
-        <form id="booking-form" asp-action="SelectServices" asp-controller="Booking" method="post" data-max-shift-duration="@Model.Totals.MaxShiftDurationMinutes">
-            @Html.AntiForgeryToken()
+            @* ── Danh sách dịch vụ ───────────────────── *@
+            <div>
+                @* Category pills *@
+                @if (Model.Groups.Count > 1)
+                {
+                    <div class="sl-pill-filter sticky-top bg-white py-2 z-2" style="top:60px;">
+                        @foreach (var group in Model.Groups)
+                        {
+                            var targetId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
+                            <a href="#@targetId" class="sl-pill">@group.Name (@group.Services.Count)</a>
+                        }
+                    </div>
+                }
 
-            @if (!string.IsNullOrEmpty(Model.ErrorMessage) || !ViewData.ModelState.IsValid)
-            {
-                <div class="alert alert-danger alert-dismissible fade show mb-4 border-0 shadow-sm" role="alert">
-                    <i class="bi bi-exclamation-octagon-fill me-2 fs-5"></i>
-                    <span>@(Model.ErrorMessage ?? "Số lượng dịch vụ trong một lượt đặt không được vượt quá 5.")</span>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            }
+                @foreach (var group in Model.Groups)
+                {
+                    var groupId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
+                    <div id="@groupId" class="sl-group-section scroll-mt-16">
+                        <h2 class="sl-group-heading">
+                            <i class="bi bi-gem"></i>@group.Name
+                        </h2>
 
-            <div class="row g-4">
-                <!-- Left Column: Services list -->
-                <div class="col-12 col-lg-8">
-                    <!-- Category jump pills -->
-                    @if (Model.Groups.Count > 1)
-                    {
-                        <div class="sticky-top bg-white py-2 mb-3 z-2 border-bottom" style="top: 70px;">
-                            <div class="d-flex flex-wrap gap-2">
-                                @foreach (var group in Model.Groups)
+                        @if (group.Services.Count == 0)
+                        {
+                            <p class="sl-page-subtitle" style="font-style:italic;">Nhóm này chưa có dịch vụ nào.</p>
+                        }
+                        else
+                        {
+                            <div class="row g-3">
+                                @foreach (var service in group.Services)
                                 {
-                                    var targetId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
-                                    <a href="#@targetId" class="btn btn-sm btn-outline-secondary rounded-pill">
-                                        @group.Name (@group.Services.Count)
-                                    </a>
-                                }
-                            </div>
-                        </div>
-                    }
+                                    var isChecked = service.IsSelected;
+                                    <div class="col-12 col-md-6">
+                                        <div class="sl-booking-item service-item-card @(isChecked ? "selected" : "")"
+                                             data-service-id="@service.ServiceId"
+                                             data-name="@service.ServiceName"
+                                             data-duration="@service.DurationMinutes"
+                                             data-price="@service.Price"
+                                             style="cursor:pointer;">
 
-                    <!-- Service Groups -->
-                    @foreach (var group in Model.Groups)
-                    {
-                        var groupId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
-                        <div id="@groupId" class="mb-5 scroll-mt">
-                            <h2 class="h5 fw-bold text-dark pb-2 border-bottom mb-3">
-                                <i class="bi bi-gem text-primary me-2"></i>@group.Name
-                            </h2>
-
-                            @if (group.Services.Count == 0)
-                            {
-                                <p class="text-muted small italic">Nhóm này chưa có dịch vụ nào.</p>
-                            }
-                            else
-                            {
-                                <div class="row g-3">
-                                    @foreach (var service in group.Services)
-                                    {
-                                        var isChecked = service.IsSelected;
-                                        var cardClass = isChecked ? "border-primary bg-primary-subtle shadow-sm" : "border-light-subtle";
-                                        <div class="col-12 col-md-6">
-                                            <div class="card h-100 service-item-card transition-all @cardClass"
-                                                 data-service-id="@service.ServiceId"
-                                                 data-name="@service.ServiceName"
-                                                 data-duration="@service.DurationMinutes"
-                                                 data-price="@service.Price"
-                                                 style="cursor: pointer; border-width: 2px;">
-                                                <div class="card-body d-flex flex-column justify-content-between p-3">
-                                                    <div>
-                                                        <div class="d-flex align-items-start justify-content-between mb-2">
-                                                            <div class="form-check m-0">
-                                                                <input class="form-check-input service-checkbox fs-5"
-                                                                       type="checkbox"
-                                                                       name="selectedServiceIds"
-                                                                       value="@service.ServiceId"
-                                                                       id="service-@service.ServiceId"
-                                                                       data-service-id="@service.ServiceId"
-                                                                       data-name="@service.ServiceName"
-                                                                       data-duration="@service.DurationMinutes"
-                                                                       data-price="@service.Price"
-                                                                       @(isChecked ? "checked" : "")>
-                                                                <label class="form-check-label fw-bold text-dark ms-1" for="service-@service.ServiceId">
-                                                                    @service.ServiceName
-                                                                </label>
-                                                            </div>
-                                                        </div>
-
-                                                        @if (!string.IsNullOrWhiteSpace(service.Description))
-                                                        {
-                                                            <p class="text-muted small mb-3 line-clamp-2" style="min-height: 38px;">
-                                                                @service.Description
-                                                            </p>
-                                                        }
-                                                        else
-                                                        {
-                                                            <p class="text-muted small mb-3 fst-italic" style="min-height: 38px;">
-                                                                Dịch vụ cao cấp chuẩn Lumière.
-                                                            </p>
-                                                        }
-                                                    </div>
-
-                                                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                                                        <span class="badge bg-light text-secondary border">
-                                                            <i class="bi bi-clock me-1"></i>@service.FormattedDuration
-                                                        </span>
-                                                        <strong class="text-primary fs-6">
-                                                            @service.FormattedPrice
-                                                        </strong>
-                                                    </div>
+                                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                                <div class="form-check m-0 flex-grow-1">
+                                                    <input class="form-check-input service-checkbox"
+                                                           type="checkbox"
+                                                           name="selectedServiceIds"
+                                                           value="@service.ServiceId"
+                                                           id="service-@service.ServiceId"
+                                                           data-service-id="@service.ServiceId"
+                                                           data-name="@service.ServiceName"
+                                                           data-duration="@service.DurationMinutes"
+                                                           data-price="@service.Price"
+                                                           style="width:18px;height:18px;accent-color:var(--sl-primary);"
+                                                           @(isChecked ? "checked" : "")>
+                                                    <label class="form-check-label ms-2 fw-bold" for="service-@service.ServiceId"
+                                                           style="font-size:14px;color:var(--sl-text);cursor:pointer;">
+                                                        @service.ServiceName
+                                                    </label>
                                                 </div>
+                                            </div>
+
+                                            @if (!string.IsNullOrWhiteSpace(service.Description))
+                                            {
+                                                <p style="font-size:13px;color:var(--sl-text-secondary);min-height:40px;margin:0 0 14px;">
+                                                    @service.Description
+                                                </p>
+                                            }
+                                            else
+                                            {
+                                                <p style="font-size:13px;color:var(--sl-text-muted);font-style:italic;min-height:40px;margin:0 0 14px;">
+                                                    Dịch vụ cao cấp chuẩn Luminol.
+                                                </p>
+                                            }
+
+                                            <div class="sl-service-meta" style="padding-top:12px;border-top:1px solid var(--sl-border);">
+                                                <span class="sl-badge sl-badge-gray">
+                                                    <i class="bi bi-clock"></i>@service.FormattedDuration
+                                                </span>
+                                                <strong style="font-size:16px;color:var(--sl-primary);">@service.FormattedPrice</strong>
                                             </div>
                                         </div>
-                                    }
-                                </div>
-                            }
-                        </div>
-                    }
-                </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
 
-                <!-- Right Column: Summary Card (Sticky) -->
-                <div class="col-12 col-lg-4">
-                    <div class="card shadow-sm border-0 rounded-3 sticky-top" style="top: 90px;">
-                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                            <h3 class="h6 fw-bold mb-0 text-dark">
-                                <i class="bi bi-cart-check text-primary me-2"></i>Dịch vụ đã chọn
-                            </h3>
-                            <span id="selected-count-badge" class="badge @(Model.Totals.SelectedServices.Count >= 5 ? "bg-danger" : "bg-primary") rounded-pill px-2">
-                                Đã chọn: @Model.Totals.SelectedServices.Count/5 dịch vụ
+            @* ── Summary panel (sticky) ───────────────── *@
+            <div>
+                <div class="sl-booking-summary" style="top:80px;">
+                    <div class="sl-booking-summary-header">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span><i class="bi bi-cart-check me-2"></i>Dịch vụ đã chọn</span>
+                            <span id="selected-count-badge"
+                                  class="badge @(Model.Totals.SelectedServices.Count >= 5 ? "bg-danger" : "bg-light text-dark") rounded-pill px-2">
+                                @Model.Totals.SelectedServices.Count/5
                             </span>
                         </div>
+                    </div>
 
-                        <div class="card-body p-3">
-                            <!-- Max 5 Services Warning Notice (AC1) -->
-                            <div id="max-services-alert" class="alert alert-danger py-2 px-3 small mb-3 border-0 d-flex align-items-center @(Model.Totals.SelectedServices.Count >= 5 ? "" : "d-none")" role="alert">
-                                <i class="bi bi-exclamation-triangle-fill text-danger me-2 fs-6 flex-shrink-0"></i>
-                                <span>Bạn chỉ có thể chọn tối đa 5 dịch vụ trong một lượt đặt lịch</span>
+                    <div class="sl-booking-summary-body">
+
+                        @* Max 5 warning *@
+                        <div id="max-services-alert"
+                             class="sl-alert sl-alert-danger mb-3 @(Model.Totals.SelectedServices.Count >= 5 ? "" : "d-none")"
+                             role="alert" style="font-size:13px;">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <span>Bạn chỉ có thể chọn tối đa 5 dịch vụ trong một lượt đặt lịch</span>
+                        </div>
+
+                        @* Selected list *@
+                        <div id="selected-services-container" style="max-height:270px;overflow-y:auto;margin-bottom:14px;">
+                            <div id="empty-state" class="text-center py-3 @(Model.Totals.SelectedServices.Count > 0 ? "d-none" : "")">
+                                <i class="bi bi-hand-index-thumb" style="font-size:32px;color:var(--sl-text-muted);display:block;margin-bottom:8px;"></i>
+                                <p style="color:var(--sl-text-secondary);font-size:13px;margin:0;">Chưa chọn dịch vụ nào.</p>
+                                <small style="color:var(--sl-text-muted);font-size:12px;">Hãy tích chọn dịch vụ từ danh sách.</small>
                             </div>
 
-                            <!-- Selected Services Container -->
-                            <div id="selected-services-container" class="mb-3" style="max-height: 280px; overflow-y: auto;">
-                                <!-- Empty state -->
-                                <div id="empty-state" class="text-center py-4 @(Model.Totals.SelectedServices.Count > 0 ? "d-none" : "")">
-                                    <i class="bi bi-hand-index-thumb fs-2 text-muted d-block mb-2"></i>
-                                    <p class="text-muted small mb-0">Chưa chọn dịch vụ nào.</p>
-                                    <small class="text-secondary">Hãy tích chọn các dịch vụ bạn muốn từ danh sách bên cạnh.</small>
-                                </div>
-
-                                <!-- Items list -->
-                                <ul id="selected-services-list" class="list-group list-group-flush @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
-                                    @foreach (var item in Model.Totals.SelectedServices)
-                                    {
-                                        <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-start border-light" data-service-id="@item.ServiceId">
-                                            <div class="me-2">
-                                                <div class="fw-semibold text-dark small">@item.ServiceName</div>
-                                                <div class="text-muted" style="font-size: 0.75rem;">
-                                                    <i class="bi bi-clock"></i> @item.FormattedDuration · <span class="text-primary">@item.FormattedPrice</span>
-                                                </div>
+                            <ul id="selected-services-list"
+                                class="list-group list-group-flush @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
+                                @foreach (var item in Model.Totals.SelectedServices)
+                                {
+                                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-start"
+                                        data-service-id="@item.ServiceId"
+                                        style="border-color:var(--sl-border);">
+                                        <div class="me-2">
+                                            <div style="font-size:13px;font-weight:600;color:var(--sl-text);">@item.ServiceName</div>
+                                            <div style="font-size:12px;color:var(--sl-text-secondary);">
+                                                <i class="bi bi-clock"></i> @item.FormattedDuration ·
+                                                <span style="color:var(--sl-primary);">@item.FormattedPrice</span>
                                             </div>
-                                            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 remove-service-btn" data-service-id="@item.ServiceId" title="Bỏ chọn dịch vụ này">
-                                                <i class="bi bi-x-circle"></i>
-                                            </button>
-                                        </li>
-                                    }
-                                </ul>
-                            </div>
+                                        </div>
+                                        <button type="button"
+                                                class="btn btn-sm border-0 p-1 remove-service-btn"
+                                                data-service-id="@item.ServiceId"
+                                                title="Bỏ chọn dịch vụ này"
+                                                style="color:var(--sl-danger);background:transparent;">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
 
-                            <hr class="my-3">
+                        <hr style="border-color:var(--sl-border);margin:14px 0;">
 
-                            <!-- Totals Calculation -->
-                            <div class="bg-light p-3 rounded-3 mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="text-muted small">
-                                        <i class="bi bi-clock-history me-1"></i>Tổng thời lượng:
-                                    </span>
-                                    <span id="summary-total-duration" class="fw-bold text-dark">
-                                        @Model.Totals.FormattedTotalDuration
-                                    </span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-muted small">
-                                        <i class="bi bi-cash-stack me-1"></i>Tổng tiền tạm tính:
-                                    </span>
-                                    <span id="summary-total-price" class="fw-bold text-primary fs-5">
-                                        @Model.Totals.FormattedTotalPrice
-                                    </span>
-                                </div>
+                        @* Totals *@
+                        <div class="sl-summary-totals">
+                            <div class="sl-summary-row">
+                                <span style="color:var(--sl-text-secondary);font-size:13px;">
+                                    <i class="bi bi-clock-history me-1"></i>Tổng thời lượng:
+                                </span>
+                                <span id="summary-total-duration" style="font-weight:700;font-size:14px;">
+                                    @Model.Totals.FormattedTotalDuration
+                                </span>
                             </div>
+                            <div class="sl-summary-row sl-summary-row-total" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--sl-border);">
+                                <span style="color:var(--sl-text-secondary);font-size:13px;">
+                                    <i class="bi bi-cash-stack me-1"></i>Tổng tạm tính:
+                                </span>
+                                <span id="summary-total-price" style="font-size:18px;font-weight:700;color:var(--sl-primary);">
+                                    @Model.Totals.FormattedTotalPrice
+                                </span>
+                            </div>
+                        </div>
 
-                            <!-- Longest Shift Warning Alert (AC4) -->
-                            <div id="shift-warning-alert" class="alert alert-warning py-2 px-3 small mb-3 border-0 d-flex align-items-start @(Model.Totals.HasExceededShiftWarning ? "" : "d-none")" role="alert">
-                                <i class="bi bi-clock-history text-warning me-2 fs-6 flex-shrink-0 mt-1"></i>
-                                <div id="shift-warning-message">
-                                    @(Model.Totals.ShiftWarningMessage ?? $"Tổng thời gian các dịch vụ đã chọn ({Model.Totals.TotalDurationMinutes} phút) vượt quá độ dài ca làm việc dài nhất của tiệm ({Model.Totals.MaxShiftDurationMinutes} phút). Quý khách nên cân nhắc tách thành 2 lần hẹn để có trải nghiệm phục vụ tốt nhất.")
-                                </div>
+                        @* Shift warning *@
+                        <div id="shift-warning-alert"
+                             class="sl-alert sl-alert-warning mt-3 @(Model.Totals.HasExceededShiftWarning ? "" : "d-none")"
+                             role="alert" style="font-size:12.5px;">
+                            <i class="bi bi-clock-history"></i>
+                            <div id="shift-warning-message">
+                                @(Model.Totals.ShiftWarningMessage ?? $"Tổng thời gian ({Model.Totals.TotalDurationMinutes} phút) vượt quá ca dài nhất ({Model.Totals.MaxShiftDurationMinutes} phút). Nên tách 2 lần hẹn.")
                             </div>
+                        </div>
 
-                            <!-- Temporary Price Notice -->
-                            <div class="alert alert-warning py-2 px-3 small mb-3 border-0 d-flex align-items-start" role="note">
-                                <i class="bi bi-info-circle-fill text-warning me-2 fs-6 flex-shrink-0 mt-1"></i>
-                                <div>
-                                    <strong>Ghi chú:</strong> Giá trên là giá tạm tính, giá cuối do tiệm chốt khi thanh toán.
-                                </div>
-                            </div>
+                        @* Price note *@
+                        <div class="sl-alert sl-alert-info mt-3" style="font-size:12.5px;">
+                            <i class="bi bi-info-circle-fill"></i>
+                            <div><strong>Lưu ý:</strong> Giá trên là tạm tính, giá cuối do tiệm chốt khi thanh toán.</div>
+                        </div>
 
-                            <!-- Submit / Continue Button -->
-                            <div class="d-grid gap-2">
-                                <button type="button" id="btn-submit-booking" class="btn btn-primary btn-lg fw-semibold" @(Model.Totals.SelectedServices.Count == 0 ? "disabled" : "")>
-                                    Chọn thợ và giờ <i class="bi bi-arrow-right ms-1"></i>
-                                </button>
-                                <button type="button" id="btn-clear-all" class="btn btn-sm btn-link text-muted text-decoration-none @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
-                                    <i class="bi bi-trash3 me-1"></i>Bỏ chọn tất cả
-                                </button>
-                            </div>
+                        @* Actions *@
+                        <div class="d-grid gap-2 mt-2">
+                            <button type="button" id="btn-submit-booking"
+                                    class="sl-btn sl-btn-primary sl-btn-full"
+                                    style="height:46px;font-size:15px;"
+                                    @(Model.Totals.SelectedServices.Count == 0 ? "disabled" : "")>
+                                Chọn thợ và giờ <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                            <button type="button" id="btn-clear-all"
+                                    class="sl-btn sl-btn-ghost sl-btn-full sl-btn-sm
+                                           @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
+                                <i class="bi bi-trash3 me-1"></i>Bỏ chọn tất cả
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-            <partial name="_StylistSelection" />
-        </form>
-    }
-</div>
+
+        </div><!-- /.sl-booking-layout -->
+
+        <partial name="_StylistSelection" />
+    </form>
+}
 
 @section Scripts {
     <script src="~/js/booking-stylist.js" asp-append-version="true" defer></script>
@@ -306,10 +300,10 @@
             // Sync card styling
             function syncCardState(card, isChecked) {
                 if (isChecked) {
-                    card.classList.add("border-primary", "bg-primary-subtle", "shadow-sm");
+                    card.classList.add("selected");
                     card.classList.remove("border-light-subtle");
                 } else {
-                    card.classList.remove("border-primary", "bg-primary-subtle", "shadow-sm");
+                    card.classList.remove("selected");
                     card.classList.add("border-light-subtle");
                 }
             }
@@ -322,11 +316,11 @@
                 if (badgeCount) {
                     badgeCount.textContent = `Đã chọn: ${count}/${MAX_SERVICES} dịch vụ`;
                     if (isMaxReached) {
-                        badgeCount.classList.remove("bg-primary");
+                        badgeCount.classList.remove("bg-light", "text-dark");
                         badgeCount.classList.add("bg-danger");
                     } else {
                         badgeCount.classList.remove("bg-danger");
-                        badgeCount.classList.add("bg-primary");
+                        badgeCount.classList.add("bg-light", "text-dark");
                     }
                 }
 
@@ -346,11 +340,11 @@
                         cb.disabled = isMaxReached;
                         if (card) {
                             if (isMaxReached) {
-                                card.classList.add("opacity-50");
+                                card.classList.add("opacity-50", "disabled");
                                 card.style.cursor = "not-allowed";
                                 card.setAttribute("title", "Bạn chỉ có thể chọn tối đa 5 dịch vụ trong một lượt đặt lịch");
                             } else {
-                                card.classList.remove("opacity-50");
+                                card.classList.remove("opacity-50", "disabled");
                                 card.style.cursor = "pointer";
                                 card.removeAttribute("title");
                             }
@@ -358,7 +352,7 @@
                     } else {
                         cb.disabled = false;
                         if (card) {
-                            card.classList.remove("opacity-50");
+                            card.classList.remove("opacity-50", "disabled");
                             card.style.cursor = "pointer";
                             card.removeAttribute("title");
                         }
@@ -485,16 +479,18 @@
                     selectedList.innerHTML = "";
                     items.forEach(item => {
                         const li = document.createElement("li");
-                        li.className = "list-group-item px-0 py-2 d-flex justify-content-between align-items-start border-light";
+                        li.className = "list-group-item px-0 py-2 d-flex justify-content-between align-items-start";
+                        li.style.borderColor = "var(--sl-border)";
                         li.dataset.serviceId = item.serviceId;
                         li.innerHTML = `
                             <div class="me-2">
-                                <div class="fw-semibold text-dark small">${escapeHtml(item.serviceName)}</div>
-                                <div class="text-muted" style="font-size: 0.75rem;">
-                                    <i class="bi bi-clock"></i> ${escapeHtml(item.formattedDuration || formatDuration(item.durationMinutes))} · <span class="text-primary">${escapeHtml(item.formattedPrice || formatVND(item.price))}</span>
+                                <div style="font-size:13px;font-weight:600;color:var(--sl-text);">${escapeHtml(item.serviceName)}</div>
+                                <div style="font-size:12px;color:var(--sl-text-secondary);">
+                                    <i class="bi bi-clock"></i> ${escapeHtml(item.formattedDuration || formatDuration(item.durationMinutes))} ·
+                                    <span style="color:var(--sl-primary);">${escapeHtml(item.formattedPrice || formatVND(item.price))}</span>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 remove-service-btn" data-service-id="${item.serviceId}" title="Bỏ chọn dịch vụ này">
+                            <button type="button" class="btn btn-sm border-0 p-1 remove-service-btn" data-service-id="${item.serviceId}" title="Bỏ chọn dịch vụ này" style="color:var(--sl-danger);background:transparent;">
                                 <i class="bi bi-x-circle"></i>
                             </button>
                         `;
