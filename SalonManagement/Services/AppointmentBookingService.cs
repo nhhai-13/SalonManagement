@@ -53,6 +53,11 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
         await ConfirmationLock.WaitAsync();
         try
         {
+            return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+            {
+            await using var transaction = db.Database.IsSqlServer() ? await db.Database.BeginTransactionAsync() : null;
+            if (transaction != null)
+                await db.Database.ExecuteSqlInterpolatedAsync($"SELECT StylistId FROM Stylists WITH (UPDLOCK, HOLDLOCK) WHERE StylistId = {stylist.StylistId}");
             // The availability query above is only a preview. Re-check after taking the
             // booking lock so a competing request cannot commit the same interval.
             var validSlots = await new AvailabilityService(db, timeProvider).GetSlotsAsync(request.Date.Date, request.ServiceIds, request.StartTime);
@@ -80,7 +85,9 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
             var reference = await CreateReferenceAsync();
             db.Appointments.Add(new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "Confirmed", BookingReference = reference, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() });
             try { await db.SaveChangesAsync(); } catch (DbUpdateException) { return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác."); }
-            return new(new(reference, stylist.FullName, services.Select(item => item.ServiceName).ToList(), request.Date.Date, request.StartTime, endTime), null, null);
+            if (transaction != null) await transaction.CommitAsync();
+            return new BookingCreationResult(new(reference, stylist.FullName, services.Select(item => item.ServiceName).ToList(), request.Date.Date, request.StartTime, endTime), null, null);
+            });
         }
         finally { ConfirmationLock.Release(); }
     }

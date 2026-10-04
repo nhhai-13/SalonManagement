@@ -88,10 +88,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     async function loadSlots() {
         clearSlots();
+        const suggestedDates = document.getElementById('suggested-dates');
+        const dateMessage = document.getElementById('date-message');
+        suggestedDates.replaceChildren(); dateMessage.textContent = '';
         selectedSlot.disabled = !selected.value || !date.value || !date.validity.valid;
         slotMessage.textContent = selectedSlot.disabled
             ? 'Chọn thợ và ngày trước khi nhập giờ hẹn.'
             : 'Nhập giờ hẹn. Dịch vụ phải hoàn tất trong giờ mở cửa và ca làm của thợ.';
+        if (selectedSlot.disabled) return;
+        const current = slotVersion;
+        slotRequest = new AbortController();
+        const q = query(); q.set('stylistId', selected.value); q.set('date', date.value);
+        try {
+            const data = await json(`${panel.dataset.datesUrl}?${q}`, slotRequest.signal);
+            if (current !== slotVersion) return;
+            if (data.slotCount === 0) {
+                dateMessage.textContent = data.suggestions.length
+                    ? 'Ngày này không còn giờ trống. Bạn có thể chọn một trong hai ngày gần nhất còn chỗ:'
+                    : 'Ngày này không còn giờ trống; chưa tìm thấy ngày còn chỗ trong 14 ngày tiếp theo.';
+                data.suggestions.forEach(item => {
+                    const b = button(`${item.label} (từ ${item.earliestSlot})`);
+                    b.addEventListener('click', () => { date.value = item.date; loadSlots(); });
+                    suggestedDates.append(b);
+                });
+            }
+        } catch (e) {
+            if (current === slotVersion && e.name !== 'AbortError') dateMessage.textContent = e.message;
+        }
     }
     selectedSlot.addEventListener('input', validateTime);
     async function loadStylists() {

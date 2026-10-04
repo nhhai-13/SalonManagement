@@ -26,6 +26,27 @@ public sealed class StylistAvailabilityController(StylistAvailabilityService ava
         catch (ArgumentException e) { return BadRequest(new { message = e.Message }); }
     }
 
+    [HttpGet("stylist-dates")]
+    public async Task<IActionResult> Dates([FromQuery] int[] serviceIds, int? stylistId, DateOnly date)
+    {
+        if (!ModelState.IsValid || date == default || stylistId == null || stylistId < 0 || date.DayNumber > DateOnly.MaxValue.DayNumber - 14)
+            return BadRequest(new { message = "Vui lòng chọn ngày và thợ hợp lệ." });
+        try
+        {
+            var slots = await availability.GetSlotsAsync(serviceIds, stylistId.Value, date);
+            var suggestions = new List<object>();
+            if (slots.Count == 0)
+                for (var i = 1; i <= 14 && suggestions.Count < 2; i++)
+                {
+                    var day = date.AddDays(i);
+                    var next = await availability.GetSlotsAsync(serviceIds, stylistId.Value, day);
+                    if (next.Count > 0) suggestions.Add(new { date = day.ToString("yyyy-MM-dd"), label = day.ToString("dd/MM/yyyy"), earliestSlot = next[0].Start });
+                }
+            return Ok(new { slotCount = slots.Count, suggestions });
+        }
+        catch (ArgumentException e) { return BadRequest(new { message = e.Message }); }
+    }
+
     [HttpGet("stylist-assignment")]
     public async Task<IActionResult> Assignment([FromQuery] int[] serviceIds, int? stylistId, DateOnly date, TimeOnly? start)
     {

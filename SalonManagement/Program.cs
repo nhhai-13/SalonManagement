@@ -196,6 +196,7 @@ builder.Services.AddScoped<
     TokenService>();
 
 builder.Services.AddMemoryCache();
+builder.Services.AddResponseCompression();
 
 builder.Services.AddScoped<
     IEmailService,
@@ -248,7 +249,11 @@ else
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseResponseCompression();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context => context.Context.Response.Headers.CacheControl = "public,max-age=3600"
+});
 
 // =====================================
 // REDIRECT DEFAULT IDENTITY PAGES

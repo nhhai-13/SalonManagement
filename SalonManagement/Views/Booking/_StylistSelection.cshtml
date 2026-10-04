@@ -1,6 +1,7 @@
 <section id="stylist-selection" class="card p-3 my-4" hidden
          data-stylists-url="@Url.Action("Stylists", "StylistAvailability")"
          data-slots-url="@Url.Action("Slots", "StylistAvailability")"
+         data-dates-url="@Url.Action("Dates", "StylistAvailability")"
          data-assignment-url="@Url.Action("Assignment", "StylistAvailability")"
          data-confirm-url="@Url.Action("Confirm", "Booking")">
     <h2 class="h4">Chọn thợ và giờ hẹn</h2>
@@ -10,6 +11,8 @@
     <label for="booking-date" class="form-label mt-3">Ngày hẹn</label>
     <input id="booking-date" type="date" class="form-control" />
     <p id="slot-message" role="status" aria-live="polite" class="mt-3"></p>
+    <p id="date-message" role="status" class="mt-2"></p>
+    <div id="suggested-dates" class="d-flex flex-wrap gap-2"></div>
     <label for="selected-slot" class="form-label">Giờ hẹn (giờ Việt Nam)</label>
     <input type="text" id="selected-slot" name="startTime" class="form-control" placeholder="HH:mm, ví dụ 14:30" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" maxlength="5" autocomplete="off" disabled aria-describedby="slot-message" />
     <div id="slot-options" hidden></div>

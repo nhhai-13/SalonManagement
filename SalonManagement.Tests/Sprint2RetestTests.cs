@@ -12,6 +12,40 @@ namespace SalonManagement.Tests;
 public class Sprint2RetestTests
 {
     [Fact]
+    public async Task EmptyDaySuggestsNearestTwoDatesForSelectedStylist()
+    {
+        await using var db = Db(); var day = new DateOnly(2030, 1, 7);
+        var service = new Service { ServiceId = 1, ServiceName = "Cut", DurationMinutes = 30, IsActive = true };
+        db.Stylists.Add(new() { StylistId = 1, FullName = "Stylist", Services = [new() { Service = service }] });
+        foreach (var offset in new[] { 1, 3 }) {
+            var next = day.AddDays(offset);
+            db.BusinessHours.Add(new() { DayOfWeek = next.DayOfWeek, OpensAt = new(9, 0), ClosesAt = new(17, 0) });
+            db.WorkSchedules.Add(new() { StylistId = 1, WorkDate = next.ToDateTime(TimeOnly.MinValue), StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(17) });
+        }
+        await db.SaveChangesAsync();
+        var controller = new SalonManagement.Controllers.Booking.StylistAvailabilityController(new(db, TimeProvider.System));
+        var result = Assert.IsType<OkObjectResult>(await controller.Dates([1], 1, day));
+        using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(result.Value));
+        var suggestions = json.RootElement.GetProperty("suggestions");
+        Assert.Equal(2, suggestions.GetArrayLength());
+        Assert.Equal("2030-01-08", suggestions[0].GetProperty("date").GetString());
+        Assert.Equal("2030-01-10", suggestions[1].GetProperty("date").GetString());
+    }
+    [Fact]
+    public async Task HolidayRangeWarnsBeforeSavingAndCreatesInclusiveDates()
+    {
+        await using var db = Db(); var day = new DateOnly(2030, 1, 7);
+        db.Appointments.Add(new() { Customer = new() { FullName = "Test" }, Stylist = new() { FullName = "Stylist" },
+            AppointmentDate = day.ToDateTime(TimeOnly.MinValue), StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(11), Status = "Confirmed", BookingReference = "RANGET01" });
+        await db.SaveChangesAsync(); var controller = new ShopHolidaysController(db);
+        Assert.IsType<ConflictObjectResult>(await controller.CreateRange(new(day, day.AddDays(2), "Tet")));
+        Assert.Empty(await db.ShopHolidays.ToListAsync());
+        Assert.IsType<OkObjectResult>(await controller.CreateRange(new(day, day.AddDays(2), "Tet", true)));
+        Assert.Equal(3, await db.ShopHolidays.CountAsync());
+        Assert.IsType<ConflictObjectResult>(await controller.CreateRange(new(day, day.AddDays(2), "Tet", true)));
+        Assert.IsType<BadRequestObjectResult>(await controller.CreateRange(new(day, day.AddDays(-1), "Tet")));
+    }
+    [Fact]
     public async Task HolidayCannotHideExistingActiveAppointment()
     {
         await using var db = Db();
