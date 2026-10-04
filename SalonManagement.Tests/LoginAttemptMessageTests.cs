@@ -6,6 +6,7 @@ namespace SalonManagement.Tests;
 public class LoginAttemptMessageTests
 {
     [Theory]
+    [InlineData(5)]
     [InlineData(4)]
     [InlineData(3)]
     [InlineData(2)]

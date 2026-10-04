@@ -54,7 +54,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
     options.Password.RequireNonAlphanumeric = false;
 
     options.Lockout.AllowedForNewUsers = true;
-    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.MaxFailedAccessAttempts = LoginLockoutPolicy.MaxFailedAttempts;
     options.Lockout.DefaultLockoutTimeSpan =
         TimeSpan.FromMinutes(15);
 })
