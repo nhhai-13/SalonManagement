@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmedStylistId = null;
         bookingResult.textContent = '';
         bookingResult.classList.remove('text-success');
+        document.getElementById('booking-confirmed-services').hidden = true;
         assignmentMessage.textContent = assignmentDetail.textContent = '';
         confirm.disabled = true;
     }
@@ -209,6 +210,9 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmedStylistId = null;
             assignmentMessage.textContent = `Thợ: ${data.stylistName}`;
             assignmentDetail.textContent = `${data.date} · ${data.startTime} – ${data.endTime}`;
+            const confirmedServices = document.getElementById('booking-confirmed-services');
+            confirmedServices.textContent = `Dịch vụ: ${data.services.join(', ')}`;
+            confirmedServices.hidden = false;
             bookingResult.textContent = `Đặt lịch thành công! Mã lịch hẹn: ${data.reference}. Vui lòng lưu mã để tra cứu lịch hẹn.`;
             bookingResult.classList.add('text-success');
         } catch {

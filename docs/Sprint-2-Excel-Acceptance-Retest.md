@@ -39,3 +39,9 @@ Build thành công, không warning/error. Kiểm tra trình duyệt với tài k
 - Màn hình 360px: scrollWidth 345px, không tràn ngang; hai phần form/danh sách xếp dọc.
 - Bổ sung kiểm tra lý do chỉ có khoảng trắng và khoảng ngày vượt 366 ngày ngay trên form; cả hai thông báo đã kiểm tra trên trình duyệt.
 - Chạy lại 235 test: tất cả đạt, không skip. Bằng chứng local: TestResults/holiday-form-retest.trx. Có cảnh báo NU1900 do không truy cập được feed kiểm tra lỗ hổng NuGet; không có lỗi test.
+
+## Cổng kiểm tra trước khi đưa main (05/10/2026)
+
+Đã bổ sung tên tất cả dịch vụ vào thông báo xác nhận đặt lịch thành công S2-07; phần này được xóa khi đổi lựa chọn để không hiển thị thông tin cũ. Chạy lại bản build hiện tại: 235/235 test đạt, không skip (TestResults/before-main-final.trx). Phép merge-tree với origin/main không có xung đột; chưa thay đổi main.
+
+Chưa tuyên bố hoàn thành toàn bộ đề: tốc độ dưới hai giây trên 4G ở môi trường triển khai chưa kiểm chứng; thao tác chủ tiệm S2-01 chưa kiểm tra đầy đủ trên trình duyệt. Ô nhập giờ thủ công là yêu cầu đã chốt của người dùng, khác danh sách giờ gợi ý trong đề gốc. Chỉ gộp main khi hoàn thành kiểm chứng các điều kiện nghiệm thu hoặc người dùng chấp nhận rõ phạm vi còn lại.
