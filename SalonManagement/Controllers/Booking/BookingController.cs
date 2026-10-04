@@ -7,7 +7,7 @@ using SalonManagement.Services;
 
 namespace SalonManagement.Controllers.Booking;
 
-public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, string FullName, string Phone, string? Email, string? Notes, string? Website);
+public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, string FullName, string Phone, string? Email, string? Notes, string? Website, int? StylistId = null);
 
 [AllowAnonymous]
 [Route("booking")]
@@ -98,7 +98,7 @@ public class BookingController : Controller
         var limiter = new BookingRateLimiter(_timeProvider);
         var limit = limiter.TryReserve(ipAddress);
         if (!limit.Allowed) return StatusCode(StatusCodes.Status429TooManyRequests, new { code = "ip_rate_limited", message = $"Bạn đã đạt giới hạn 5 lượt đặt trong một giờ. Vui lòng thử lại sau {limit.RetryAt!.Value.LocalDateTime:HH:mm}." });
-        var result = await _appointmentBookingService.CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, input.Phone, input.Email, input.Notes));
+        var result = await _appointmentBookingService.CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, input.Phone, input.Email, input.Notes, input.StylistId));
         if (result.Confirmation is null)
         {
             limiter.Release(ipAddress);

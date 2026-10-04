@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SalonManagement.Services;
 
-public sealed record BookingRequest(DateTime Date, TimeSpan StartTime, IReadOnlyCollection<int> ServiceIds, string FullName, string Phone, string? Email = null, string? Notes = null);
+public sealed record BookingRequest(DateTime Date, TimeSpan StartTime, IReadOnlyCollection<int> ServiceIds, string FullName, string Phone, string? Email = null, string? Notes = null, int? StylistId = null);
 public sealed record BookingConfirmation(string Reference, string StylistName, IReadOnlyList<string> Services, DateTime Date, TimeSpan StartTime, TimeSpan EndTime);
 public sealed record BookingCreationResult(BookingConfirmation? Confirmation, string? ErrorCode, string? Message, IReadOnlyDictionary<string, string>? FieldErrors = null)
 {
@@ -21,6 +21,7 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
     public async Task<BookingCreationResult> CreateAsync(BookingRequest request)
     {
         var errors = new Dictionary<string, string>();
+        if (request.StylistId < 0) errors["stylistId"] = "Lựa chọn thợ không hợp lệ.";
         var name = request.FullName?.Trim() ?? string.Empty;
         if (name.Length is < 1 or > 100) errors["fullName"] = "Họ tên phải có từ 1 đến 100 ký tự.";
         var phone = BookingService.NormalizePhone(request.Phone);
@@ -46,7 +47,7 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
         var timeOffsForDate = await db.StylistTimeOffs.Where(t => t.OffDate == DateOnly.FromDateTime(request.Date)).ToListAsync();
         var offIds = await db.StylistDaysOff.Where(t => t.OffDate == request.Date.Date).Select(t => t.StylistId).ToListAsync();
         var breaksForDate = await db.StylistBreaks.Where(t => t.BreakDate == request.Date.Date && t.StartTime < endTime && request.StartTime < t.EndTime).Select(t => t.StylistId).ToListAsync();
-        var stylist = stylists.FirstOrDefault(candidate => !offIds.Contains(candidate.StylistId) && !breaksForDate.Contains(candidate.StylistId) && !timeOffsForDate.Any(t => t.StylistId == candidate.StylistId && (t.IsFullDay || (t.StartTime.HasValue && t.EndTime.HasValue && t.StartTime.Value.ToTimeSpan() < endTime && request.StartTime < t.EndTime.Value.ToTimeSpan()))) && required.All(serviceId => candidate.Services.Any(skill => skill.ServiceId == serviceId)) && candidate.WorkSchedules.Any(schedule => schedule.StartTime <= request.StartTime && endTime <= schedule.EndTime) && !appointments.Where(item => item.StylistId == candidate.StylistId).Any(item => item.StartTime < endTime && request.StartTime < item.EndTime));
+        var stylist = stylists.Where(candidate => !request.StylistId.HasValue || request.StylistId == 0 || candidate.StylistId == request.StylistId).OrderBy(candidate => appointments.Count(a => a.StylistId == candidate.StylistId && (a.Status == "Pending" || a.Status == "Confirmed" || a.Status == "InProgress"))).ThenBy(candidate => candidate.StylistId).FirstOrDefault(candidate => !offIds.Contains(candidate.StylistId) && !breaksForDate.Contains(candidate.StylistId) && !timeOffsForDate.Any(t => t.StylistId == candidate.StylistId && (t.IsFullDay || (t.StartTime.HasValue && t.EndTime.HasValue && t.StartTime.Value.ToTimeSpan() < endTime && request.StartTime < t.EndTime.Value.ToTimeSpan()))) && required.All(serviceId => candidate.Services.Any(skill => skill.ServiceId == serviceId)) && candidate.WorkSchedules.Any(schedule => schedule.StartTime <= request.StartTime && endTime <= schedule.EndTime) && !appointments.Where(item => item.StylistId == candidate.StylistId).Any(item => item.StartTime < endTime && request.StartTime < item.EndTime));
         if (stylist is null) return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác.");
 
         await ConfirmationLock.WaitAsync();

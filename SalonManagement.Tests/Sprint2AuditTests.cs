@@ -86,6 +86,36 @@ public class Sprint2AuditTests
         var valid = await booking.CreateAsync(new(new DateTime(2030,1,7),TimeSpan.FromHours(10),ids,"Test Customer","0912345678"));
         Assert.IsNotNull(valid.Confirmation);
     }
+    [TestMethod]
+    public async Task Confirm_SpecificStylist_PreservesSelection()
+    {
+        using var db = Db(); var ids = await Seed(db);
+        db.Stylists.Add(new Stylist { FullName = "Second stylist", Phone = "0900000002", IsActive = true, Services = [new StylistService { ServiceId = ids[0] }] }); await db.SaveChangesAsync();
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = 2, WorkDate = new DateTime(2030,1,7), StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(17) }); await db.SaveChangesAsync();
+        var result = await new AppointmentBookingService(db,TimeProvider.System).CreateAsync(new(new DateTime(2030,1,7),TimeSpan.FromHours(10),ids,"Test Customer","0912345678",StylistId:2));
+        Assert.IsNotNull(result.Confirmation);
+        Assert.AreEqual(2,(await db.Appointments.SingleAsync()).StylistId);
+    }
+    [TestMethod]
+    public async Task Confirm_SpecificStylistWithoutSkills_DoesNotSubstituteAnother()
+    {
+        using var db = Db(); var ids = await Seed(db);
+        db.Stylists.Add(new Stylist { FullName = "Unqualified", Phone = "0900000002", IsActive = true }); await db.SaveChangesAsync();
+        var result = await new AppointmentBookingService(db,TimeProvider.System).CreateAsync(new(new DateTime(2030,1,7),TimeSpan.FromHours(10),ids,"Test Customer","0912345678",StylistId:2));
+        Assert.IsNull(result.Confirmation);
+        Assert.AreEqual(0,await db.Appointments.CountAsync());
+    }
+    [TestMethod]
+    public async Task Confirm_AnyStylist_PrefersLeastBusy()
+    {
+        using var db = Db(); var ids = await Seed(db);
+        db.Stylists.Add(new Stylist { FullName = "Second stylist", Phone = "0900000002", IsActive = true, Services = [new StylistService { ServiceId = ids[0] }] }); await db.SaveChangesAsync();
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = 2, WorkDate = new DateTime(2030,1,7), StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(17) });
+        db.Appointments.Add(new Appointment { StylistId = 1, AppointmentDate = new DateTime(2030,1,7), StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(9), Status = "Confirmed", BookingReference = "TEST0001", Customer = new Customer { FullName = "Existing", Phone = "0900000003" } }); await db.SaveChangesAsync();
+        var result = await new AppointmentBookingService(db,TimeProvider.System).CreateAsync(new(new DateTime(2030,1,7),TimeSpan.FromHours(10),ids,"Test Customer","0912345678",StylistId:0));
+        Assert.IsNotNull(result.Confirmation);
+        Assert.AreEqual("Second stylist",result.Confirmation.StylistName);
+    }
     private sealed class AuditClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
