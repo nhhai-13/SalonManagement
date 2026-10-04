@@ -116,6 +116,19 @@ public class Sprint2AuditTests
         Assert.IsNotNull(result.Confirmation);
         Assert.AreEqual("Second stylist",result.Confirmation.StylistName);
     }
+    [TestMethod]
+    public async Task DemoSeeds_CreateUniqueNonEmptyReferences_AndAreRepeatable()
+    {
+        using var db = Db(); var day = new DateTime(2030,1,7);
+        await StylistBookingDemoSeed.SeedAsync(db,day);
+        await StylistAssignmentDemoSeed.SeedAsync(db,day);
+        var appointments = await db.Appointments.ToListAsync();
+        Assert.IsTrue(appointments.All(a => a.BookingReference.Length == 8));
+        Assert.AreEqual(appointments.Count,appointments.Select(a => a.BookingReference).Distinct().Count());
+        await StylistBookingDemoSeed.SeedAsync(db,day);
+        await StylistAssignmentDemoSeed.SeedAsync(db,day);
+        Assert.AreEqual(appointments.Count,await db.Appointments.CountAsync());
+    }
     private sealed class AuditClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

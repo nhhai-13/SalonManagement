@@ -15,7 +15,7 @@ public static class StylistAssignmentDemoSeed
             a.AppointmentDate == day && a.Notes == "Demo S2-06 assignment")) return;
         db.Appointments.Add(new() { StylistId = source.StylistId, CustomerId = source.CustomerId,
             AppointmentDate = day, StartTime = TimeSpan.FromHours(12), EndTime = TimeSpan.FromHours(12.5),
-            Status = "Pending", Notes = "Demo S2-06 assignment" });
+            BookingReference = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(), Status = "Pending", Notes = "Demo S2-06 assignment" });
         await db.SaveChangesAsync();
     }
 }

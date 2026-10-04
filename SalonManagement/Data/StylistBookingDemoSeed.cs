@@ -22,7 +22,7 @@ public static class StylistBookingDemoSeed
             {
                 db.Appointments.Add(new() { StylistId = demo.StylistId, CustomerId = demo.CustomerId,
                     AppointmentDate = fullDay, StartTime = demo.EndTime, EndTime = TimeSpan.FromHours(17),
-                    Status = "Confirmed", Notes = "Demo S2-06 any stylist" });
+                    BookingReference = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(), Status = "Confirmed", Notes = "Demo S2-06 any stylist" });
                 await db.SaveChangesAsync();
             }
             return;
@@ -44,9 +44,9 @@ public static class StylistBookingDemoSeed
             foreach (var stylist in new[] { a, b, c })
                 db.WorkSchedules.Add(new() { Stylist = stylist, WorkDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(17) });
             db.Appointments.Add(new() { Stylist = a, Customer = customer, AppointmentDate = date,
-                StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(i == 1 ? 17 : 10), Status = "Confirmed", Notes = "Demo S2-06" });
+                StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(i == 1 ? 17 : 10), BookingReference = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(), Status = "Confirmed", Notes = "Demo S2-06" });
             db.Appointments.Add(new() { Stylist = b, Customer = customer, AppointmentDate = date,
-                StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(11), Status = "Confirmed", Notes = "Demo S2-06" });
+                StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(11), BookingReference = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(), Status = "Confirmed", Notes = "Demo S2-06" });
         }
         await db.SaveChangesAsync();
     }
