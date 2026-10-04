@@ -1,0 +1,112 @@
+@model SalonManagement.Models.ViewModels.ResetPasswordViewModel
+@{
+    Layout = "_AuthLayout";
+    ViewData["Title"] = "Đặt lại mật khẩu";
+}
+
+<div class="sl-auth-page">
+  <div class="sl-auth-showcase">
+    <a class="brand" href="/">Salon Management</a>
+    <div class="showcase-copy">
+        <h1>Đặt lại mật khẩu</h1>
+        <p>Tạo mật khẩu mới cho tài khoản của bạn.</p>
+    </div>
+    <div class="showcase-footer">
+        <span>Bảo vệ an toàn</span>
+    </div>
+  </div>
+  <div class="sl-auth-panel">
+    <a class="sl-auth-logo-mobile brand" href="/">Salon Management</a>
+    <div class="sl-auth-card">
+      <div class="sl-auth-heading">
+        <span class="sl-eyebrow">Khôi phục tài khoản</span>
+        <h2>Đặt lại mật khẩu</h2>
+        <p>Nhập mật khẩu mới bên dưới.</p>
+      </div>
+
+      @{
+          var modelErrors = ViewData.ModelState[string.Empty]?.Errors
+              .Select(e => e.ErrorMessage)
+              .Where(m => !string.IsNullOrWhiteSpace(m))
+              .ToList() ?? new List<string>();
+
+          var allErrors = ViewData.ModelState.Values
+              .SelectMany(v => v.Errors)
+              .Select(e => e.ErrorMessage)
+              .Where(m => !string.IsNullOrWhiteSpace(m))
+              .Distinct()
+              .ToList();
+
+          var displayErrors = modelErrors.Count > 0 ? modelErrors : allErrors;
+
+          var customError = ViewData["ErrorMessage"]?.ToString() ?? TempData["ErrorMessage"]?.ToString();
+          if (!string.IsNullOrEmpty(customError) && !displayErrors.Contains(customError))
+          {
+              displayErrors.Add(customError);
+          }
+
+          var successMessage = ViewData["SuccessMessage"]?.ToString() ?? TempData["SuccessMessage"]?.ToString();
+      }
+
+      @if (displayErrors.Count > 0)
+      {
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+              @if (displayErrors.Count == 1)
+              {
+                  <span>@displayErrors[0]</span>
+              }
+              else
+              {
+                  <ul class="mb-0 ps-3">
+                      @foreach (var err in displayErrors)
+                      {
+                          <li>@err</li>
+                      }
+                  </ul>
+              }
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+          </div>
+      }
+
+      @if (!string.IsNullOrEmpty(successMessage))
+      {
+          <div class="alert alert-success alert-dismissible fade show" role="alert">
+              <span>@successMessage</span>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+          </div>
+      }
+
+      <form asp-action="ResetPassword" method="post" novalidate>
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Email" />
+        <input type="hidden" asp-for="Token" />
+
+        <div class="sl-form-group mb-3">
+          <label asp-for="NewPassword" class="sl-label fw-semibold"></label>
+          <div class="sl-input-wrap">
+            <input asp-for="NewPassword" class="sl-input form-control" placeholder="Tối thiểu 8 ký tự, gồm chữ và số" autocomplete="new-password" />
+          </div>
+          <span asp-validation-for="NewPassword" class="text-danger small"></span>
+          <div class="form-text">Mật khẩu phải có ít nhất 8 ký tự, gồm cả chữ cái và chữ số.</div>
+        </div>
+
+        <div class="sl-form-group mb-4">
+          <label asp-for="ConfirmPassword" class="sl-label fw-semibold"></label>
+          <div class="sl-input-wrap">
+            <input asp-for="ConfirmPassword" class="sl-input form-control" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" />
+          </div>
+          <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+        </div>
+
+        <div class="d-grid">
+            <button type="submit" class="sl-auth-submit btn btn-primary btn-lg fw-semibold">Đặt lại mật khẩu</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

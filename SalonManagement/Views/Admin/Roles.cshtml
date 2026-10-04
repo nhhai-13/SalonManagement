@@ -1,0 +1,44 @@
+@{ ViewData["Title"] = "Vai trò & phân quyền"; }
+
+<div id="roles-content" class="sl-body d-none">
+    <header class="sl-hero-card sl-hero-admin">
+        <div>
+            <span class="sl-hero-kicker">Quản trị hệ thống · S1-03</span>
+            <h1>Vai trò &amp; phân quyền</h1>
+            <p>Gán vai trò cho tài khoản nhân sự. Quyền truy cập được kiểm tra ở cả menu và API.</p>
+        </div>
+        <div class="sl-hero-meta sl-hero-account" aria-label="Thông tin phiên đăng nhập">
+            <span class="sl-hero-role">Quản trị viên</span>
+            <strong data-session-email></strong>
+        </div>
+    </header>
+
+    <section class="sl-card admin-role-management">
+        <div class="sl-card-header admin-card-heading">
+            <div>
+                <span class="sl-eyebrow">Danh sách tài khoản nội bộ</span>
+                <h2 class="sl-card-title">Gán vai trò</h2>
+                <p class="sl-card-subtitle">Chọn vai trò mới rồi bấm Lưu vai trò cho từng tài khoản.</p>
+            </div>
+            <a class="sl-btn sl-btn-outline sl-btn-sm" href="/admin#staff-accounts"><i class="bi bi-people"></i> Quản lý tài khoản</a>
+        </div>
+        <div class="sl-card-body">
+            <div id="role-management-message" class="alert d-none" role="alert"></div>
+            <div class="sl-table-wrap">
+                <table class="sl-table">
+                    <thead><tr><th>Tài khoản</th><th>Trạng thái</th><th>Vai trò</th><th class="text-end">Thao tác</th></tr></thead>
+                    <tbody id="role-account-list"><tr><td colspan="4" class="sl-table-empty">Đang tải...</td></tr></tbody>
+                </table>
+            </div>
+            <p class="sl-form-hint mt-3 mb-0">Không thể thay đổi vai trò của tài khoản Admin cuối cùng còn hoạt động.</p>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>
+        SalonAuth.requireSession({ contentId: "roles-content" })
+            .then(() => SalonAuth.bindRoleManagement());
+    </script>
+}

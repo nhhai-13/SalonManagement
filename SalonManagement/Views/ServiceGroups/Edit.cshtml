@@ -1,0 +1,34 @@
+@model ServiceGroupInput
+@{ ViewData["Title"] = Model.ServiceGroupId == 0 ? "Thêm nhóm dịch vụ" : "Sửa nhóm dịch vụ"; }
+<div class="container my-4 sl-body">
+    <div class="card shadow-sm sl-card sl-lookup-card mx-auto" style="max-width: 640px;">
+        <div class="card-header bg-primary text-white sl-page-header">
+            <h6 class="text-uppercase mb-1 sl-eyebrow">Nhóm dịch vụ</h6>
+            <h4 class="mb-0 sl-page-title">@ViewData["Title"]</h4>
+        </div>
+        <div class="card-body">
+            <form asp-action="@(Model.ServiceGroupId == 0 ? "Create" : "Edit")" asp-route-id="@Model.ServiceGroupId" method="post">
+                <input asp-for="ServiceGroupId" type="hidden" />
+                <div asp-validation-summary="All" class="text-danger mb-3"></div>
+                
+                <div class="mb-3 sl-form-group">
+                    <label asp-for="GroupName" class="form-label sl-label">Tên nhóm</label>
+                    <input asp-for="GroupName" class="form-control sl-input" maxlength="100" required />
+                    <span asp-validation-for="GroupName" class="text-danger"></span>
+                </div>
+                
+                <div class="mb-3 sl-form-group">
+                    <label asp-for="DisplayOrder" class="form-label sl-label">Thứ tự hiển thị</label>
+                    <input asp-for="DisplayOrder" class="form-control sl-input" min="0" />
+                    <span asp-validation-for="DisplayOrder" class="text-danger"></span>
+                    <small class="text-muted">Số nhỏ hiển thị trước. Thay đổi có hiệu lực khi tải lại trang công khai.</small>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary sl-btn sl-btn-primary" type="submit">Lưu nhóm</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary sl-btn sl-btn-ghost">Huỷ</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

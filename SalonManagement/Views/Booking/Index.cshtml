@@ -1,0 +1,582 @@
+@model SalonManagement.Models.ViewModels.Booking.BookingSelectServicesViewModel
+@{
+    ViewData["Title"] = "Đặt lịch - Chọn dịch vụ";
+}
+
+<div class="sl-page-header">
+    <div>
+        <span class="sl-eyebrow">Đặt lịch</span>
+        <h1 class="sl-page-title">Chọn dịch vụ bạn muốn trải nghiệm</h1>
+        <p class="sl-page-subtitle">Chọn một hoặc nhiều dịch vụ để xem tổng thời lượng và giá tạm tính.</p>
+    </div>
+</div>
+
+@* ── Stepper ─────────────────────────────────────────────── *@
+<div class="sl-stepper" aria-label="Tiến trình đặt lịch">
+    <div class="sl-step active">
+        <div class="sl-step-circle">1</div>
+        <div class="sl-step-label">Chọn dịch vụ</div>
+    </div>
+    <div class="sl-step">
+        <div class="sl-step-circle">2</div>
+        <div class="sl-step-label">Thời gian &amp; Thợ</div>
+    </div>
+    <div class="sl-step">
+        <div class="sl-step-circle">3</div>
+        <div class="sl-step-label">Xác nhận</div>
+    </div>
+</div>
+
+@if (!Model.HasServices)
+{
+    <div class="sl-alert sl-alert-info" role="alert">
+        <i class="bi bi-info-circle-fill"></i>
+        <div>
+            <strong>Hiện tại chưa có dịch vụ nào đang kinh doanh.</strong>
+            <p style="margin:4px 0 0;font-size:13px;">Vui lòng quay lại sau hoặc liên hệ salon để được hỗ trợ.</p>
+        </div>
+    </div>
+}
+else
+{
+    <form id="booking-form" asp-action="SelectServices" asp-controller="Booking" method="post"
+          data-max-shift-duration="@Model.Totals.MaxShiftDurationMinutes">
+        @Html.AntiForgeryToken()
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage) || !ViewData.ModelState.IsValid)
+        {
+            <div class="sl-alert sl-alert-danger alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-octagon-fill"></i>
+                <div>@(Model.ErrorMessage ?? "Số lượng dịch vụ trong một lượt đặt không được vượt quá 5.")</div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+            </div>
+        }
+
+        <div class="sl-booking-layout">
+
+            @* ── Danh sách dịch vụ ───────────────────── *@
+            <div>
+                @* Category pills *@
+                @if (Model.Groups.Count > 1)
+                {
+                    <div class="sl-pill-filter sticky-top bg-white py-2 z-2" style="top:60px;">
+                        @foreach (var group in Model.Groups)
+                        {
+                            var targetId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
+                            <a href="#@targetId" class="sl-pill">@group.Name (@group.Services.Count)</a>
+                        }
+                    </div>
+                }
+
+                @foreach (var group in Model.Groups)
+                {
+                    var groupId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
+                    <div id="@groupId" class="sl-group-section scroll-mt-16">
+                        <h2 class="sl-group-heading">
+                            <i class="bi bi-gem"></i>@group.Name
+                        </h2>
+
+                        @if (group.Services.Count == 0)
+                        {
+                            <p class="sl-page-subtitle" style="font-style:italic;">Nhóm này chưa có dịch vụ nào.</p>
+                        }
+                        else
+                        {
+                            <div class="row g-3">
+                                @foreach (var service in group.Services)
+                                {
+                                    var isChecked = service.IsSelected;
+                                    <div class="col-12 col-md-6">
+                                        <div class="sl-booking-item service-item-card @(isChecked ? "selected" : "")"
+                                             data-service-id="@service.ServiceId"
+                                             data-name="@service.ServiceName"
+                                             data-duration="@service.DurationMinutes"
+                                             data-price="@service.Price"
+                                             style="cursor:pointer;">
+
+                                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                                <div class="form-check m-0 flex-grow-1">
+                                                    <input class="form-check-input service-checkbox"
+                                                           type="checkbox"
+                                                           name="selectedServiceIds"
+                                                           value="@service.ServiceId"
+                                                           id="service-@service.ServiceId"
+                                                           data-service-id="@service.ServiceId"
+                                                           data-name="@service.ServiceName"
+                                                           data-duration="@service.DurationMinutes"
+                                                           data-price="@service.Price"
+                                                           style="width:18px;height:18px;accent-color:var(--sl-primary);"
+                                                           @(isChecked ? "checked" : "")>
+                                                    <label class="form-check-label ms-2 fw-bold" for="service-@service.ServiceId"
+                                                           style="font-size:14px;color:var(--sl-text);cursor:pointer;">
+                                                        @service.ServiceName
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            @if (!string.IsNullOrWhiteSpace(service.Description))
+                                            {
+                                                <p style="font-size:13px;color:var(--sl-text-secondary);min-height:40px;margin:0 0 14px;">
+                                                    @service.Description
+                                                </p>
+                                            }
+                                            else
+                                            {
+                                                <p style="font-size:13px;color:var(--sl-text-muted);font-style:italic;min-height:40px;margin:0 0 14px;">
+                                                    Dịch vụ cao cấp chuẩn Luminol.
+                                                </p>
+                                            }
+
+                                            <div class="sl-service-meta" style="padding-top:12px;border-top:1px solid var(--sl-border);">
+                                                <span class="sl-badge sl-badge-gray">
+                                                    <i class="bi bi-clock"></i>@service.FormattedDuration
+                                                </span>
+                                                <strong style="font-size:16px;color:var(--sl-primary);">@service.FormattedPrice</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* ── Summary panel (sticky) ───────────────── *@
+            <div>
+                <div class="sl-booking-summary" style="top:80px;">
+                    <div class="sl-booking-summary-header">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span><i class="bi bi-cart-check me-2"></i>Dịch vụ đã chọn</span>
+                            <span id="selected-count-badge"
+                                  class="badge @(Model.Totals.SelectedServices.Count >= 5 ? "bg-danger" : "bg-light text-dark") rounded-pill px-2">
+                                @Model.Totals.SelectedServices.Count/5
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="sl-booking-summary-body">
+
+                        @* Max 5 warning *@
+                        <div id="max-services-alert"
+                             class="sl-alert sl-alert-danger mb-3 @(Model.Totals.SelectedServices.Count >= 5 ? "" : "d-none")"
+                             role="alert" style="font-size:13px;">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <span>Bạn chỉ có thể chọn tối đa 5 dịch vụ trong một lượt đặt lịch</span>
+                        </div>
+
+                        @* Selected list *@
+                        <div id="selected-services-container" style="max-height:270px;overflow-y:auto;margin-bottom:14px;">
+                            <div id="empty-state" class="text-center py-3 @(Model.Totals.SelectedServices.Count > 0 ? "d-none" : "")">
+                                <i class="bi bi-hand-index-thumb" style="font-size:32px;color:var(--sl-text-muted);display:block;margin-bottom:8px;"></i>
+                                <p style="color:var(--sl-text-secondary);font-size:13px;margin:0;">Chưa chọn dịch vụ nào.</p>
+                                <small style="color:var(--sl-text-muted);font-size:12px;">Hãy tích chọn dịch vụ từ danh sách.</small>
+                            </div>
+
+                            <ul id="selected-services-list"
+                                class="list-group list-group-flush @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
+                                @foreach (var item in Model.Totals.SelectedServices)
+                                {
+                                    <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-start"
+                                        data-service-id="@item.ServiceId"
+                                        style="border-color:var(--sl-border);">
+                                        <div class="me-2">
+                                            <div style="font-size:13px;font-weight:600;color:var(--sl-text);">@item.ServiceName</div>
+                                            <div style="font-size:12px;color:var(--sl-text-secondary);">
+                                                <i class="bi bi-clock"></i> @item.FormattedDuration ·
+                                                <span style="color:var(--sl-primary);">@item.FormattedPrice</span>
+                                            </div>
+                                        </div>
+                                        <button type="button"
+                                                class="btn btn-sm border-0 p-1 remove-service-btn"
+                                                data-service-id="@item.ServiceId"
+                                                title="Bỏ chọn dịch vụ này"
+                                                style="color:var(--sl-danger);background:transparent;">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+
+                        <hr style="border-color:var(--sl-border);margin:14px 0;">
+
+                        @* Totals *@
+                        <div class="sl-summary-totals">
+                            <div class="sl-summary-row">
+                                <span style="color:var(--sl-text-secondary);font-size:13px;">
+                                    <i class="bi bi-clock-history me-1"></i>Tổng thời lượng:
+                                </span>
+                                <span id="summary-total-duration" style="font-weight:700;font-size:14px;">
+                                    @Model.Totals.FormattedTotalDuration
+                                </span>
+                            </div>
+                            <div class="sl-summary-row sl-summary-row-total" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--sl-border);">
+                                <span style="color:var(--sl-text-secondary);font-size:13px;">
+                                    <i class="bi bi-cash-stack me-1"></i>Tổng tạm tính:
+                                </span>
+                                <span id="summary-total-price" style="font-size:18px;font-weight:700;color:var(--sl-primary);">
+                                    @Model.Totals.FormattedTotalPrice
+                                </span>
+                            </div>
+                        </div>
+
+                        @* Shift warning *@
+                        <div id="shift-warning-alert"
+                             class="sl-alert sl-alert-warning mt-3 @(Model.Totals.HasExceededShiftWarning ? "" : "d-none")"
+                             role="alert" style="font-size:12.5px;">
+                            <i class="bi bi-clock-history"></i>
+                            <div id="shift-warning-message">
+                                @(Model.Totals.ShiftWarningMessage ?? $"Tổng thời gian ({Model.Totals.TotalDurationMinutes} phút) vượt quá ca dài nhất ({Model.Totals.MaxShiftDurationMinutes} phút). Nên tách 2 lần hẹn.")
+                            </div>
+                        </div>
+
+                        @* Price note *@
+                        <div class="sl-alert sl-alert-info mt-3" style="font-size:12.5px;">
+                            <i class="bi bi-info-circle-fill"></i>
+                            <div><strong>Lưu ý:</strong> Giá trên là tạm tính, giá cuối do tiệm chốt khi thanh toán.</div>
+                        </div>
+
+                        @* Actions *@
+                        <div class="d-grid gap-2 mt-2">
+                            <button type="button" id="btn-submit-booking"
+                                    class="sl-btn sl-btn-primary sl-btn-full"
+                                    style="height:46px;font-size:15px;"
+                                    @(Model.Totals.SelectedServices.Count == 0 ? "disabled" : "")>
+                                Chọn thợ và giờ <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                            <button type="button" id="btn-clear-all"
+                                    class="sl-btn sl-btn-ghost sl-btn-full sl-btn-sm
+                                           @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
+                                <i class="bi bi-trash3 me-1"></i>Bỏ chọn tất cả
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /.sl-booking-layout -->
+
+        <partial name="_StylistSelection" />
+    </form>
+}
+
+@section Scripts {
+    <script src="~/js/booking-stylist.js" asp-append-version="true" defer></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const form = document.getElementById("booking-form");
+            if (!form) return;
+
+            const MAX_SERVICES = 5;
+            const maxShiftDuration = parseInt(form.dataset.maxShiftDuration || "240", 10);
+            const checkboxes = Array.from(document.querySelectorAll(".service-checkbox"));
+            const cards = Array.from(document.querySelectorAll(".service-item-card"));
+            const emptyState = document.getElementById("empty-state");
+            const selectedList = document.getElementById("selected-services-list");
+            const badgeCount = document.getElementById("selected-count-badge");
+            const maxAlert = document.getElementById("max-services-alert");
+            const shiftAlert = document.getElementById("shift-warning-alert");
+            const shiftAlertMessage = document.getElementById("shift-warning-message");
+            const summaryDuration = document.getElementById("summary-total-duration");
+            const summaryPrice = document.getElementById("summary-total-price");
+            const btnSubmit = document.getElementById("btn-submit-booking");
+            const btnClearAll = document.getElementById("btn-clear-all");
+
+            // Formatters
+            function formatVND(amount) {
+                return new Intl.NumberFormat("vi-VN").format(amount) + " đ";
+            }
+
+            function formatDuration(minutes) {
+                if (minutes <= 0) return "0 phút";
+                if (minutes < 60) return minutes + " phút";
+                const hours = Math.floor(minutes / 60);
+                const rem = minutes % 60;
+                if (rem === 0) return `${hours} giờ (${minutes} phút)`;
+                return `${hours} giờ ${rem} phút (${minutes} phút)`;
+            }
+
+            // Sync card styling
+            function syncCardState(card, isChecked) {
+                if (isChecked) {
+                    card.classList.add("selected");
+                    card.classList.remove("border-light-subtle");
+                } else {
+                    card.classList.remove("selected");
+                    card.classList.add("border-light-subtle");
+                }
+            }
+
+            // Quản lý trạng thái giới hạn tối đa 5 dịch vụ (AC1)
+            function updateLimitState(count) {
+                const isMaxReached = count >= MAX_SERVICES;
+
+                // 1. Cập nhật nhãn và style bộ đếm
+                if (badgeCount) {
+                    badgeCount.textContent = `Đã chọn: ${count}/${MAX_SERVICES} dịch vụ`;
+                    if (isMaxReached) {
+                        badgeCount.classList.remove("bg-light", "text-dark");
+                        badgeCount.classList.add("bg-danger");
+                    } else {
+                        badgeCount.classList.remove("bg-danger");
+                        badgeCount.classList.add("bg-light", "text-dark");
+                    }
+                }
+
+                // 2. Hiển thị / ẩn cảnh báo giới hạn 5 dịch vụ
+                if (maxAlert) {
+                    if (isMaxReached) {
+                        maxAlert.classList.remove("d-none");
+                    } else {
+                        maxAlert.classList.add("d-none");
+                    }
+                }
+
+                // 3. Vô hiệu hóa hoặc kích hoạt lại các checkbox & thẻ dịch vụ chưa được chọn
+                checkboxes.forEach(cb => {
+                    const card = cb.closest(".service-item-card");
+                    if (!cb.checked) {
+                        cb.disabled = isMaxReached;
+                        if (card) {
+                            if (isMaxReached) {
+                                card.classList.add("opacity-50", "disabled");
+                                card.style.cursor = "not-allowed";
+                                card.setAttribute("title", "Bạn chỉ có thể chọn tối đa 5 dịch vụ trong một lượt đặt lịch");
+                            } else {
+                                card.classList.remove("opacity-50", "disabled");
+                                card.style.cursor = "pointer";
+                                card.removeAttribute("title");
+                            }
+                        }
+                    } else {
+                        cb.disabled = false;
+                        if (card) {
+                            card.classList.remove("opacity-50", "disabled");
+                            card.style.cursor = "pointer";
+                            card.removeAttribute("title");
+                        }
+                    }
+                });
+            }
+
+            // Quản lý cảnh báo vượt ca dài nhất trong tuần (AC4)
+            function updateShiftWarning(totalMinutes, serverHasExceeded, serverMessage) {
+                if (!shiftAlert) return;
+
+                const isExceeded = (serverHasExceeded !== undefined && serverHasExceeded !== null)
+                    ? serverHasExceeded
+                    : (totalMinutes > maxShiftDuration);
+
+                if (isExceeded && totalMinutes > 0) {
+                    const msg = serverMessage || `Tổng thời gian các dịch vụ đã chọn (${totalMinutes} phút) vượt quá độ dài ca làm việc dài nhất của tiệm (${maxShiftDuration} phút). Quý khách nên cân nhắc tách thành 2 lần hẹn để có trải nghiệm phục vụ tốt nhất.`;
+                    if (shiftAlertMessage) {
+                        shiftAlertMessage.textContent = msg;
+                    }
+                    shiftAlert.classList.remove("d-none");
+                } else {
+                    shiftAlert.classList.add("d-none");
+                }
+            }
+
+            // Recalculate and update UI (Client-Side Instant + Server Verification)
+            let totalsVersion = 0;
+            async function updateTotals() {
+                const currentVersion = ++totalsVersion;
+                document.dispatchEvent(new Event("booking:services-changed"));
+                const selectedBoxes = checkboxes.filter(cb => cb.checked);
+                const selectedIds = selectedBoxes.map(cb => parseInt(cb.value, 10));
+
+                // 1. Cập nhật tức thời Client-side (Zero latency)
+                let totalMin = 0;
+                let totalPrice = 0;
+                const itemsData = [];
+
+                selectedBoxes.forEach(cb => {
+                    const duration = parseInt(cb.dataset.duration || "0", 10);
+                    const price = parseFloat(cb.dataset.price || "0");
+                    const name = cb.dataset.name || "";
+                    const id = parseInt(cb.value, 10);
+
+                    totalMin += duration;
+                    totalPrice += price;
+
+                    itemsData.push({
+                        serviceId: id,
+                        serviceName: name,
+                        durationMinutes: duration,
+                        price: price,
+                        formattedDuration: formatDuration(duration),
+                        formattedPrice: formatVND(price)
+                    });
+                });
+
+                renderSummary(selectedIds.length, totalMin, totalPrice, itemsData);
+
+                // 2. Gọi Server API để tính toán lại và đảm bảo tính toàn vẹn dữ liệu
+                try {
+                    const response = await fetch("/booking/calculate-totals", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ serviceIds: selectedIds })
+                    });
+
+                    if (response.ok) {
+                        const serverData = await response.json();
+                        if (currentVersion !== totalsVersion) return;
+                        renderSummary(
+                            serverData.selectedServices.length,
+                            serverData.totalDurationMinutes,
+                            serverData.totalPrice,
+                            serverData.selectedServices,
+                            serverData.formattedTotalDuration,
+                            serverData.formattedTotalPrice,
+                            serverData.hasExceededShiftWarning,
+                            serverData.shiftWarningMessage
+                        );
+                    } else if (response.status === 400) {
+                        const err = await response.json();
+                        console.warn("Server validation:", err.message);
+                    }
+                } catch (err) {
+                    console.warn("Lỗi đồng bộ giá server, dùng kết quả tính tạm thời client:", err);
+                }
+            }
+
+            function renderSummary(count, totalMin, totalPrice, items, serverFormattedDuration, serverFormattedPrice, serverHasExceededShift, serverShiftWarning) {
+                // Cập nhật bộ đếm và trạng thái giới hạn 5 dịch vụ
+                updateLimitState(count);
+
+                // Cập nhật cảnh báo thời lượng vượt ca dài nhất (AC4)
+                updateShiftWarning(totalMin, serverHasExceededShift, serverShiftWarning);
+
+                // Empty state toggle
+                if (count === 0) {
+                    if (emptyState) emptyState.classList.remove("d-none");
+                    if (selectedList) selectedList.classList.add("d-none");
+                    if (btnSubmit) btnSubmit.disabled = true;
+                    if (btnClearAll) btnClearAll.classList.add("d-none");
+                    if (summaryDuration) summaryDuration.textContent = "0 phút";
+                    if (summaryPrice) summaryPrice.textContent = "0 đ";
+                    if (selectedList) selectedList.innerHTML = "";
+                    if (shiftAlert) shiftAlert.classList.add("d-none");
+                    return;
+                }
+
+                if (emptyState) emptyState.classList.add("d-none");
+                if (selectedList) selectedList.classList.remove("d-none");
+                if (btnSubmit) btnSubmit.disabled = false;
+                if (btnClearAll) btnClearAll.classList.remove("d-none");
+
+                // Duration & Price
+                if (summaryDuration) summaryDuration.textContent = serverFormattedDuration || formatDuration(totalMin);
+                if (summaryPrice) summaryPrice.textContent = serverFormattedPrice || formatVND(totalPrice);
+
+                // Render list items
+                if (selectedList) {
+                    selectedList.innerHTML = "";
+                    items.forEach(item => {
+                        const li = document.createElement("li");
+                        li.className = "list-group-item px-0 py-2 d-flex justify-content-between align-items-start";
+                        li.style.borderColor = "var(--sl-border)";
+                        li.dataset.serviceId = item.serviceId;
+                        li.innerHTML = `
+                            <div class="me-2">
+                                <div style="font-size:13px;font-weight:600;color:var(--sl-text);">${escapeHtml(item.serviceName)}</div>
+                                <div style="font-size:12px;color:var(--sl-text-secondary);">
+                                    <i class="bi bi-clock"></i> ${escapeHtml(item.formattedDuration || formatDuration(item.durationMinutes))} ·
+                                    <span style="color:var(--sl-primary);">${escapeHtml(item.formattedPrice || formatVND(item.price))}</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm border-0 p-1 remove-service-btn" data-service-id="${item.serviceId}" title="Bỏ chọn dịch vụ này" style="color:var(--sl-danger);background:transparent;">
+                                <i class="bi bi-x-circle"></i>
+                            </button>
+                        `;
+                        selectedList.appendChild(li);
+                    });
+                }
+            }
+
+            function escapeHtml(str) {
+                if (!str) return "";
+                const div = document.createElement("div");
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // Click card toggles checkbox
+            cards.forEach(card => {
+                card.addEventListener("click", function (e) {
+                    // Tránh toggle 2 lần nếu click trực tiếp vào checkbox
+                    if (e.target.matches("input[type='checkbox']") || e.target.closest("label")) {
+                        return;
+                    }
+                    const cb = card.querySelector(".service-checkbox");
+                    if (cb) {
+                        if (cb.disabled) {
+                            return;
+                        }
+                        cb.checked = !cb.checked;
+                        syncCardState(card, cb.checked);
+                        updateTotals();
+                    }
+                });
+            });
+
+            // Checkbox change event
+            checkboxes.forEach(cb => {
+                cb.addEventListener("change", function () {
+                    const checkedCount = checkboxes.filter(c => c.checked).length;
+                    if (cb.checked && checkedCount > MAX_SERVICES) {
+                        cb.checked = false;
+                        return;
+                    }
+                    const card = cb.closest(".service-item-card");
+                    if (card) syncCardState(card, cb.checked);
+                    updateTotals();
+                });
+            });
+
+            // Delegate remove button click from summary list
+            if (selectedList) {
+                selectedList.addEventListener("click", function (e) {
+                    const removeBtn = e.target.closest(".remove-service-btn");
+                    if (!removeBtn) return;
+                    const serviceId = removeBtn.dataset.serviceId;
+                    const cb = document.querySelector(`.service-checkbox[value='${serviceId}']`);
+                    if (cb) {
+                        cb.checked = false;
+                        const card = cb.closest(".service-item-card");
+                        if (card) syncCardState(card, false);
+                        updateTotals();
+                    }
+                });
+            }
+
+            // Clear all button
+            if (btnClearAll) {
+                btnClearAll.addEventListener("click", function () {
+                    checkboxes.forEach(cb => {
+                        cb.checked = false;
+                        const card = cb.closest(".service-item-card");
+                        if (card) syncCardState(card, false);
+                    });
+                    updateTotals();
+                });
+            }
+
+            // Khởi tạo trạng thái giới hạn ban đầu (hỗ trợ trường hợp đã có sẵn dịch vụ được chọn)
+            const initialCount = checkboxes.filter(cb => cb.checked).length;
+            updateLimitState(initialCount);
+            const initialTotalDuration = @Model.Totals.TotalDurationMinutes;
+            updateShiftWarning(
+                initialTotalDuration,
+                @(Model.Totals.HasExceededShiftWarning ? "true" : "false"),
+                @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Totals.ShiftWarningMessage))
+            );
+
+        });
+    </script>
+}

@@ -1,0 +1,40 @@
+<section id="stylist-selection" class="card p-3 my-4" hidden
+         data-stylists-url="@Url.Action("Stylists", "StylistAvailability")"
+         data-slots-url="@Url.Action("Slots", "StylistAvailability")"
+         data-dates-url="@Url.Action("Dates", "StylistAvailability")"
+         data-assignment-url="@Url.Action("Assignment", "StylistAvailability")"
+         data-confirm-url="@Url.Action("Confirm", "Booking")">
+    <h2 class="h4">Chọn thợ và giờ hẹn</h2>
+    <p>Chọn một thợ hoặc “Thợ bất kỳ”, sau đó nhập ngày và giờ hẹn mong muốn.</p>
+    <p id="stylist-message" role="status" aria-live="polite"></p>
+    <div id="stylist-options" class="d-flex flex-wrap gap-2" role="group" aria-label="Thợ phù hợp"></div>
+    <label for="booking-date" class="form-label mt-3">Ngày hẹn</label>
+    <input id="booking-date" type="date" class="form-control" />
+    <p id="slot-message" role="status" aria-live="polite" class="mt-3"></p>
+    <p id="date-message" role="status" class="mt-2"></p>
+    <div id="suggested-dates" class="d-flex flex-wrap gap-2"></div>
+    <label for="selected-slot" class="form-label">Giờ hẹn (giờ Việt Nam)</label>
+    <input type="text" id="selected-slot" name="startTime" class="form-control" placeholder="HH:mm, ví dụ 14:30" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" maxlength="5" autocomplete="off" disabled aria-describedby="slot-message" />
+    <div id="slot-options" hidden></div>
+    <input type="hidden" id="selected-stylist" name="stylistId" />
+    <button type="button" id="confirm-stylist-selection" class="btn btn-primary mt-3" disabled>Xác nhận lựa chọn</button>
+    <div id="assignment-confirmation" class="border rounded p-3 mt-3" hidden aria-live="polite">
+        <h3 class="h5">Thông tin xác nhận</h3>
+        <p id="assignment-message" role="status"></p>
+        <p id="assignment-detail"></p>
+        <p id="booking-confirmed-services" hidden></p>
+        <div id="booking-customer-details" hidden>
+            <label for="booking-full-name" class="form-label">Họ tên</label>
+            <input id="booking-full-name" class="form-control" autocomplete="name" required maxlength="100" />
+            <label for="booking-phone" class="form-label mt-2">Số điện thoại</label>
+            <input id="booking-phone" type="tel" class="form-control" value="@ViewData["BookingPhone"]" autocomplete="tel" required pattern="0[0-9]{9}" maxlength="10" placeholder="10 chữ số, bắt đầu bằng 0" />
+            <label for="booking-email" class="form-label mt-2">Email (không bắt buộc)</label>
+            <input id="booking-email" type="email" class="form-control" autocomplete="email" />
+            <label for="booking-notes" class="form-label mt-2">Ghi chú (không bắt buộc)</label>
+            <textarea id="booking-notes" class="form-control" maxlength="300"></textarea>
+            <button type="button" id="submit-appointment" class="btn btn-primary mt-3">Xác nhận đặt lịch</button>
+        </div>
+        <p id="booking-result" role="status" class="mt-3 mb-0"></p>
+    </div>
+    <noscript>Bật JavaScript để chọn thợ và kiểm tra giờ hẹn.</noscript>
+</section>

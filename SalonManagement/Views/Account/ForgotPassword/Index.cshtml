@@ -1,0 +1,108 @@
+@model SalonManagement.Models.ViewModels.ForgotPasswordViewModel
+@{
+    Layout = "_AuthLayout";
+    ViewData["Title"] = "Quên mật khẩu";
+}
+
+<div class="sl-auth-page">
+  <div class="sl-auth-showcase">
+    <a class="brand" href="/">Salon Management</a>
+    <div class="showcase-copy">
+        <h1>Quên mật khẩu</h1>
+        <p>Lấy lại quyền truy cập vào tài khoản của bạn.</p>
+    </div>
+    <div class="showcase-footer">
+        <span>Bảo mật an toàn</span>
+    </div>
+  </div>
+  <div class="sl-auth-panel">
+    <a class="sl-auth-logo-mobile brand" href="/">Salon Management</a>
+    <div class="sl-auth-card">
+      <div class="sl-auth-heading">
+        <span class="sl-eyebrow">Khôi phục tài khoản</span>
+        <h2>Quên mật khẩu</h2>
+        <p>Nhập email đã đăng ký — chúng tôi sẽ gửi link đặt lại mật khẩu cho bạn.</p>
+      </div>
+
+      @{
+          var modelErrors = ViewData.ModelState[string.Empty]?.Errors
+              .Select(e => e.ErrorMessage)
+              .Where(m => !string.IsNullOrWhiteSpace(m))
+              .ToList() ?? new List<string>();
+
+          var allErrors = ViewData.ModelState.Values
+              .SelectMany(v => v.Errors)
+              .Select(e => e.ErrorMessage)
+              .Where(m => !string.IsNullOrWhiteSpace(m))
+              .Distinct()
+              .ToList();
+
+          var displayErrors = modelErrors.Count > 0 ? modelErrors : allErrors;
+
+          var customError = ViewData["ErrorMessage"]?.ToString() ?? TempData["ErrorMessage"]?.ToString();
+          if (!string.IsNullOrEmpty(customError) && !displayErrors.Contains(customError))
+          {
+              displayErrors.Add(customError);
+          }
+
+          var successMessage = ViewData["SuccessMessage"]?.ToString() ?? TempData["SuccessMessage"]?.ToString();
+      }
+
+      @if (displayErrors.Count > 0)
+      {
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+              @if (displayErrors.Count == 1)
+              {
+                  <span>@displayErrors[0]</span>
+              }
+              else
+              {
+                  <ul class="mb-0 ps-3">
+                      @foreach (var err in displayErrors)
+                      {
+                          <li>@err</li>
+                      }
+                  </ul>
+              }
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+          </div>
+      }
+
+      @if (!string.IsNullOrEmpty(successMessage))
+      {
+          <div class="alert alert-success alert-dismissible fade show" role="alert">
+              <span>@successMessage</span>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+          </div>
+      }
+
+      <form asp-action="ForgotPassword" method="post" novalidate>
+        @Html.AntiForgeryToken()
+
+        <div class="sl-form-group mb-4">
+          <label asp-for="Email" class="sl-label fw-semibold"></label>
+          <div class="sl-input-wrap">
+            <input asp-for="Email" class="sl-input form-control" type="email" placeholder="example@email.com" autocomplete="email" />
+          </div>
+          <span asp-validation-for="Email" class="text-danger small"></span>
+        </div>
+
+        <div class="alert alert-info small py-2 mb-4" role="alert">
+            <strong>Lưu ý:</strong> Bạn chỉ có thể yêu cầu tối đa <strong>3 lần</strong> trong vòng 1 giờ.
+        </div>
+
+        <div class="d-grid">
+            <button type="submit" class="sl-auth-submit btn btn-warning btn-lg fw-semibold text-white">Gửi link đặt lại mật khẩu</button>
+        </div>
+      </form>
+      
+      <div class="mt-4 text-center">
+        <a asp-controller="Account" asp-action="Login" class="text-muted small text-decoration-none">← Quay lại đăng nhập</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

@@ -2,14 +2,25 @@
     ViewData["Title"] = "Giờ hoạt động";
 }
 
-<div id="hours-page" class="d-none">
-    <h1 class="h3">Giờ hoạt động</h1>
-    <p class="text-muted">Múi giờ cố định: Asia/Ho_Chi_Minh</p>
-    <form id="hours-form">
-        <div id="hours-list"></div>
-        <div id="hours-result" class="alert d-none" role="alert"></div>
-        <button class="btn btn-primary" type="submit">Lưu cấu hình</button>
-    </form>
+<div id="hours-page" class="portal-page d-none container py-4">
+    <div class="sl-page-header d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <span class="portal-kicker sl-eyebrow">S1-08 · Chủ tiệm</span>
+            <h1 class="sl-page-title h2">Giờ hoạt động</h1>
+            <p class="text-muted">Cấu hình riêng từng ngày; ngày đóng cửa không cần nhập giờ.</p>
+        </div>
+        <div class="text-end">
+            <a class="btn btn-outline-secondary sl-btn mb-2 d-block" href="/owner">Về khu vực chủ tiệm</a>
+            <span class="portal-timezone text-muted small"><i class="bi bi-globe-asia-australia"></i> Asia/Ho_Chi_Minh</span>
+        </div>
+    </div>
+    <div class="sl-card p-4 shadow-sm">
+        <form id="hours-form" class="portal-panel">
+            <div id="hours-list" class="mb-4"></div>
+            <div id="hours-result" class="alert d-none sl-alert" role="alert"></div>
+            <button class="btn btn-primary sl-btn sl-btn-primary" type="submit"><i class="bi bi-check2-circle me-2"></i>Lưu cấu hình</button>
+        </form>
+    </div>
 </div>
 
 @section Scripts {

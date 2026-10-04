@@ -1,0 +1,55 @@
+/* ============================================================
+   Luminol Catalog CSS – Public Service Listing
+   Used by _CatalogLayout.cshtml
+   ============================================================ */
+
+/* Ensures the catalog body has good defaults */
+body.sl-body .catalog-header,
+.sl-catalog-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255, 255, 255, .96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid #E5E7EB;
+    box-shadow: 0 1px 4px rgba(30, 41, 59, .06);
+}
+
+/* Legacy catalog nav (kept for _CatalogLayout compatibility) */
+.catalog-nav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    height: 64px;
+}
+
+.catalog-nav .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1A1A2E;
+    font-weight: 700;
+    font-size: 17px;
+    font-family: 'Playfair Display', Georgia, serif;
+    text-decoration: none;
+}
+
+.catalog-nav a:not(.brand) {
+    color: #6B7280;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color .18s;
+}
+
+.catalog-nav a:not(.brand):hover { color: #3B5BDB; }
+
+@media (max-width: 600px) {
+    .sl-catalog-nav { flex-wrap: wrap; height: auto; gap: 12px; padding: 12px 16px; }
+    .sl-catalog-nav-links { order: 3; flex-basis: 100%; flex-wrap: wrap; gap: 12px; }
+    .sl-catalog-nav-links a { white-space: normal; }
+}

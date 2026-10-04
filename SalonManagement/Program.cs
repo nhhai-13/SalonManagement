@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpContextAccessor();
 // =====================================
 // LOGGING
 // =====================================
@@ -32,14 +33,8 @@ var connectionString =
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (builder.Configuration["DatabaseProvider"] == "Sqlite")
-    {
-        options.UseSqlite(connectionString);
-    }
-    else
-    {
-        options.UseSqlServer(connectionString);
-    }
+    options.UseSqlServer(connectionString, sqlServerOptions =>
+        sqlServerOptions.EnableRetryOnFailure());
 });
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -50,7 +45,7 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 {
-    options.SignIn.RequireConfirmedAccount = false;
+    options.SignIn.RequireConfirmedAccount = true;
 
     options.Password.RequiredLength = 8;
     options.Password.RequireDigit = true;
@@ -59,7 +54,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
     options.Password.RequireNonAlphanumeric = false;
 
     options.Lockout.AllowedForNewUsers = true;
-    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.MaxFailedAccessAttempts = LoginLockoutPolicy.MaxFailedAttempts;
     options.Lockout.DefaultLockoutTimeSpan =
         TimeSpan.FromMinutes(15);
 })
@@ -81,7 +76,7 @@ builder.Services.Configure<DataProtectionTokenProviderOptions>(
 // DATA PROTECTION
 // =====================================
 
-if (builder.Environment.IsDevelopment())
+if (builder.Environment.IsDevelopment() || builder.Environment.IsStaging())
 {
     builder.Services.AddDataProtection()
         .PersistKeysToFileSystem(
@@ -90,7 +85,7 @@ if (builder.Environment.IsDevelopment())
                     builder.Environment.ContentRootPath,
                     ".keys")))
         .SetApplicationName(
-            "SalonManagement.Development");
+            $"SalonManagement.{builder.Environment.EnvironmentName}");
 }
 
 // =====================================
@@ -99,11 +94,13 @@ if (builder.Environment.IsDevelopment())
 
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme =
-        JwtBearerDefaults.AuthenticationScheme;
-
-    options.DefaultChallengeScheme =
-        JwtBearerDefaults.AuthenticationScheme;
+    // The application issues JWTs (and mirrors the access token into an
+    // HttpOnly cookie for page navigations). AddDefaultIdentity registers its
+    // application cookie as the default scheme, so explicitly select bearer
+    // authentication for every protected MVC/API endpoint.
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(options =>
 {
@@ -130,29 +127,35 @@ builder.Services.AddAuthentication(options =>
         };
     options.Events = new JwtBearerEvents
     {
+        // Browser page navigations cannot attach an Authorization header.
+        // Accept the same JWT from the secure HttpOnly cookie issued at login.
+        OnMessageReceived = context =>
+        {
+            if (string.IsNullOrWhiteSpace(context.Token) &&
+                !context.Request.Headers.ContainsKey("Authorization") &&
+                context.Request.Cookies.TryGetValue("salon.accessToken", out var cookieToken))
+            {
+                context.Token = cookieToken;
+            }
+
+            return Task.CompletedTask;
+        },
         OnTokenValidated = async context =>
         {
-            var userId =
-                context.Principal?.FindFirstValue(
-                    JwtRegisteredClaimNames.Sub);
-
-            var userManager =
-                context.HttpContext.RequestServices
-                    .GetRequiredService<
-                        UserManager<ApplicationUser>>();
-
-            var user = userId is null
-                ? null
-                : await userManager.FindByIdAsync(userId);
-
-            if (user is null || !user.IsActive)
-            {
-                context.Fail("Account is inactive.");
-            }
+            var validator = context.HttpContext.RequestServices.GetRequiredService<SessionPrincipalValidator>();
+            if (context.Principal == null || !await validator.ValidateAsync(context.Principal))
+                context.Fail("Session has been revoked or account is inactive.");
         },
         OnChallenge = async context =>
         {
             context.HandleResponse();
+            if (context.Request.Headers.Accept.ToString()
+                    .Contains("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Redirect("/admin/login");
+                return;
+            }
+
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             context.Response.ContentType = "application/json; charset=utf-8";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new
@@ -163,6 +166,13 @@ builder.Services.AddAuthentication(options =>
         },
         OnForbidden = async context =>
         {
+            if (context.Request.Headers.Accept.ToString()
+                    .Contains("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Redirect("/access-denied");
+                return;
+            }
+
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             context.Response.ContentType = "application/json; charset=utf-8";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new
@@ -179,22 +189,31 @@ builder.Services.AddAuthentication(options =>
 // =====================================
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<StylistAvailabilityService>();
 
 builder.Services.AddScoped<
     ITokenService,
     TokenService>();
 
 builder.Services.AddMemoryCache();
+builder.Services.AddResponseCompression();
 
 builder.Services.AddScoped<
     IEmailService,
     EmailService>();
 
+builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
+
 builder.Services.AddSingleton<
     IPasswordResetRateLimiter,
     PasswordResetRateLimiter>();
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<AppointmentBookingService>();
+
+builder.Services.AddScoped<SessionPrincipalValidator>();
+builder.Services.AddScoped<AvailabilityService>();
+builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
 
 // =====================================
 // BUILD APPLICATION
@@ -203,19 +222,16 @@ builder.Services.AddControllersWithViews();
 var app = builder.Build();
 
 // =====================================
-// SQLITE DATABASE INITIALIZATION
+// DATABASE MIGRATION
 // =====================================
 
-if (builder.Configuration["DatabaseProvider"] == "Sqlite")
+await using (var scope = app.Services.CreateAsyncScope())
 {
-    await using var scope =
-        app.Services.CreateAsyncScope();
-
     var dbContext =
         scope.ServiceProvider
             .GetRequiredService<ApplicationDbContext>();
 
-    await dbContext.Database.EnsureCreatedAsync();
+    await dbContext.Database.MigrateAsync();
 }
 
 // =====================================
@@ -233,7 +249,11 @@ else
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseResponseCompression();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context => context.Context.Response.Headers.CacheControl = "public,max-age=3600"
+});
 
 // =====================================
 // REDIRECT DEFAULT IDENTITY PAGES
@@ -322,6 +342,12 @@ using (var scope = app.Services.CreateScope())
     await SeedData.SeedAsync(
         dbContext,
         userManager);
+    if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
+    {
+        var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;
+        await StylistBookingDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
+        await StylistAssignmentDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
+    }
 }
 
 // =====================================
@@ -329,3 +355,4 @@ using (var scope = app.Services.CreateScope())
 // =====================================
 
 app.Run();
+

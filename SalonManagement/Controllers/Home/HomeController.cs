@@ -1,0 +1,67 @@
+using Microsoft.AspNetCore.Mvc;
+using SalonManagement.Models;
+using SalonManagement.Models.ViewModels;
+using SalonManagement.Data;
+using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
+
+namespace SalonManagement.Controllers
+{
+    public class HomeController : Controller
+    {
+        private readonly ILogger<HomeController> _logger;
+        private readonly ApplicationDbContext _dbContext;
+
+        public HomeController(ILogger<HomeController> logger, ApplicationDbContext dbContext)
+        {
+            _logger = logger;
+            _dbContext = dbContext;
+        }
+
+        public async Task<IActionResult> Index()
+        {
+            var model = new HomeViewModel
+            {
+                BusinessHours = await _dbContext.BusinessHours.AsNoTracking().OrderBy(h => h.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)h.DayOfWeek).ToListAsync(),
+                Services = await _dbContext.Services.AsNoTracking()
+                    .Include(service => service.ServiceGroup)
+                    .Where(service => service.IsActive && service.Stylists.Any(link => link.Stylist.IsActive))
+                    .OrderBy(service => service.ServiceGroupId == null)
+                    .ThenBy(service => service.ServiceGroup!.DisplayOrder)
+                    .ThenBy(service => service.ServiceGroupId)
+                    .ThenBy(service => service.ServiceName).ToListAsync(),
+                Stylists = await _dbContext.Stylists.AsNoTracking().Where(stylist => stylist.IsActive).OrderBy(stylist => stylist.FullName).Take(3).ToListAsync()
+            };
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult QuickBooking(string? phone, string? serviceId)
+        {
+            var normalized = SalonManagement.Services.BookingService.NormalizePhone(phone);
+            if (normalized == null) return BadRequest(new { message = "Số điện thoại không hợp lệ." });
+            TempData["BookingPhone"] = normalized;
+            return Redirect(int.TryParse(serviceId, out var id) && id > 0
+                ? $"/booking/select-services?serviceId={id}" : "/booking/select-services");
+        }
+
+        public IActionResult Privacy()
+        {
+            return View();
+        }
+
+        [HttpGet("/access-denied")]
+        public IActionResult AccessDenied()
+        {
+            return View();
+        }
+
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error()
+        {
+            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+    }
+}
+
