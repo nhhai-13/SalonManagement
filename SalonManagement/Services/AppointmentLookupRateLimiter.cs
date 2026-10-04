@@ -15,7 +15,7 @@ public sealed class AppointmentLookupRateLimiter(TimeProvider timeProvider)
         lock (Gate)
         {
             if (Blocks.TryGetValue(ipAddress, out var retryAt) && retryAt > timeProvider.GetUtcNow()) return new(true, retryAt);
-            Blocks.TryRemove(ipAddress, out _); Failures.TryRemove(ipAddress, out _);
+            if (Blocks.TryRemove(ipAddress, out _)) Failures.TryRemove(ipAddress, out _);
             return new(false, null);
         }
     }

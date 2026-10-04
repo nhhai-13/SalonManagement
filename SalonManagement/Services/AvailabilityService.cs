@@ -16,6 +16,9 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
         var services = await db.Services.AsNoTracking().Where(s => s.IsActive && serviceIds.Contains(s.ServiceId)).ToListAsync();
         if (services.Count != serviceIds.Distinct().Count()) return new AvailabilityResult(0, []);
         var duration = services.Sum(s => s.DurationMinutes);
+        if (await db.ShopHolidays.AnyAsync(h => h.HolidayDate == DateOnly.FromDateTime(date)))
+            return new AvailabilityResult(duration, []);
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(t => t.OffDate == DateOnly.FromDateTime(date)).ToListAsync();
         var requiredIds = serviceIds.Distinct().ToHashSet();
         var candidates = await db.Stylists.AsNoTracking().Where(s => s.IsActive)
             .Include(s => s.Services)
@@ -29,7 +32,7 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
         var eligible = candidates.Where(s => !daysOff.Contains(s.StylistId) && requiredIds.All(id => s.Services.Any(skill => skill.ServiceId == id))).ToList();
         var appointments = await db.Appointments.AsNoTracking().Where(a => a.AppointmentDate == date.Date && a.Status != "Cancelled" && a.Status != "NoShow").ToListAsync();
         var slots = eligible.SelectMany(stylist => stylist.WorkSchedules.SelectMany(shift => SlotsForShift(shift, duration, opensAt, closesAt)
-                .Where(slot => !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime) && !breaks.Where(b => b.StylistId == stylist.StylistId).Any(b => b.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < b.EndTime))))
+                .Where(slot => !timeOffs.Any(t => t.StylistId == stylist.StylistId && (t.IsFullDay || (t.StartTime.HasValue && t.EndTime.HasValue && t.StartTime.Value.ToTimeSpan() < slot + TimeSpan.FromMinutes(duration) && slot < t.EndTime.Value.ToTimeSpan()))) && !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime) && !breaks.Where(b => b.StylistId == stylist.StylistId).Any(b => b.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < b.EndTime))))
             .Distinct().OrderBy(time => time).ToList();
 
         var now = SalonClock.GetLocalNow(timeProvider);

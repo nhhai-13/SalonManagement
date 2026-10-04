@@ -27,17 +27,26 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
         if (phone is null) errors["phone"] = "Số điện thoại phải gồm đúng 10 chữ số.";
         if (!string.IsNullOrWhiteSpace(request.Email) && !new EmailAddressAttribute().IsValid(request.Email.Trim())) errors["email"] = "Email không đúng định dạng.";
         if ((request.Notes?.Length ?? 0) > 300) errors["notes"] = "Ghi chú không được vượt quá 300 ký tự.";
-        if (request.ServiceIds.Count == 0) errors["services"] = "Vui lòng chọn ít nhất một dịch vụ.";
-        if (errors.Count > 0) return BookingCreationResult.Invalid(errors);
+        if (request.ServiceIds is null || request.ServiceIds.Count == 0) errors["services"] = "Vui lòng chọn ít nhất một dịch vụ.";
+        if (request.ServiceIds is not null && request.ServiceIds.Distinct().Count() > 5)
+            errors["services"] = "Chỉ được chọn tối đa 5 dịch vụ.";
+        if (errors.Count > 0 || request.ServiceIds is null) return BookingCreationResult.Invalid(errors);
         if (request.Date.Date < SalonClock.GetLocalNow(timeProvider).Date) return BookingCreationResult.Rejected("past_date", "Ngày hẹn không hợp lệ.");
 
+        if (request.StartTime < TimeSpan.Zero || request.StartTime >= TimeSpan.FromDays(1))
+            return BookingCreationResult.Rejected("slot_unavailable", "Giờ hẹn không hợp lệ.");
+        if (request.Date.Date.Add(request.StartTime) < SalonClock.GetLocalNow(timeProvider).AddHours(1))
+            return BookingCreationResult.Rejected("slot_unavailable", "Vui lòng đặt lịch trước ít nhất 60 phút.");
         var services = await db.Services.Where(item => item.IsActive && request.ServiceIds.Contains(item.ServiceId)).ToListAsync();
         if (services.Count != request.ServiceIds.Distinct().Count()) return BookingCreationResult.Rejected("invalid_services", "Dịch vụ đã chọn không còn khả dụng.");
         var endTime = request.StartTime.Add(TimeSpan.FromMinutes(services.Sum(item => item.DurationMinutes)));
         var stylists = await db.Stylists.Where(item => item.IsActive).Include(item => item.Services).Include(item => item.WorkSchedules.Where(schedule => schedule.WorkDate == request.Date.Date)).ToListAsync();
         var required = request.ServiceIds.Distinct().ToHashSet();
         var appointments = await db.Appointments.Where(item => item.AppointmentDate == request.Date.Date && item.Status != "Cancelled" && item.Status != "NoShow").ToListAsync();
-        var stylist = stylists.FirstOrDefault(candidate => required.All(serviceId => candidate.Services.Any(skill => skill.ServiceId == serviceId)) && candidate.WorkSchedules.Any(schedule => schedule.StartTime <= request.StartTime && endTime <= schedule.EndTime) && !appointments.Where(item => item.StylistId == candidate.StylistId).Any(item => item.StartTime < endTime && request.StartTime < item.EndTime));
+        var timeOffsForDate = await db.StylistTimeOffs.Where(t => t.OffDate == DateOnly.FromDateTime(request.Date)).ToListAsync();
+        var offIds = await db.StylistDaysOff.Where(t => t.OffDate == request.Date.Date).Select(t => t.StylistId).ToListAsync();
+        var breaksForDate = await db.StylistBreaks.Where(t => t.BreakDate == request.Date.Date && t.StartTime < endTime && request.StartTime < t.EndTime).Select(t => t.StylistId).ToListAsync();
+        var stylist = stylists.FirstOrDefault(candidate => !offIds.Contains(candidate.StylistId) && !breaksForDate.Contains(candidate.StylistId) && !timeOffsForDate.Any(t => t.StylistId == candidate.StylistId && (t.IsFullDay || (t.StartTime.HasValue && t.EndTime.HasValue && t.StartTime.Value.ToTimeSpan() < endTime && request.StartTime < t.EndTime.Value.ToTimeSpan()))) && required.All(serviceId => candidate.Services.Any(skill => skill.ServiceId == serviceId)) && candidate.WorkSchedules.Any(schedule => schedule.StartTime <= request.StartTime && endTime <= schedule.EndTime) && !appointments.Where(item => item.StylistId == candidate.StylistId).Any(item => item.StartTime < endTime && request.StartTime < item.EndTime));
         if (stylist is null) return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác.");
 
         await ConfirmationLock.WaitAsync();
@@ -45,6 +54,14 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
         {
             // The availability query above is only a preview. Re-check after taking the
             // booking lock so a competing request cannot commit the same interval.
+            var validSlots = await new AvailabilityService(db, timeProvider).GetSlotsAsync(request.Date.Date, request.ServiceIds);
+            if (!validSlots.Slots.Contains(request.StartTime))
+                return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ không còn khả dụng. Vui lòng chọn giờ khác.");
+            var timeOffs = await db.StylistTimeOffs.Where(t => t.StylistId == stylist.StylistId && t.OffDate == DateOnly.FromDateTime(request.Date)).ToListAsync();
+            var legacyDayOff = await db.StylistDaysOff.AnyAsync(t => t.StylistId == stylist.StylistId && t.OffDate == request.Date.Date);
+            var legacyBreak = await db.StylistBreaks.AnyAsync(t => t.StylistId == stylist.StylistId && t.BreakDate == request.Date.Date && t.StartTime < endTime && request.StartTime < t.EndTime);
+            if (legacyDayOff || legacyBreak || timeOffs.Any(t => t.IsFullDay || (t.StartTime.HasValue && t.EndTime.HasValue && t.StartTime.Value.ToTimeSpan() < endTime && request.StartTime < t.EndTime.Value.ToTimeSpan())))
+                return BookingCreationResult.Rejected("slot_unavailable", "Thợ không làm việc trong khung giờ này.");
             var collisionExists = await db.Appointments.AnyAsync(item =>
                 item.StylistId == stylist.StylistId &&
                 item.AppointmentDate == request.Date.Date &&
