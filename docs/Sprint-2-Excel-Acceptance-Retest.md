@@ -30,3 +30,12 @@ Kiểm thử tự động: **235/235 đạt**, gồm cả test ngoài Sprint 2. 
 Đã bổ sung `/owner/holidays`, chỉ tài khoản Owner truy cập, có lối vào từ khu vực chủ tiệm và menu quản lý salon. Form gồm khoảng ngày, lý do, danh sách ngày nghỉ và danh sách lịch bị ảnh hưởng với checkbox xác nhận. Thay đổi ngày/lý do xóa xác nhận cũ; khóa nhập và nút lưu trong lúc gửi yêu cầu. Dữ liệu từ API hiển thị bằng textContent.
 
 Build thành công, không warning/error. Kiểm tra trình duyệt với tài khoản Owner trên database riêng: cảnh báo bảy lịch ngày 05/10 trước khi lưu; đổi sang 01–02/01/2031 xóa cảnh báo cũ; lưu thành công hai ngày và danh sách cập nhật. Truy cập khi chưa đăng nhập chuyển đến trang đăng nhập. Đây là kiểm tra form bổ sung; không chạy lại toàn bộ 235 test vì backend nghiệp vụ không đổi.
+
+## Kiểm tra tiếp form (05/10/2026)
+
+- Không tích xác nhận: form chặn lưu và yêu cầu xác nhận.
+- Tích xác nhận: lưu thành công ngày nghỉ 05/10 trên database kiểm thử riêng, giữ nguyên các lịch đã có.
+- Tạo ngày trùng: hiển thị thông báo khoảng ngày có ngày nghỉ đã thiết lập.
+- Màn hình 360px: scrollWidth 345px, không tràn ngang; hai phần form/danh sách xếp dọc.
+- Bổ sung kiểm tra lý do chỉ có khoảng trắng và khoảng ngày vượt 366 ngày ngay trên form; cả hai thông báo đã kiểm tra trên trình duyệt.
+- Chạy lại 235 test: tất cả đạt, không skip. Bằng chứng local: TestResults/holiday-form-retest.trx. Có cảnh báo NU1900 do không truy cập được feed kiểm tra lỗ hổng NuGet; không có lỗi test.

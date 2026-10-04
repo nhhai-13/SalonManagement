@@ -34,6 +34,8 @@
     form.addEventListener('submit', async event => {
         event.preventDefault(); if (busy || !form.reportValidity()) return;
         if (end.value < start.value) { feedback.textContent = 'Ngày kết thúc phải từ ngày bắt đầu trở đi.'; return; }
+        if ((Date.parse(end.value) - Date.parse(start.value)) / 86400000 > 365) { feedback.textContent = 'Khoảng nghỉ tối đa 366 ngày, bao gồm ngày bắt đầu và kết thúc.'; return; }
+        if (!reason.value.trim()) { feedback.textContent = 'Vui lòng nhập lý do nghỉ, không chỉ nhập khoảng trắng.'; reason.focus(); return; }
         if (!warning.hidden && !confirmation.checked) { feedback.textContent = 'Vui lòng xác nhận đã kiểm tra các lịch bị ảnh hưởng.'; return; }
         busy = true; save.disabled = true;
         [start, end, reason, confirmation].forEach(input => input.disabled = true);
