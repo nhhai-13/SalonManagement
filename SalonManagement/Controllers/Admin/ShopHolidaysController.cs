@@ -44,6 +44,14 @@ public class ShopHolidaysController : ControllerBase
             });
         }
 
+        var day = request.HolidayDate.ToDateTime(TimeOnly.MinValue);
+        var nextDay = day.AddDays(1);
+        var affected = await _dbContext.Appointments.AsNoTracking()
+            .Where(a => a.AppointmentDate >= day && a.AppointmentDate < nextDay &&
+                (a.Status == "Pending" || a.Status == "Confirmed" || a.Status == "InProgress"))
+            .Select(a => new { a.AppointmentId, a.BookingReference, a.StartTime, a.EndTime }).ToListAsync();
+        if (affected.Count > 0)
+            return Conflict(new { message = "Ngày nghỉ trùng với lịch hẹn đang hoạt động. Vui lòng xử lý lịch hẹn trước khi tạo ngày nghỉ.", affectedAppointments = affected });
         var holiday = new ShopHoliday
         {
             HolidayDate = request.HolidayDate,

@@ -175,7 +175,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok) {
                 bookingResult.textContent = [data.message, ...Object.values(data.errors || {})].filter(Boolean).join(' ');
-                if (data.reloadSlots) { confirmedStylistId = null; customerDetails.hidden = true; }
+                if (data.reloadSlots) {
+                    await validateTime();
+                    slotMessage.textContent = `${data.message} ${slotMessage.textContent}`;
+                }
                 return;
             }
             succeeded = true;

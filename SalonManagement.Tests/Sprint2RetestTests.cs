@@ -11,6 +11,25 @@ namespace SalonManagement.Tests;
 
 public class Sprint2RetestTests
 {
+    [Fact]
+    public async Task HolidayCannotHideExistingActiveAppointment()
+    {
+        await using var db = Db();
+        db.Appointments.Add(new() { Customer = new() { FullName = "Test" }, Stylist = new() { FullName = "Stylist" },
+            AppointmentDate = new(2030, 1, 7), StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(11), Status = "Confirmed", BookingReference = "HOLTEST1" });
+        await db.SaveChangesAsync();
+        Assert.IsType<ConflictObjectResult>(await new ShopHolidaysController(db).Create(new() { HolidayDate = new(2030, 1, 7), Reason = "Holiday" }));
+        Assert.Empty(await db.ShopHolidays.ToListAsync()); Assert.Single(await db.Appointments.ToListAsync());
+    }
+
+    [Fact]
+    public void HomeOpeningHoursFollowConfiguration()
+    {
+        var model = new SalonManagement.Models.ViewModels.HomeViewModel { BusinessHours = [
+            new() { DayOfWeek = DayOfWeek.Monday, OpensAt = new(9, 0), ClosesAt = new(17, 0) },
+            new() { DayOfWeek = DayOfWeek.Sunday, IsClosed = true }] };
+        Assert.Equal(new[] { "Thứ 2: 09:00 – 17:00", "Chủ Nhật: Đóng cửa" }, model.OpeningHours);
+    }
     private static ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 

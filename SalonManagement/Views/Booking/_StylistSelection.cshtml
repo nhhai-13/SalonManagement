@@ -23,7 +23,7 @@
             <label for="booking-full-name" class="form-label">Họ tên</label>
             <input id="booking-full-name" class="form-control" autocomplete="name" required maxlength="100" />
             <label for="booking-phone" class="form-label mt-2">Số điện thoại</label>
-            <input id="booking-phone" type="tel" class="form-control" autocomplete="tel" required pattern="0[0-9]{9}" maxlength="10" placeholder="10 chữ số, bắt đầu bằng 0" />
+            <input id="booking-phone" type="tel" class="form-control" value="@ViewData["BookingPhone"]" autocomplete="tel" required pattern="0[0-9]{9}" maxlength="10" placeholder="10 chữ số, bắt đầu bằng 0" />
             <label for="booking-email" class="form-label mt-2">Email (không bắt buộc)</label>
             <input id="booking-email" type="email" class="form-control" autocomplete="email" />
             <label for="booking-notes" class="form-label mt-2">Ghi chú (không bắt buộc)</label>

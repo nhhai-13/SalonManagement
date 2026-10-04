@@ -60,6 +60,7 @@ public class BookingController : Controller
         }
 
         var viewModel = await _bookingService.GetSelectServicesViewModelAsync(preselected);
+        ViewData["BookingPhone"] = TempData["BookingPhone"];
         return View("~/Views/Booking/Index.cshtml", viewModel);
     }
 

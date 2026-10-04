@@ -22,6 +22,7 @@ namespace SalonManagement.Controllers
         {
             var model = new HomeViewModel
             {
+                BusinessHours = await _dbContext.BusinessHours.AsNoTracking().OrderBy(h => h.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)h.DayOfWeek).ToListAsync(),
                 Services = await _dbContext.Services.AsNoTracking()
                     .Include(service => service.ServiceGroup)
                     .Where(service => service.IsActive && service.Stylists.Any(link => link.Stylist.IsActive))
@@ -32,6 +33,17 @@ namespace SalonManagement.Controllers
                 Stylists = await _dbContext.Stylists.AsNoTracking().Where(stylist => stylist.IsActive).OrderBy(stylist => stylist.FullName).Take(3).ToListAsync()
             };
             return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult QuickBooking(string? phone, string? serviceId)
+        {
+            var normalized = SalonManagement.Services.BookingService.NormalizePhone(phone);
+            if (normalized == null) return BadRequest(new { message = "Số điện thoại không hợp lệ." });
+            TempData["BookingPhone"] = normalized;
+            return Redirect(int.TryParse(serviceId, out var id) && id > 0
+                ? $"/booking/select-services?serviceId={id}" : "/booking/select-services");
         }
 
         public IActionResult Privacy()
