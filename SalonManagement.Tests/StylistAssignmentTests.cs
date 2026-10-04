@@ -36,6 +36,29 @@ public class StylistAssignmentTests
             StartTime = TimeSpan.FromHours(hour), EndTime = TimeSpan.FromHours(hour) + TimeSpan.FromMinutes(minutes), Status = status });
 
     [Fact]
+    public async Task ShopHolidayRemovesAllStylistSlots()
+    {
+        await using var db = Db(); await Seed(db);
+        db.ShopHolidays.Add(new() { HolidayDate = Date, Reason = "Holiday" }); await db.SaveChangesAsync();
+        Assert.Empty(await Service(db).GetSlotsAsync([1],0,Date));
+    }
+    [Fact]
+    public async Task SpecificStylistTimeOffDoesNotRemoveOtherStylists()
+    {
+        await using var db = Db(); await Seed(db);
+        db.StylistTimeOffs.Add(new() { StylistId = 1, OffDate = Date, IsFullDay = true }); await db.SaveChangesAsync();
+        Assert.Empty(await Service(db).GetSlotsAsync([1],1,Date));
+        Assert.NotEmpty(await Service(db).GetSlotsAsync([1],0,Date));
+        Assert.NotEqual(1,(await Service(db).AssignAsync([1],0,Date,new(14,0)))!.StylistId);
+    }
+    [Fact]
+    public async Task InProgressAppointmentsCountTowardAssignmentLoad()
+    {
+        await using var db = Db(); await Seed(db);
+        Book(db,1,9,"InProgress"); await db.SaveChangesAsync();
+        Assert.Equal(2,(await Service(db).AssignAsync([1],0,Date,new(14,0)))!.StylistId);
+    }
+    [Fact]
     public async Task ThreeFreeStylists_ChoosesFewestAppointments_AndRecomputesAfterChanges()
     {
         await using var db = Db(); await Seed(db);

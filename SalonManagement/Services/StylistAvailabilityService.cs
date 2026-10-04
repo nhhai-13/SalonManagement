@@ -17,7 +17,7 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     private async Task<List<Service>> SelectedServices(IEnumerable<int> serviceIds)
     {
         var ids = serviceIds.Distinct().ToArray();
-        if (ids.Length == 0 || ids.Any(id => id <= 0))
+        if (ids.Length == 0 || ids.Length > 5 || ids.Any(id => id <= 0))
             throw new ArgumentException("Vui lòng chọn dịch vụ hợp lệ.");
         var services = await db.Services.AsNoTracking()
             .Where(s => ids.Contains(s.ServiceId) && s.IsActive).ToListAsync();
@@ -53,13 +53,13 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var candidateIds = candidates.Select(s => s.StylistId).Distinct().ToArray();
         var day = date.ToDateTime(TimeOnly.MinValue);
         var nextDay = day.AddDays(1);
-        // Proposed PO policy: appointment count, Pending + Confirmed, stable ID tie-break.
+        // Rank active appointments for the day, with a stable ID tie-break.
         var ranked = await db.Stylists.AsNoTracking().Where(s => candidateIds.Contains(s.StylistId) && s.IsActive)
             .Select(s => new
             {
                 s.StylistId, s.FullName,
                 Count = s.Appointments.Count(a => a.AppointmentDate >= day && a.AppointmentDate < nextDay &&
-                    (a.Status == "Pending" || a.Status == "Confirmed"))
+                    (a.Status == "Pending" || a.Status == "Confirmed" || a.Status == "InProgress"))
             }).OrderBy(s => s.Count).ThenBy(s => s.StylistId).FirstOrDefaultAsync();
         if (ranked == null) return null;
         var slot = candidates.First(s => s.StylistId == ranked.StylistId);
@@ -85,6 +85,10 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var now = SalonNow;
         if (day < now.Date || date == DateOnly.MaxValue) return [];
         var nextDay = day.AddDays(1);
+        if (await db.ShopHolidays.AnyAsync(h => h.HolidayDate == date)) return [];
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(t => t.OffDate == date).ToListAsync();
+        var daysOff = await db.StylistDaysOff.Where(t => t.OffDate == day).Select(t => t.StylistId).ToListAsync();
+        var breaks = await db.StylistBreaks.AsNoTracking().Where(t => t.BreakDate == day).ToListAsync();
         var hours = await db.BusinessHours.AsNoTracking().SingleOrDefaultAsync(h => h.DayOfWeek == day.DayOfWeek);
         if (hours == null || hours.IsClosed || hours.OpensAt == null || hours.ClosesAt == null) return [];
         var open = hours.OpensAt.Value.ToTimeSpan();
@@ -94,7 +98,7 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
             s.WorkDate >= day && s.WorkDate < nextDay && s.Status == "Working")
             .OrderBy(s => s.StartTime).Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync();
         var busy = await db.Appointments.AsNoTracking().Where(a => qualifiedIds.Contains(a.StylistId) &&
-            a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled")
+            a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled" && a.Status != "NoShow" && a.Status != "Completed")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
 
         var duration = services.Sum(s => (long)s.DurationMinutes);
@@ -105,6 +109,7 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         // Calculate each stylist independently: never stitch two people's free time together.
         foreach (var stylistShifts in shifts.GroupBy(s => s.StylistId))
         {
+            if (daysOff.Contains(stylistShifts.Key)) continue;
             var stylistBusy = busyByStylist[stylistShifts.Key].ToList();
 
             // Union overlapping/adjacent shifts, but never bridge a break.
@@ -125,7 +130,9 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
                 for (var start = first; start + length <= window.End; start += TimeSpan.FromMinutes(15))
                 {
                     var end = start + length;
-                    if (day + start <= now || stylistBusy.Any(a => start < a.EndTime && end > a.StartTime)) continue;
+                    if (day + start < now.AddHours(1) || stylistBusy.Any(a => start < a.EndTime && end > a.StartTime)) continue;
+                    if (breaks.Any(b => b.StylistId == stylistShifts.Key && b.StartTime < end && start < b.EndTime)) continue;
+                    if (timeOffs.Any(t => t.StylistId == stylistShifts.Key && (t.IsFullDay || (t.StartTime.HasValue && t.EndTime.HasValue && t.StartTime.Value.ToTimeSpan() < end && start < t.EndTime.Value.ToTimeSpan())))) continue;
                     slots.Add(new(stylistShifts.Key, start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
                 }
             }
