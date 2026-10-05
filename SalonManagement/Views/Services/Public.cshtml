@@ -1,10 +1,24 @@
 @model SalonManagement.Models.ViewModels.PublicServiceCatalog
-@{ ViewData["Title"] = "Dịch vụ"; }
+@{ ViewData["Title"] = "Dịch vụ"; Layout = "_CatalogLayout"; }
 <div class="container my-4">
     <h1>Dịch vụ của salon</h1>
+    <form method="get" asp-controller="Services" asp-action="Public" role="search" class="mb-4">
+        <label for="service-search" class="form-label">Tìm theo tên dịch vụ</label>
+        <div class="d-flex flex-wrap gap-2">
+            <input type="search" id="service-search" name="search" value="@Model.Search"
+                   class="form-control" placeholder="Ví dụ: cat toc, goi" />
+            <button type="submit" class="btn btn-primary">Tìm kiếm</button>
+            @if (!string.IsNullOrEmpty(Model.Search))
+            {
+                <a asp-controller="Services" asp-action="Public" class="btn btn-outline-secondary">Xóa từ khóa</a>
+            }
+        </div>
+    </form>
     @if (!Model.HasServices)
     {
-        <p role="status">Chưa có dịch vụ nào để hiển thị.</p>
+        <p role="status">@(string.IsNullOrEmpty(Model.Search)
+            ? "Chưa có dịch vụ nào để hiển thị."
+            : "Không tìm thấy dịch vụ phù hợp.")</p>
     }
     @if (Model.Groups.Count > 0)
     {

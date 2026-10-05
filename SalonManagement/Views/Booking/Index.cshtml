@@ -251,8 +251,8 @@
 
                             <!-- Submit / Continue Button -->
                             <div class="d-grid gap-2">
-                                <button type="submit" id="btn-submit-booking" class="btn btn-primary btn-lg fw-semibold" @(Model.Totals.SelectedServices.Count == 0 ? "disabled" : "")>
-                                    Tiếp tục đặt lịch <i class="bi bi-arrow-right ms-1"></i>
+                                <button type="button" id="btn-submit-booking" class="btn btn-primary btn-lg fw-semibold" @(Model.Totals.SelectedServices.Count == 0 ? "disabled" : "")>
+                                    Chọn thợ và giờ <i class="bi bi-arrow-right ms-1"></i>
                                 </button>
                                 <button type="button" id="btn-clear-all" class="btn btn-sm btn-link text-muted text-decoration-none @(Model.Totals.SelectedServices.Count == 0 ? "d-none" : "")">
                                     <i class="bi bi-trash3 me-1"></i>Bỏ chọn tất cả
@@ -262,11 +262,13 @@
                     </div>
                 </div>
             </div>
+            <partial name="_StylistSelection" />
         </form>
     }
 </div>
 
 @section Scripts {
+    <script src="~/js/booking-stylist.js" asp-append-version="true" defer></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const form = document.getElementById("booking-form");
@@ -384,7 +386,10 @@
             }
 
             // Recalculate and update UI (Client-Side Instant + Server Verification)
+            let totalsVersion = 0;
             async function updateTotals() {
+                const currentVersion = ++totalsVersion;
+                document.dispatchEvent(new Event("booking:services-changed"));
                 const selectedBoxes = checkboxes.filter(cb => cb.checked);
                 const selectedIds = selectedBoxes.map(cb => parseInt(cb.value, 10));
 
@@ -426,6 +431,7 @@
 
                     if (response.ok) {
                         const serverData = await response.json();
+                        if (currentVersion !== totalsVersion) return;
                         renderSummary(
                             serverData.selectedServices.length,
                             serverData.totalDurationMinutes,
