@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using SalonManagement.Controllers.Reception;
 using SalonManagement.Data;
 using SalonManagement.Models;
 using SalonManagement.Models.ViewModels.Appointments;
+using SalonManagement.Services;
 using SalonManagement.Services.Appointments;
 using Xunit;
 
@@ -625,5 +628,240 @@ public class AppointmentRescheduleServiceTests
         Assert.Equal("Lễ tân 2", history[0].ModifiedByUserName);
         Assert.Equal("Lễ tân 1", history[1].ModifiedByUserName);
         Assert.True(history[0].ChangedAtUtc > history[1].ChangedAtUtc);
+    }
+
+    [Fact]
+    public async Task RescheduleEmailQueue_EnqueueAndDequeue_SuccessfullyProcessesMessage()
+    {
+        // Arrange
+        var queue = new AppointmentRescheduleEmailQueue();
+        var msg = new RescheduleEmailMessage
+        {
+            AppointmentId = 101,
+            CustomerEmail = "khach@test.com",
+            CustomerName = "Trần Thị Khách",
+            StylistName = "Thợ Chính",
+            AppointmentDate = DateTime.Today.AddDays(1),
+            StartTime = new TimeSpan(10, 0, 0),
+            EndTime = new TimeSpan(11, 0, 0),
+            ServicesSummary = "Cắt tóc nữ"
+        };
+
+        // Act
+        await queue.EnqueueAsync(msg);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        var dequeued = await queue.DequeueAsync(cts.Token);
+
+        // Assert
+        Assert.NotNull(dequeued);
+        Assert.Equal(101, dequeued.AppointmentId);
+        Assert.Equal("khach@test.com", dequeued.CustomerEmail);
+        Assert.Equal("Trần Thị Khách", dequeued.CustomerName);
+    }
+
+    [Fact]
+    public async Task RescheduleEmailQueue_EnqueueEmptyEmail_SkipsSafely()
+    {
+        // Arrange
+        var queue = new AppointmentRescheduleEmailQueue();
+        var emptyEmailMsg = new RescheduleEmailMessage
+        {
+            AppointmentId = 102,
+            CustomerEmail = "", // Không có email
+            CustomerName = "Khách Lẻ Không Email"
+        };
+
+        // Act
+        await queue.EnqueueAsync(emptyEmailMsg);
+
+        // Assert - hàng đợi phải rỗng
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            await queue.DequeueAsync(cts.Token);
+        });
+    }
+
+    [Fact]
+    public async Task RescheduleAppointment_WhenCustomerHasEmail_EnqueuesEmailNotification()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDbContext();
+
+        var svc = new Service { ServiceId = 1, ServiceName = "Gội đầu", DurationMinutes = 30, Price = 80000m, IsActive = true };
+        db.Services.Add(svc);
+
+        var stylist = new Stylist { StylistId = 1, FullName = "Thợ Chuyên Nghiệp", IsActive = true };
+        db.Stylists.Add(stylist);
+        db.StylistServices.Add(new StylistService { StylistId = 1, ServiceId = 1 });
+
+        var date = DateTime.Today.AddDays(1);
+        db.WorkSchedules.Add(new WorkSchedule { WorkScheduleId = 1, StylistId = 1, WorkDate = date, StartTime = new TimeSpan(8, 0, 0), EndTime = new TimeSpan(18, 0, 0), Status = "Working" });
+
+        var customer = new Customer { CustomerId = 1, FullName = "Nguyễn Văn Có Email", Email = "nguyenvan@gmail.com", Phone = "0900000001" };
+        db.Customers.Add(customer);
+
+        var appt = new Appointment
+        {
+            AppointmentId = 110,
+            CustomerId = 1,
+            StylistId = 1,
+            AppointmentDate = date,
+            StartTime = new TimeSpan(9, 0, 0),
+            EndTime = new TimeSpan(9, 30, 0),
+            Status = "Confirmed"
+        };
+        db.Appointments.Add(appt);
+        db.AppointmentServices.Add(new AppointmentService { AppointmentServiceId = 1, AppointmentId = 110, ServiceId = 1, DurationMinutes = 30, Price = 80000m });
+        await db.SaveChangesAsync();
+
+        var fakeQueue = new FakeRescheduleEmailQueue();
+        var service = new AppointmentRescheduleService(db, fakeQueue);
+
+        // Act
+        var request = new RescheduleAppointmentRequest
+        {
+            NewStylistId = 1,
+            NewDate = date,
+            NewStartTime = new TimeSpan(11, 0, 0),
+            Reason = "Đổi sang buổi trưa"
+        };
+
+        var result = await service.RescheduleAppointmentAsync(110, request, "user1", "letan1");
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Single(fakeQueue.EnqueuedMessages);
+        var enqueued = fakeQueue.EnqueuedMessages[0];
+        Assert.Equal(110, enqueued.AppointmentId);
+        Assert.Equal("nguyenvan@gmail.com", enqueued.CustomerEmail);
+        Assert.Equal("Nguyễn Văn Có Email", enqueued.CustomerName);
+        Assert.Equal(new TimeSpan(11, 0, 0), enqueued.StartTime);
+    }
+
+    [Fact]
+    public async Task RescheduleAppointment_WhenCustomerHasNoEmail_SkipsSafelyWithoutError()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDbContext();
+
+        var svc = new Service { ServiceId = 1, ServiceName = "Cắt tóc", DurationMinutes = 30, Price = 70000m, IsActive = true };
+        db.Services.Add(svc);
+
+        var stylist = new Stylist { StylistId = 1, FullName = "Thợ A", IsActive = true };
+        db.Stylists.Add(stylist);
+        db.StylistServices.Add(new StylistService { StylistId = 1, ServiceId = 1 });
+
+        var date = DateTime.Today.AddDays(1);
+        db.WorkSchedules.Add(new WorkSchedule { WorkScheduleId = 1, StylistId = 1, WorkDate = date, StartTime = new TimeSpan(8, 0, 0), EndTime = new TimeSpan(18, 0, 0), Status = "Working" });
+
+        var customer = new Customer { CustomerId = 2, FullName = "Khách Không Email", Email = null, Phone = "0900000002" };
+        db.Customers.Add(customer);
+
+        var appt = new Appointment
+        {
+            AppointmentId = 120,
+            CustomerId = 2,
+            StylistId = 1,
+            AppointmentDate = date,
+            StartTime = new TimeSpan(9, 0, 0),
+            EndTime = new TimeSpan(9, 30, 0),
+            Status = "Confirmed"
+        };
+        db.Appointments.Add(appt);
+        db.AppointmentServices.Add(new AppointmentService { AppointmentServiceId = 1, AppointmentId = 120, ServiceId = 1, DurationMinutes = 30, Price = 70000m });
+        await db.SaveChangesAsync();
+
+        var fakeQueue = new FakeRescheduleEmailQueue();
+        var service = new AppointmentRescheduleService(db, fakeQueue);
+
+        // Act
+        var request = new RescheduleAppointmentRequest
+        {
+            NewStylistId = 1,
+            NewDate = date,
+            NewStartTime = new TimeSpan(13, 0, 0),
+            Reason = "Đổi ca chiều"
+        };
+
+        var result = await service.RescheduleAppointmentAsync(120, request, "user1", "letan1");
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Empty(fakeQueue.EnqueuedMessages); // Bỏ qua an toàn, không có tin nhắn nào trong hàng đợi
+    }
+
+    [Fact]
+    public async Task AppointmentRescheduleEmailWorker_ProcessWithRetry_RetriesUpTo3TimesOnFailure()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var failingEmailService = new FailingEmailService();
+        services.AddSingleton<IEmailService>(failingEmailService);
+        var serviceProvider = services.BuildServiceProvider();
+        var scopeFactory = serviceProvider.GetRequiredService<IServiceScopeFactory>();
+
+        var queue = new AppointmentRescheduleEmailQueue();
+        var worker = new AppointmentRescheduleEmailWorker(queue, scopeFactory, NullLogger<AppointmentRescheduleEmailWorker>.Instance);
+
+        var msg = new RescheduleEmailMessage
+        {
+            AppointmentId = 130,
+            CustomerEmail = "retry.test@salon.vn",
+            CustomerName = "Khách Thử Nghiệm Retry"
+        };
+
+        // Act
+        var success = await worker.ProcessWithRetryAsync(msg);
+
+        // Assert
+        Assert.False(success);
+        Assert.Equal(3, failingEmailService.CallCount); // Đã thử đúng 3 lần
+        Assert.Equal(3, msg.RetryCount);
+    }
+
+    private class FakeRescheduleEmailQueue : IAppointmentRescheduleEmailQueue
+    {
+        public List<RescheduleEmailMessage> EnqueuedMessages { get; } = new();
+
+        public ValueTask EnqueueAsync(RescheduleEmailMessage message, CancellationToken cancellationToken = default)
+        {
+            if (!string.IsNullOrWhiteSpace(message.CustomerEmail))
+            {
+                EnqueuedMessages.Add(message);
+            }
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<RescheduleEmailMessage> DequeueAsync(CancellationToken cancellationToken)
+        {
+            if (EnqueuedMessages.Count > 0)
+            {
+                var msg = EnqueuedMessages[0];
+                EnqueuedMessages.RemoveAt(0);
+                return ValueTask.FromResult(msg);
+            }
+            throw new InvalidOperationException("Hàng đợi trống.");
+        }
+    }
+
+    private class FailingEmailService : IEmailService
+    {
+        public int CallCount { get; private set; }
+
+        public Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode) => Task.CompletedTask;
+        public Task SendPasswordResetEmailAsync(string toEmail, string resetLink) => Task.CompletedTask;
+        public Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword) => Task.CompletedTask;
+
+        public Task SendRescheduleNotificationEmailAsync(
+            string toEmail, string customerName, string stylistName,
+            DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime,
+            string servicesSummary, string? reason = null,
+            string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh",
+            string salonHotline = "1900 1234")
+        {
+            CallCount++;
+            throw new InvalidOperationException("Lỗi kết nối SMTP giả lập.");
+        }
     }
 }
