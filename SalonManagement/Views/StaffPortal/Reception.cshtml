@@ -1,25 +1,192 @@
 @{
-    ViewData["Title"] = "Không gian lễ tân";
+    ViewData["Title"] = "Lễ tân - Lịch hẹn & Vận hành";
 }
 
-<div id="reception-content" class="d-none py-4">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+<div id="reception-content" class="d-none py-3">
+    <!-- Top Bar -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 border-bottom pb-3">
         <div>
-            <span class="text-uppercase text-muted small fw-semibold">Không gian làm việc</span>
-            <h1 class="h2 mb-1">Lễ tân</h1>
-            <p class="text-muted mb-0">Xin chào <strong data-session-email></strong></p>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary px-2 py-1"><i class="bi bi-person-badge me-1"></i>Lễ tân</span>
+                <span class="text-muted small">Xin chào <strong data-session-email></strong></span>
+            </div>
+            <h1 class="h3 mb-0 mt-1 fw-bold text-dark">Quản lý Lịch hẹn &amp; Vận hành</h1>
         </div>
-        <button id="logout" class="btn btn-outline-danger" type="button">Đăng xuất</button>
+        <div class="d-flex align-items-center gap-2">
+            <a href="/booking" target="_blank" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Trang đặt lịch khách
+            </a>
+            <button id="logout" class="btn btn-outline-danger btn-sm" type="button">
+                <i class="bi bi-box-arrow-right me-1"></i>Đăng xuất
+            </button>
+        </div>
     </div>
 
-    <div class="row g-3">
-        <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body"><i class="bi bi-calendar-check fs-3 text-primary"></i><h2 class="h5 mt-3">Lịch hẹn</h2><p class="text-muted mb-0">Theo dõi và sắp xếp lịch hẹn của khách hàng.</p></div></div></div>
-        <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body"><i class="bi bi-person-plus fs-3 text-primary"></i><h2 class="h5 mt-3">Tiếp nhận khách</h2><p class="text-muted mb-0">Hỗ trợ khách đến salon và cập nhật trạng thái phục vụ.</p></div></div></div>
-        <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body"><i class="bi bi-people fs-3 text-primary"></i><h2 class="h5 mt-3">Khách hàng</h2><p class="text-muted mb-0">Tra cứu thông tin và lịch sử đặt lịch.</p></div></div></div>
+    <!-- Calendar Navigation & Controls Bar -->
+    <div class="card shadow-sm border-0 mb-3 bg-white">
+        <div class="card-body p-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <button id="btn-prev-day" class="btn btn-outline-secondary btn-sm" title="Ngày hôm trước">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <input id="calendar-date-input" type="date" class="form-control form-control-sm" style="width: 160px;" />
+                    <button id="btn-next-day" class="btn btn-outline-secondary btn-sm" title="Ngày tiếp theo">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button id="btn-today" class="btn btn-light btn-sm border fw-semibold">
+                        Hôm nay
+                    </button>
+                    <button id="btn-refresh-calendar" class="btn btn-light btn-sm border" title="Tải lại">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <div class="fs-5 fw-bold text-primary" id="calendar-current-date-display">
+                        --/--/----
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="calendar-loading" class="text-center py-4 d-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Đang tải lịch hẹn...</span>
+        </div>
+        <p class="text-muted small mt-2">Đang tải lịch làm việc và lịch hẹn...</p>
+    </div>
+
+    <!-- Calendar Schedule Grid -->
+    <div id="calendar-grid-container" class="position-relative">
+        <!-- Rendered by reception-calendar.js -->
+    </div>
+</div>
+
+<!-- Modal: Sửa lịch / Đổi thợ / Dời giờ (S3-04) -->
+<div class="modal fade" id="rescheduleModal" tabindex="-1" aria-labelledby="reschedule-modal-title" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light border-bottom">
+                <div>
+                    <h5 class="modal-title fw-bold text-dark" id="reschedule-modal-title">
+                        <i class="bi bi-calendar-event text-primary me-2"></i>Điều chỉnh lịch hẹn
+                    </h5>
+                    <small class="text-muted">Đổi thợ phụ trách hoặc dời giờ bắt đầu cho khách hàng</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form id="reschedule-form" novalidate>
+                <input type="hidden" id="reschedule-appointment-id" />
+
+                <div class="modal-body p-4">
+                    <!-- Validation Alert Box (Hiển thị lỗi F33, Trùng lịch, Ngoài ca) -->
+                    <div id="reschedule-validation-alert" class="alert alert-danger d-none border-0 shadow-sm mb-3" role="alert">
+                        <div id="reschedule-validation-message" class="small"></div>
+                    </div>
+
+                    <!-- Thông tin hiện tại của lịch hẹn -->
+                    <div class="bg-light p-3 rounded-3 mb-3 border">
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <span class="text-muted small d-block">Khách hàng:</span>
+                                <strong id="reschedule-customer-name" class="text-dark">--</strong>
+                                <span class="text-muted small ms-1">(<span id="reschedule-customer-phone">--</span>)</span>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <span class="text-muted small d-block">Thợ hiện tại:</span>
+                                <strong id="reschedule-current-stylist" class="text-dark">--</strong>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <span class="text-muted small d-block">Giờ hiện tại:</span>
+                                <span id="reschedule-current-time" class="badge bg-secondary-subtle text-secondary border">--</span>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <span class="text-muted small d-block">Dịch vụ đã đặt:</span>
+                                <div id="reschedule-services-list" class="mt-1"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form điều chỉnh -->
+                    <h6 class="fw-bold text-dark mb-3">
+                        <i class="bi bi-pencil-square text-primary me-1"></i>Thông tin điều chỉnh mới
+                    </h6>
+
+                    <div class="row g-3">
+                        <!-- Chọn ngày hẹn mới -->
+                        <div class="col-12 col-md-6">
+                            <label for="reschedule-date" class="form-label small fw-semibold">Ngày hẹn mới <span class="text-danger">*</span></label>
+                            <input type="date" id="reschedule-date" class="form-control" required />
+                        </div>
+
+                        <!-- Chọn thợ mới -->
+                        <div class="col-12 col-md-6">
+                            <label for="reschedule-stylist-select" class="form-label small fw-semibold">Thợ phụ trách mới <span class="text-danger">*</span></label>
+                            <select id="reschedule-stylist-select" class="form-select" required>
+                                <!-- Rendered dynamically with skill badges -->
+                            </select>
+                            <div id="reschedule-stylist-note"></div>
+                        </div>
+
+                        <!-- Giờ bắt đầu mới -->
+                        <div class="col-12 col-md-6">
+                            <label for="reschedule-start-time" class="form-label small fw-semibold">Giờ bắt đầu mới <span class="text-danger">*</span></label>
+                            <input type="time" id="reschedule-start-time" class="form-control" step="900" required />
+                            <small class="text-muted" style="font-size: 0.75rem;">Bước nhảy chuẩn 15 phút (vd: 09:00, 09:15, 09:30...)</small>
+                        </div>
+
+                        <!-- Giờ kết thúc mới (Tự động tính) -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-semibold">Giờ kết thúc dự kiến</label>
+                            <input type="text" id="reschedule-end-time-display" class="form-control bg-light" readonly />
+                            <small class="text-muted" style="font-size: 0.75rem;">Tự động tính = Giờ bắt đầu + Tổng thời lượng</small>
+                        </div>
+
+                        <!-- Lý do dời lịch -->
+                        <div class="col-12">
+                            <label for="reschedule-reason" class="form-label small fw-semibold">Lý do điều chỉnh (Tùy chọn)</label>
+                            <input type="text" id="reschedule-reason" class="form-control" placeholder="Ví dụ: Khách báo đến trễ 15 phút, thợ bận ca phát sinh..." />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light border-top">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" id="btn-submit-reschedule" class="btn btn-primary btn-sm px-3 fw-semibold">
+                        <i class="bi bi-check2-circle me-1"></i>Lưu thay đổi
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Toast thông báo kết quả -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="reception-toast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body" id="reception-toast-message">
+                Thao tác thành công.
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
     </div>
 </div>
 
 @section Scripts {
     <script src="~/js/auth.js" asp-append-version="true"></script>
-    <script>SalonAuth.requireSession({ endpoint: "/api/portal/reception/session", contentId: "reception-content" });</script>
+    <script src="~/js/reception-calendar.js" asp-append-version="true"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            SalonAuth.requireSession({
+                endpoint: "/api/portal/reception/session",
+                contentId: "reception-content"
+            });
+            ReceptionCalendar.init();
+        });
+    </script>
 }
