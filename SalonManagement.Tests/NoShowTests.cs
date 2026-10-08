@@ -17,7 +17,7 @@ public class NoShowTests
         public override DateTimeOffset GetUtcNow() => Now.ToUniversalTime();
     }
     private static ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
     private static async Task<Appointment> Seed(ApplicationDbContext db)
     {
         var a = new Appointment { AppointmentDate = Start.Date, StartTime = TimeSpan.FromHours(10),

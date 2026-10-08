@@ -6,7 +6,16 @@ using SalonManagement.Models;
 namespace SalonManagement.Services;
 public class DeskBookingService(ApplicationDbContext db, TimeProvider clock)
 {
-    public async Task<Appointment> Create(DeskBookingRequest request, string actor)
+    public Task<Appointment> Create(DeskBookingRequest request, string actor)
+    {
+        var attempts = 0;
+        return db.Database.CreateExecutionStrategy().ExecuteAsync(() =>
+        {
+            if (attempts++ > 0) db.ChangeTracker.Clear();
+            return CreateCore(request, actor);
+        });
+    }
+    private async Task<Appointment> CreateCore(DeskBookingRequest request, string actor)
     {
         Validator.ValidateObject(request, new ValidationContext(request), true);
         if (string.IsNullOrWhiteSpace(actor)) throw new InvalidOperationException("Không xác định được người thực hiện.");
@@ -21,6 +30,8 @@ public class DeskBookingService(ApplicationDbContext db, TimeProvider clock)
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT StylistId FROM Stylists WITH (UPDLOCK, HOLDLOCK) WHERE StylistId = {stylist.StylistId}");
         var service = await db.Services.SingleOrDefaultAsync(s => s.ServiceId == request.ServiceId && s.IsActive)
             ?? throw new InvalidOperationException("Dịch vụ không hoạt động.");
+        if (!await db.StylistServices.AnyAsync(link => link.StylistId == stylist.StylistId && link.ServiceId == service.ServiceId))
+            throw new InvalidOperationException("Thợ chưa được gán dịch vụ đã chọn.");
         if (service.DurationMinutes <= 0) throw new InvalidOperationException("Thời lượng dịch vụ không hợp lệ.");
         var end = start.AddMinutes(service.DurationMinutes);
         if (end.Date != start.Date) throw new InvalidOperationException("Lịch hẹn phải kết thúc trong ngày.");

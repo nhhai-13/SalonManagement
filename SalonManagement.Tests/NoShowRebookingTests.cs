@@ -12,7 +12,7 @@ public class NoShowRebookingTests
     public async Task RebookingReleasedSlotRequiresWarningAndPreventsUndo()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
-        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options);
+        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         await db.Database.EnsureCreatedAsync();
         var day = new DateTime(2026,10,8);
         var stylist = new Stylist { FullName = "Thợ" }; var customer = new Customer { FullName = "Khách", Phone = "0901234567" };
@@ -20,6 +20,7 @@ public class NoShowRebookingTests
         var old = new Appointment { Customer = customer, Stylist = stylist, AppointmentDate = day,
             StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(10), Status = "Confirmed" };
         db.AddRange(old, service); await db.SaveChangesAsync();
+        db.Add(new StylistService { StylistId = stylist.StylistId, ServiceId = service.ServiceId });
         db.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = day, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(18) });
         await db.SaveChangesAsync();
         var operations = new NoShowService(db, new Clock()); await operations.Apply(old.AppointmentId, "no-show", "desk");

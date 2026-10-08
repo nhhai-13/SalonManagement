@@ -17,7 +17,16 @@ public class NoShowService(ApplicationDbContext db, TimeProvider clock)
         a.Status == AppointmentStatuses.NoShow && a.NoShowAt.HasValue &&
         now >= a.NoShowAt && now <= a.NoShowAt.Value.AddMinutes(15);
 
-    public async Task<Appointment> Apply(int id, string action, string actorId)
+    public Task<Appointment> Apply(int id, string action, string actorId)
+    {
+        var attempts = 0;
+        return db.Database.CreateExecutionStrategy().ExecuteAsync(() =>
+        {
+            if (attempts++ > 0) db.ChangeTracker.Clear();
+            return ApplyCore(id, action, actorId);
+        });
+    }
+    private async Task<Appointment> ApplyCore(int id, string action, string actorId)
     {
         if (string.IsNullOrWhiteSpace(actorId)) throw new InvalidOperationException("Không xác định được người thực hiện.");
         var stylistId = await db.Appointments.AsNoTracking().Where(a => a.AppointmentId == id).Select(a => (int?)a.StylistId).SingleOrDefaultAsync()

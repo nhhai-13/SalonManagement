@@ -1,4 +1,6 @@
-"""HTTP regression test using a disposable SQLite database. Run after dotnet build."""
+"""HTTP regression test using a disposable SQL Server database. Requires SQLCMD and LocalDB."""
+import sys
+sys.dont_write_bytecode = True
 import datetime as dt
 import html
 import http.cookiejar
@@ -7,7 +9,7 @@ import os
 from pathlib import Path
 import re
 import socket
-import sqlite3
+from attendance_sql_support import SERVER, Connection, new_database, drop_database
 import subprocess
 import tempfile
 import time
@@ -22,12 +24,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 with tempfile.TemporaryDirectory(prefix="s3-06-http-", dir=ROOT) as temporary:
-    database = Path(temporary) / "test.db"
+    database = new_database()
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     base = f"http://127.0.0.1:{port}"
-    env = dict(os.environ, DatabaseProvider="Sqlite", ConnectionStrings__DefaultConnection=f"Data Source={database}",
+    env = dict(os.environ, DatabaseProvider="Sqlite", ConnectionStrings__DefaultConnection=f"Server={SERVER};Database={database};Trusted_Connection=True;TrustServerCertificate=True",
                ASPNETCORE_ENVIRONMENT="Development", Logging__LogLevel__Default="Error")
     server = subprocess.Popen(["dotnet", str(ROOT / "SalonManagement/bin/Debug/net8.0/SalonManagement.dll"), "--urls", base],
                               cwd=ROOT / "SalonManagement", env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -67,15 +69,15 @@ with tempfile.TemporaryDirectory(prefix="s3-06-http-", dir=ROOT) as temporary:
         desk_tokens = login(desk, "receptionist@salon.local", "Reception123!", "reception")
         stylist_tokens = login(stylist, "stylist@salon.local", "Stylist123!", "stylist")
         owner_tokens = login(owner, "owner@salon.local", "Owner123!", "admin")
-        assert request(anonymous, "/api/auth/management-session", token=owner_tokens["accessToken"])[0] == 200
-        assert request(anonymous, "/api/auth/management-session", token=desk_tokens["accessToken"])[0] == 403
+        assert request(anonymous, "/api/owner/session", token=owner_tokens["accessToken"])[0] == 200
+        assert request(anonymous, "/api/owner/session", token=desk_tokens["accessToken"])[0] == 403
         for opener, path in [(desk, "/NoShows"), (desk, "/NoShows/Create"), (owner, "/admin")]:
             assert request(opener, path)[0] == 200, path
-        assert request(stylist, "/NoShows")[0] == 302
+        assert request(stylist, "/NoShows")[0] == 403
         assert request(anonymous, "/api/appointments/1/no-show", {})[0] == 401
         print("PASS login cookies, Razor pages and role restrictions")
         now = dt.datetime.now(dt.timezone.utc).astimezone(dt.timezone(dt.timedelta(hours=7))).replace(tzinfo=None)
-        con = sqlite3.connect(database)
+        con = Connection(database)
         c = con.cursor()
         c.execute("INSERT INTO Customers (FullName,Phone,IsActive,CreatedAt) VALUES (?,?,?,?)", ("HTTP Test", "0999998888", 1, now.isoformat(" ")))
         customer = c.lastrowid
@@ -116,7 +118,8 @@ with tempfile.TemporaryDirectory(prefix="s3-06-http-", dir=ROOT) as temporary:
         future = now + dt.timedelta(minutes=10)
         c.execute("UPDATE Appointments SET Status='NoShow',CheckedInAt=NULL,StartTime='00:00:00',EndTime='23:59:00' WHERE AppointmentId IN (?,?,?)", tuple(ids))
         c.execute("INSERT INTO WorkSchedules (StylistId,WorkDate,StartTime,EndTime,Status,CreatedAt) VALUES (?,?,?,?,?,?)", (1, future.strftime("%Y-%m-%d 00:00:00"), "00:00:00", "23:59:00", "Working", now.isoformat(" ")))
-        c.execute("UPDATE Services SET DurationMinutes=1 WHERE ServiceId=1"); con.commit()
+        c.execute("UPDATE Services SET DurationMinutes=1 WHERE ServiceId=1")
+        c.execute("IF NOT EXISTS (SELECT 1 FROM StylistServices WHERE StylistId=1 AND ServiceId=1) INSERT INTO StylistServices (StylistId,ServiceId) VALUES (1,1)"); con.commit()
         status, page = request(desk, "/NoShows/Create")
         form = {"FullName": "HTTP Test", "Phone": "0999998888", "StylistId": 1, "ServiceId": 1, "StartsAt": future.strftime("%Y-%m-%dT%H:%M"), "__RequestVerificationToken": csrf(page)}
         before = c.execute("SELECT COUNT(*) FROM Appointments").fetchone()[0]
@@ -129,7 +132,7 @@ with tempfile.TemporaryDirectory(prefix="s3-06-http-", dir=ROOT) as temporary:
         assert c.execute("SELECT COUNT(*) FROM Appointments").fetchone()[0] == before + 1
         print("PASS booking warning, rebooking released slot and overlap rejection")
         status, _ = request(desk, "/api/auth/logout", {"refreshToken": desk_tokens["refreshToken"]})
-        assert status == 204 and request(desk, "/NoShows")[0] == 302
+        assert status == 204 and request(desk, "/NoShows")[0] == 401
         con.close()
         print("PASS logout clears the browser session")
     finally:
@@ -142,3 +145,4 @@ with tempfile.TemporaryDirectory(prefix="s3-06-http-", dir=ROOT) as temporary:
             server.wait(timeout=10)
         except subprocess.TimeoutExpired:
             server.kill(); server.wait()
+        drop_database(database)
