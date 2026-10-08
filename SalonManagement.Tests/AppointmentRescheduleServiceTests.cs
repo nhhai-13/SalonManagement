@@ -864,4 +864,175 @@ public class AppointmentRescheduleServiceTests
             throw new InvalidOperationException("Lỗi kết nối SMTP giả lập.");
         }
     }
+
+    [Fact]
+    public async Task GetDailyScheduleAsync_PopulatesAppointments_WithCorrectCanRescheduleFlags()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDbContext();
+
+        var stylist = new Stylist { StylistId = 1, FullName = "Stylist Test", IsActive = true };
+        db.Stylists.Add(stylist);
+
+        var date = DateTime.Today;
+        db.WorkSchedules.Add(new WorkSchedule { WorkScheduleId = 1, StylistId = 1, WorkDate = date, StartTime = new TimeSpan(8, 0, 0), EndTime = new TimeSpan(18, 0, 0), Status = "Working" });
+
+        var customer = new Customer { CustomerId = 1, FullName = "Khách Hàng" };
+        db.Customers.Add(customer);
+
+        var apptConfirmed = new Appointment { AppointmentId = 201, CustomerId = 1, StylistId = 1, AppointmentDate = date, StartTime = new TimeSpan(9, 0, 0), EndTime = new TimeSpan(10, 0, 0), Status = "Confirmed" };
+        var apptCompleted = new Appointment { AppointmentId = 202, CustomerId = 1, StylistId = 1, AppointmentDate = date, StartTime = new TimeSpan(10, 0, 0), EndTime = new TimeSpan(11, 0, 0), Status = "Completed" };
+        var apptCancelled = new Appointment { AppointmentId = 203, CustomerId = 1, StylistId = 1, AppointmentDate = date, StartTime = new TimeSpan(11, 0, 0), EndTime = new TimeSpan(12, 0, 0), Status = "Cancelled" };
+        var apptPending = new Appointment { AppointmentId = 204, CustomerId = 1, StylistId = 1, AppointmentDate = date, StartTime = new TimeSpan(13, 0, 0), EndTime = new TimeSpan(14, 0, 0), Status = "Pending" };
+
+        db.Appointments.AddRange(apptConfirmed, apptCompleted, apptCancelled, apptPending);
+        await db.SaveChangesAsync();
+
+        var service = new AppointmentRescheduleService(db);
+
+        // Act
+        var dailySchedule = await service.GetDailyScheduleAsync(date);
+
+        // Assert
+        var stylistCol = dailySchedule.Stylists.FirstOrDefault(s => s.StylistId == 1);
+        Assert.NotNull(stylistCol);
+
+        var cardConfirmed = stylistCol.Appointments.First(a => a.AppointmentId == 201);
+        var cardCompleted = stylistCol.Appointments.First(a => a.AppointmentId == 202);
+        var cardPending = stylistCol.Appointments.First(a => a.AppointmentId == 204);
+
+        // Kéo thả chỉ được phép khi CanReschedule == true
+        Assert.True(cardConfirmed.CanReschedule);
+        Assert.True(cardPending.CanReschedule);
+        Assert.False(cardCompleted.CanReschedule);
+
+        // Lịch đã hủy bị loại trừ khỏi lịch ngày hoạt động
+        Assert.DoesNotContain(stylistCol.Appointments, a => a.AppointmentId == 203);
+        Assert.False(new AppointmentCalendarCardDto { Status = "Cancelled" }.CanReschedule);
+    }
+
+    [Fact]
+    public async Task RescheduleAppointment_WhenDragDroppedToDifferentStylist_SuccessfullyReassignsStylist()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDbContext();
+
+        var svc = new Service { ServiceId = 1, ServiceName = "Combo Cắt Gội", DurationMinutes = 45, Price = 120000m, IsActive = true };
+        db.Services.Add(svc);
+
+        var stylist1 = new Stylist { StylistId = 1, FullName = "Thợ 1", IsActive = true };
+        var stylist2 = new Stylist { StylistId = 2, FullName = "Thợ 2", IsActive = true };
+        db.Stylists.AddRange(stylist1, stylist2);
+        db.StylistServices.AddRange(
+            new StylistService { StylistId = 1, ServiceId = 1 },
+            new StylistService { StylistId = 2, ServiceId = 1 }
+        );
+
+        var date = DateTime.Today;
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { WorkScheduleId = 1, StylistId = 1, WorkDate = date, StartTime = new TimeSpan(8, 0, 0), EndTime = new TimeSpan(18, 0, 0), Status = "Working" },
+            new WorkSchedule { WorkScheduleId = 2, StylistId = 2, WorkDate = date, StartTime = new TimeSpan(8, 0, 0), EndTime = new TimeSpan(18, 0, 0), Status = "Working" }
+        );
+
+        var customer = new Customer { CustomerId = 1, FullName = "Khách Kéo Thả" };
+        db.Customers.Add(customer);
+
+        var appt = new Appointment
+        {
+            AppointmentId = 210,
+            CustomerId = 1,
+            StylistId = 1,
+            AppointmentDate = date,
+            StartTime = new TimeSpan(10, 0, 0),
+            EndTime = new TimeSpan(10, 45, 0),
+            Status = "Confirmed"
+        };
+        db.Appointments.Add(appt);
+        db.AppointmentServices.Add(new AppointmentService { AppointmentServiceId = 1, AppointmentId = 210, ServiceId = 1, DurationMinutes = 45, Price = 120000m });
+        await db.SaveChangesAsync();
+
+        var service = new AppointmentRescheduleService(db);
+
+        // Act: Kéo thả từ thợ 1 sang thợ 2 (giữ nguyên giờ 10:00)
+        var dragDropRequest = new RescheduleAppointmentRequest
+        {
+            NewStylistId = 2,
+            NewDate = date,
+            NewStartTime = new TimeSpan(10, 0, 0),
+            Reason = "[Kéo thả lịch ngày] Đổi sang thợ 2"
+        };
+
+        var result = await service.RescheduleAppointmentAsync(210, dragDropRequest, "reception-user", "letan@salon.vn");
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal(2, result.UpdatedAppointment!.StylistId);
+        Assert.Equal("Thợ 2", result.UpdatedAppointment.StylistName);
+
+        var updatedInDb = await db.Appointments.FindAsync(210);
+        Assert.NotNull(updatedInDb);
+        Assert.Equal(2, updatedInDb.StylistId);
+    }
+
+    [Fact]
+    public async Task RescheduleAppointment_WhenDragDroppedToStylistWithoutSkills_FailsWithF33AndPreservesOriginalState()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDbContext();
+
+        var svcHair = new Service { ServiceId = 1, ServiceName = "Uốn nhuộm chuyên sâu", DurationMinutes = 90, Price = 600000m, IsActive = true };
+        db.Services.Add(svcHair);
+
+        var stylistMaster = new Stylist { StylistId = 1, FullName = "Thợ Chính", IsActive = true };
+        var stylistApprentice = new Stylist { StylistId = 2, FullName = "Thợ Phụ (Không biết uốn)", IsActive = true };
+        db.Stylists.AddRange(stylistMaster, stylistApprentice);
+
+        // Chỉ stylist 1 có kỹ năng dịch vụ 1
+        db.StylistServices.Add(new StylistService { StylistId = 1, ServiceId = 1 });
+
+        var date = DateTime.Today;
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { WorkScheduleId = 1, StylistId = 1, WorkDate = date, StartTime = new TimeSpan(8, 0, 0), EndTime = new TimeSpan(18, 0, 0), Status = "Working" },
+            new WorkSchedule { WorkScheduleId = 2, StylistId = 2, WorkDate = date, StartTime = new TimeSpan(8, 0, 0), EndTime = new TimeSpan(18, 0, 0), Status = "Working" }
+        );
+
+        var customer = new Customer { CustomerId = 1, FullName = "Khách Thử Nghiệm" };
+        db.Customers.Add(customer);
+
+        var appt = new Appointment
+        {
+            AppointmentId = 220,
+            CustomerId = 1,
+            StylistId = 1,
+            AppointmentDate = date,
+            StartTime = new TimeSpan(14, 0, 0),
+            EndTime = new TimeSpan(15, 30, 0),
+            Status = "Confirmed"
+        };
+        db.Appointments.Add(appt);
+        db.AppointmentServices.Add(new AppointmentService { AppointmentServiceId = 1, AppointmentId = 220, ServiceId = 1, DurationMinutes = 90, Price = 600000m });
+        await db.SaveChangesAsync();
+
+        var service = new AppointmentRescheduleService(db);
+
+        // Act: Kéo thả sang thợ phụ thiếu kỹ năng
+        var invalidDragDrop = new RescheduleAppointmentRequest
+        {
+            NewStylistId = 2,
+            NewDate = date,
+            NewStartTime = new TimeSpan(14, 0, 0),
+            Reason = "[Kéo thả lịch ngày] Thử kéo sang thợ phụ"
+        };
+
+        var result = await service.RescheduleAppointmentAsync(220, invalidDragDrop, "reception-user", "letan@salon.vn");
+
+        // Assert: Thất bại với lỗi F33, revert thẻ (giữ nguyên stylistId = 1 trong DB)
+        Assert.False(result.Success);
+        Assert.NotNull(result.Validation);
+        Assert.Equal("F33", result.Validation.ErrorCode);
+
+        var inDb = await db.Appointments.FindAsync(220);
+        Assert.NotNull(inDb);
+        Assert.Equal(1, inDb.StylistId); // Không bị thay đổi
+    }
 }
