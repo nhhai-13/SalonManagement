@@ -10,10 +10,12 @@ namespace SalonManagement.Services.Appointments;
 public class AppointmentRescheduleService : IAppointmentRescheduleService
 {
     private readonly ApplicationDbContext _db;
+    private readonly IAppointmentRescheduleEmailQueue? _emailQueue;
 
-    public AppointmentRescheduleService(ApplicationDbContext db)
+    public AppointmentRescheduleService(ApplicationDbContext db, IAppointmentRescheduleEmailQueue? emailQueue = null)
     {
         _db = db;
+        _emailQueue = emailQueue;
     }
 
     public async Task<DailyScheduleDto> GetDailyScheduleAsync(DateTime date, CancellationToken cancellationToken = default)
@@ -400,6 +402,27 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                     await transaction.CommitAsync(cancellationToken);
                 }
 
+                var servicesSummary = string.Join(", ", appointment.AppointmentServices.Select(s => s.Service?.ServiceName ?? "").Where(s => !string.IsNullOrEmpty(s)));
+
+                // [AC5 - Background Email Queue]: Đẩy vào hàng đợi gửi email nền cho khách (nếu có email)
+                if (_emailQueue != null && appointment.Customer != null && !string.IsNullOrWhiteSpace(appointment.Customer.Email))
+                {
+                    var emailMsg = new RescheduleEmailMessage
+                    {
+                        AppointmentId = appointment.AppointmentId,
+                        CustomerEmail = appointment.Customer.Email,
+                        CustomerName = appointment.Customer.FullName,
+                        StylistName = newStylistName,
+                        AppointmentDate = appointment.AppointmentDate,
+                        StartTime = appointment.StartTime,
+                        EndTime = appointment.EndTime,
+                        ServicesSummary = servicesSummary,
+                        Reason = request.Reason
+                    };
+
+                    await _emailQueue.EnqueueAsync(emailMsg, cancellationToken);
+                }
+
                 var updatedCard = new AppointmentCalendarCardDto
                 {
                     AppointmentId = appointment.AppointmentId,
@@ -413,7 +436,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                     EndTime = appointment.EndTime,
                     DurationMinutes = totalDuration,
                     Status = appointment.Status,
-                    ServiceNamesSummary = string.Join(", ", appointment.AppointmentServices.Select(s => s.Service?.ServiceName ?? "").Where(s => !string.IsNullOrEmpty(s))),
+                    ServiceNamesSummary = servicesSummary,
                     TotalAmount = appointment.AppointmentServices.Sum(s => s.Price)
                 };
 

@@ -195,6 +195,8 @@ builder.Services.AddSingleton<
     PasswordResetRateLimiter>();
 
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddSingleton<IAppointmentRescheduleEmailQueue, AppointmentRescheduleEmailQueue>();
+builder.Services.AddHostedService<AppointmentRescheduleEmailWorker>();
 builder.Services.AddScoped<IAppointmentRescheduleService, AppointmentRescheduleService>();
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
