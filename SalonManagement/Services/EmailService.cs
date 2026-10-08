@@ -262,4 +262,171 @@ public sealed class EmailService(
 </body>
 </html>
 """;
+
+    public async Task SendRescheduleNotificationEmailAsync(
+        string toEmail,
+        string customerName,
+        string stylistName,
+        DateTime appointmentDate,
+        TimeSpan startTime,
+        TimeSpan endTime,
+        string servicesSummary,
+        string? reason = null,
+        string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh",
+        string salonHotline = "1900 1234")
+    {
+        var smtpSection = configuration.GetSection("SmtpSettings");
+        var server = smtpSection["Server"];
+        var portStr = smtpSection["Port"];
+        var senderEmail = smtpSection["SenderEmail"];
+        var senderName = smtpSection["SenderName"] ?? "Salon Management Support";
+        var username = smtpSection["Username"];
+        var password = smtpSection["Password"];
+
+        int port = int.TryParse(portStr, out var p) ? p : 587;
+
+        var hasSmtpConfig = !string.IsNullOrWhiteSpace(server)
+            && !string.IsNullOrWhiteSpace(senderEmail)
+            && !string.IsNullOrWhiteSpace(username)
+            && !string.IsNullOrWhiteSpace(password);
+
+        var htmlBody = BuildRescheduleNotificationHtmlBody(
+            customerName,
+            stylistName,
+            appointmentDate,
+            startTime,
+            endTime,
+            servicesSummary,
+            reason,
+            salonAddress,
+            salonHotline);
+
+        if (hasSmtpConfig)
+        {
+            try
+            {
+                using var client = new SmtpClient(server, port)
+                {
+                    EnableSsl = true,
+                    UseDefaultCredentials = false,
+                    Credentials = new NetworkCredential(username, password),
+                    DeliveryMethod = SmtpDeliveryMethod.Network,
+                    Timeout = 15000
+                };
+
+                using var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(senderEmail!, senderName),
+                    Subject = $"[Salon Management] Cập nhật lịch hẹn của quý khách - {appointmentDate:dd/MM/yyyy}",
+                    IsBodyHtml = true,
+                    Body = htmlBody
+                };
+                mailMessage.To.Add(toEmail);
+
+                await client.SendMailAsync(mailMessage);
+                logger.LogInformation("Đã gửi email thông báo dời lịch hẹn thành công qua SMTP tới {Email}", toEmail);
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Lỗi khi gửi email thông báo dời lịch qua SMTP tới {Email}", toEmail);
+                if (!env.IsDevelopment() && !env.IsStaging()) throw;
+            }
+        }
+        else if (!env.IsDevelopment() && !env.IsStaging())
+        {
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi email thông báo dời lịch.");
+        }
+
+        logger.LogWarning("[FALLBACK EMAIL] Thông báo dời lịch gửi tới {Email} (Thợ: {Stylist}, Ngày: {Date:dd/MM/yyyy}, Giờ: {Start:hh\\:mm}-{End:hh\\:mm})",
+            toEmail, stylistName, appointmentDate, startTime, endTime);
+    }
+
+    private static string BuildRescheduleNotificationHtmlBody(
+        string customerName,
+        string stylistName,
+        DateTime appointmentDate,
+        TimeSpan startTime,
+        TimeSpan endTime,
+        string servicesSummary,
+        string? reason,
+        string salonAddress,
+        string salonHotline) => $"""
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cập nhật lịch hẹn</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 15px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding: 32px 30px; text-align: center;">
+                            <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">
+                                💈 Salon Management
+                            </h1>
+                            <p style="margin: 6px 0 0 0; font-size: 14px; color: #e0f2fe;">
+                                Thông báo cập nhật lịch hẹn
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px 30px;">
+                            <p style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #0f172a;">
+                                Kính chào {WebUtility.HtmlEncode(customerName)},
+                            </p>
+                            <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                                Lịch hẹn của quý khách tại Salon đã được điều chỉnh thành công với thông tin mới nhất như sau:
+                            </p>
+                            <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                                <tr>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; width: 35%; color: #64748b; font-size: 13px;">Thợ phụ trách:</td>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #0f172a; font-size: 14px;">{WebUtility.HtmlEncode(stylistName)}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b; font-size: 13px;">Thời gian mới:</td>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #0284c7; font-size: 14px;">{appointmentDate:dd/MM/yyyy} ({startTime:hh\:mm} - {endTime:hh\:mm})</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b; font-size: 13px;">Dịch vụ đã chọn:</td>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 13px;">{WebUtility.HtmlEncode(servicesSummary)}</td>
+                                </tr>
+                                {(string.IsNullOrWhiteSpace(reason) ? "" : $@"
+                                <tr>
+                                    <td style=""padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b; font-size: 13px;"">Ghi chú điều chỉnh:</td>
+                                    <td style=""padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 13px; font-style: italic;"">{WebUtility.HtmlEncode(reason)}</td>
+                                </tr>")}
+                                <tr>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b; font-size: 13px;">Địa chỉ salon:</td>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 13px;">{WebUtility.HtmlEncode(salonAddress)}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 16px; font-weight: 600; color: #64748b; font-size: 13px;">Hotline hỗ trợ:</td>
+                                    <td style="padding: 12px 16px; font-weight: 600; color: #e11d48; font-size: 14px;">{WebUtility.HtmlEncode(salonHotline)}</td>
+                                </tr>
+                            </table>
+                            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                                Nếu cần điều chỉnh thêm thông tin hoặc có thắc mắc, quý khách vui lòng liên hệ hotline trên để được phục vụ chu đáo nhất.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                                © {DateTime.UtcNow.Year} Salon Management System. Hân hạnh được phục vụ quý khách.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+""";
 }
+
