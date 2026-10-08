@@ -1,21 +1,29 @@
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Models;
-
 namespace SalonManagement.Data
 {
-    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+    public partial class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-            : base(options)
-        {
-        }
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+public ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    IHttpContextAccessor httpContextAccessor)
+    : base(options)
+{
+    _httpContextAccessor = httpContextAccessor;
+}
 
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
         public DbSet<Customer> Customers => Set<Customer>();
 
         public DbSet<Stylist> Stylists => Set<Stylist>();
+
+        public DbSet<StylistService> StylistServices => Set<StylistService>();
 
         public DbSet<Service> Services => Set<Service>();
 
@@ -32,19 +40,170 @@ namespace SalonManagement.Data
         public DbSet<Payment> Payments => Set<Payment>();
 
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
+        
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+public override int SaveChanges()
+{
+    return SaveChangesAsync().GetAwaiter().GetResult();
+}
 
-        public DbSet<AppointmentAudit> AppointmentAudits => Set<AppointmentAudit>();
-        public DbSet<StylistNotification> StylistNotifications => Set<StylistNotification>();
+public override int SaveChanges(bool acceptAllChangesOnSuccess)
+{
+    if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
+    return SaveChanges();
+}
 
+public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+{
+    if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
+    return SaveChangesAsync(cancellationToken);
+}
+
+public override async Task<int> SaveChangesAsync(
+    CancellationToken cancellationToken = default)
+{
+    ChangeTracker.DetectChanges();
+    if (ChangeTracker.Entries<AuditLog>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+        throw new InvalidOperationException("Nhật ký hệ thống chỉ đọc, không được sửa hoặc xoá.");
+    var auditEntries = CreateAuditEntries();
+
+    var result = await base.SaveChangesAsync(true, cancellationToken);
+
+    if (auditEntries.Count > 0)
+    {
+        foreach (var entry in auditEntries)
+        {
+            entry.EntityId = GetEntityId(entry.Entity);
+
+            AuditLogs.Add(new AuditLog
+            {
+                Timestamp = DateTime.UtcNow,
+                UserId = _httpContextAccessor.HttpContext?.User?
+                    .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    ?? _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value,
+                UserName = _httpContextAccessor.HttpContext?.User?.FindFirst("email")?.Value
+                    ?? _httpContextAccessor.HttpContext?.User?.Identity?.Name,
+                Action = entry.Action,
+                EntityType = entry.EntityType,
+                EntityId = entry.EntityId,
+                Changes = entry.Changes
+            });
+        }
+
+        await base.SaveChangesAsync(true, cancellationToken);
+    }
+
+    return result;
+}
+
+private List<AuditEntry> CreateAuditEntries()
+{
+    ChangeTracker.DetectChanges();
+
+    var entries = new List<AuditEntry>();
+
+    foreach (var entry in ChangeTracker.Entries())
+    {
+        if (entry.Entity is AuditLog ||
+            entry.State == EntityState.Detached ||
+            entry.State == EntityState.Unchanged)
+        {
+            continue;
+        }
+
+        var entityType = entry.Entity.GetType().Name;
+
+        if (entityType != nameof(ApplicationUser) &&
+            entry.Entity is not Microsoft.AspNetCore.Identity.IdentityUserRole<string> &&
+            entityType != nameof(Service) &&
+            entityType != nameof(WorkSchedule) &&
+            entityType != nameof(Appointment) &&
+            entityType != nameof(Invoice))
+        {
+            continue;
+        }
+
+        var changes = new Dictionary<string, object?>();
+
+        if (entry.State == EntityState.Added)
+        {
+            foreach (var property in entry.Properties)
+            {
+                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
+                changes[property.Metadata.Name] = property.CurrentValue;
+            }
+        }
+        else if (entry.State == EntityState.Modified)
+        {
+            foreach (var property in entry.Properties)
+            {
+                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
+                if (property.IsModified)
+                {
+                    changes[property.Metadata.Name] = new
+                    {
+                        OldValue = property.OriginalValue,
+                        NewValue = property.CurrentValue
+                    };
+                }
+            }
+        }
+        else if (entry.State == EntityState.Deleted)
+        {
+            foreach (var property in entry.Properties)
+            {
+                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
+                changes[property.Metadata.Name] = property.OriginalValue;
+            }
+        }
+
+        entries.Add(new AuditEntry
+        {
+            Entity = entry.Entity,
+            Action = entry.State switch
+            {
+                EntityState.Added => "CREATE",
+                EntityState.Modified => "UPDATE",
+                EntityState.Deleted => "DELETE",
+                _ => string.Empty
+            },
+            EntityType = entityType,
+            Changes = JsonSerializer.Serialize(changes)
+        });
+    }
+
+    return entries;
+}
+
+private static bool IsSensitiveAuditProperty(string name) => name is
+    "PasswordHash" or "SecurityStamp" or "ConcurrencyStamp" or "EmailVerificationCodeHash";
+
+private static string? GetEntityId(object entity)
+{
+    return entity switch
+    {
+        ApplicationUser user => user.Id,
+        Microsoft.AspNetCore.Identity.IdentityUserRole<string> role => role.UserId,
+        Service service => service.ServiceId.ToString(),
+        WorkSchedule schedule => schedule.WorkScheduleId.ToString(),
+        Appointment appointment => appointment.AppointmentId.ToString(),
+        Invoice invoice => invoice.InvoiceId.ToString(),
+        _ => null
+    };
+}
+
+private class AuditEntry
+{
+    public object Entity { get; set; } = null!;
+    public string Action { get; set; } = string.Empty;
+    public string EntityType { get; set; } = string.Empty;
+    public string? EntityId { get; set; }
+    public string? Changes { get; set; }
+}
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
-            builder.Entity<ApplicationUser>().HasOne(u => u.Stylist).WithMany().HasForeignKey(u => u.StylistId).OnDelete(DeleteBehavior.Restrict);
-            builder.Entity<Appointment>().Property(a => a.Version).IsConcurrencyToken();
-            builder.Entity<AppointmentAudit>().Property(a => a.ActorId).HasMaxLength(450);
-            builder.Entity<AppointmentAudit>().HasIndex(a => new { a.AppointmentId, a.OccurredAt });
-            builder.Entity<StylistNotification>().HasIndex(n => new { n.StylistId, n.CreatedAt });
-
+            ConfigureAttendanceModels(builder);
 
             builder.Entity<RefreshToken>(entity =>
             {
@@ -83,6 +242,8 @@ namespace SalonManagement.Data
                 entity.Property(stylist => stylist.Phone).HasMaxLength(20);
                 entity.Property(stylist => stylist.Email).HasMaxLength(256);
                 entity.Property(stylist => stylist.Specialty).HasMaxLength(200);
+                entity.Property(stylist => stylist.Description).HasMaxLength(500);
+                entity.Property(stylist => stylist.ProfileImagePath).HasMaxLength(300);
             });
 
             builder.Entity<ServiceGroup>(entity =>
@@ -101,6 +262,21 @@ namespace SalonManagement.Data
                     .WithMany(g => g.Services)
                     .HasForeignKey(s => s.ServiceGroupId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<StylistService>(entity =>
+            {
+                entity.HasKey(item => new { item.StylistId, item.ServiceId });
+
+                entity.HasOne(item => item.Stylist)
+                    .WithMany(stylist => stylist.Services)
+                    .HasForeignKey(item => item.StylistId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(item => item.Service)
+                    .WithMany(service => service.Stylists)
+                    .HasForeignKey(item => item.ServiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<WorkSchedule>(entity =>

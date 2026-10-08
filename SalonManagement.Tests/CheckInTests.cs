@@ -17,7 +17,7 @@ public class CheckInTests
         public override DateTimeOffset GetUtcNow() => Now.ToUniversalTime();
     }
     private static ApplicationDbContext Db() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
     private static async Task<Appointment> Seed(ApplicationDbContext db)
     {
         var a = new Appointment { AppointmentDate = Start.Date, StartTime = TimeSpan.FromHours(10),
@@ -58,8 +58,8 @@ public class CheckInTests
     {
         await using var connection = new SqliteConnection("Data Source=:memory:"); await connection.OpenAsync();
         var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
-        await using var db = new ApplicationDbContext(options); await db.Database.EnsureCreatedAsync(); var a = await Seed(db);
-        await using var stale = new ApplicationDbContext(options); var old = await stale.Appointments.SingleAsync();
+        await using var db = new ApplicationDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor()); await db.Database.EnsureCreatedAsync(); var a = await Seed(db);
+        await using var stale = new ApplicationDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor()); var old = await stale.Appointments.SingleAsync();
         await new CheckInService(db, new Clock()).Apply(a.AppointmentId, "check-in", "desk");
         old.Status = "NoShow"; old.Version = Guid.NewGuid();
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => stale.SaveChangesAsync());

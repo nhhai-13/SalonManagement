@@ -13,7 +13,16 @@ public class CheckInService(ApplicationDbContext db, TimeProvider clock, Appoint
     public static bool CanCheckIn(Appointment a, DateTimeOffset now) =>
         a.Status == AppointmentStatuses.Confirmed && a.CheckedInAt == null &&
         now >= StartsAt(a).AddMinutes(-60) && now <= StartsAt(a).AddMinutes(60);
-    public async Task<Appointment> Apply(int id, string action, string actorId)
+    public Task<Appointment> Apply(int id, string action, string actorId)
+    {
+        var attempts = 0;
+        return db.Database.CreateExecutionStrategy().ExecuteAsync(() =>
+        {
+            if (attempts++ > 0) db.ChangeTracker.Clear();
+            return ApplyCore(id, action, actorId);
+        });
+    }
+    private async Task<Appointment> ApplyCore(int id, string action, string actorId)
     {
         if (string.IsNullOrWhiteSpace(actorId)) throw new InvalidOperationException("Không xác định được người thực hiện.");
         var stylistId = await db.Appointments.AsNoTracking().Where(a => a.AppointmentId == id).Select(a => (int?)a.StylistId).SingleOrDefaultAsync()

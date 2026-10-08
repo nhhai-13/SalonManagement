@@ -1,4 +1,6 @@
-"""HTTP regression test using a disposable SQLite database. Run after dotnet build."""
+"""HTTP regression test using a disposable SQL Server database. Requires SQLCMD and LocalDB."""
+import sys
+sys.dont_write_bytecode = True
 import datetime as dt
 import html
 import http.cookiejar
@@ -7,7 +9,7 @@ import os
 from pathlib import Path
 import re
 import socket
-import sqlite3
+from attendance_sql_support import SERVER, Connection, new_database, drop_database
 import subprocess
 import tempfile
 import time
@@ -22,12 +24,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 with tempfile.TemporaryDirectory(prefix="s3-03-http-", dir=ROOT) as temporary:
-    database = Path(temporary) / "test.db"
+    database = new_database()
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     base = f"http://127.0.0.1:{port}"
-    env = dict(os.environ, DatabaseProvider="Sqlite", ConnectionStrings__DefaultConnection=f"Data Source={database}",
+    env = dict(os.environ, DatabaseProvider="Sqlite", ConnectionStrings__DefaultConnection=f"Server={SERVER};Database={database};Trusted_Connection=True;TrustServerCertificate=True",
                ASPNETCORE_ENVIRONMENT="Development", Logging__LogLevel__Default="Error")
     server = subprocess.Popen(["dotnet", str(ROOT / "SalonManagement/bin/Debug/net8.0/SalonManagement.dll"), "--urls", base],
                               cwd=ROOT / "SalonManagement", env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -67,16 +69,16 @@ with tempfile.TemporaryDirectory(prefix="s3-03-http-", dir=ROOT) as temporary:
         desk_tokens = login(desk, "receptionist@salon.local", "Reception123!", "reception")
         stylist_tokens = login(stylist, "stylist@salon.local", "Stylist123!", "stylist")
         owner_tokens = login(owner, "owner@salon.local", "Owner123!", "admin")
-        assert request(anonymous, "/api/auth/management-session", token=owner_tokens["accessToken"])[0] == 200
-        assert request(anonymous, "/api/auth/management-session", token=desk_tokens["accessToken"])[0] == 403
-        for opener, path in [(desk, "/Appointments"), (stylist, "/StylistNotifications"), (owner, "/StylistLinks"), (owner, "/admin")]:
+        assert request(anonymous, "/api/owner/session", token=owner_tokens["accessToken"])[0] == 200
+        assert request(anonymous, "/api/owner/session", token=desk_tokens["accessToken"])[0] == 403
+        for opener, path in [(desk, "/CheckIn"), (stylist, "/StylistNotifications"), (owner, "/StylistLinks"), (owner, "/admin")]:
             assert request(opener, path)[0] == 200, path
-        assert request(stylist, "/Appointments")[0] == 302
-        assert request(desk, "/StylistLinks")[0] == 302
+        assert request(stylist, "/CheckIn")[0] == 403
+        assert request(desk, "/StylistLinks")[0] == 403
         assert request(anonymous, "/api/appointments/1/check-in", {})[0] == 401
         print("PASS login cookies, Razor pages and role restrictions")
         now = dt.datetime.now(dt.timezone.utc).astimezone(dt.timezone(dt.timedelta(hours=7))).replace(tzinfo=None)
-        con = sqlite3.connect(database)
+        con = Connection(database)
         c = con.cursor()
         c.execute("INSERT INTO Customers (FullName,Phone,IsActive,CreatedAt) VALUES (?,?,?,?)", ("HTTP Test", "0999998888", 1, now.isoformat(" ")))
         customer = c.lastrowid
@@ -107,12 +109,12 @@ with tempfile.TemporaryDirectory(prefix="s3-03-http-", dir=ROOT) as temporary:
             return html.unescape(re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', page).group(1))
         # Confirm the actual form posts operation instead of MVC's reserved action value.
         c.execute("UPDATE Appointments SET Status='Confirmed',CheckedInAt=NULL WHERE AppointmentId=?", (ids[2],)); con.commit()
-        status, page = request(desk, "/Appointments")
+        status, page = request(desk, "/CheckIn")
         assert 'name="operation"' in page
-        status, body = request(desk, "/Appointments/Change", {"id": ids[2], "operation": "check-in", "date": now.strftime("%Y-%m-%d"), "__RequestVerificationToken": csrf(page)}, form=True)
+        status, body = request(desk, "/CheckIn/Change", {"id": ids[2], "operation": "check-in", "date": now.strftime("%Y-%m-%d"), "__RequestVerificationToken": csrf(page)}, form=True)
         assert status == 302
         assert c.execute("SELECT Status FROM Appointments WHERE AppointmentId=?", (ids[2],)).fetchone()[0] == "Arrived"
-        assert request(desk, "/Appointments/Change", {"id": ids[2], "operation": "check-in"}, form=True)[0] == 400
+        assert request(desk, "/CheckIn/Change", {"id": ids[2], "operation": "check-in"}, form=True)[0] == 400
         assert c.execute("SELECT COUNT(*) FROM StylistNotifications").fetchone()[0] == 2
         print("PASS Razor check-in form and CSRF protection")
         # Link/unlink through the management form and verify inbox isolation.
@@ -126,7 +128,7 @@ with tempfile.TemporaryDirectory(prefix="s3-03-http-", dir=ROOT) as temporary:
         assert request(owner, "/StylistLinks/Link", {"userId": stylist_user, "stylistId": 1, "__RequestVerificationToken": csrf(page)}, form=True)[0] == 302
         print("PASS management linking and notification isolation")
         status, _ = request(desk, "/api/auth/logout", {"refreshToken": desk_tokens["refreshToken"]})
-        assert status == 204 and request(desk, "/Appointments")[0] == 302
+        assert status == 204 and request(desk, "/CheckIn")[0] == 401
         con.close()
         print("PASS logout clears the browser session")
     finally:
@@ -139,3 +141,4 @@ with tempfile.TemporaryDirectory(prefix="s3-03-http-", dir=ROOT) as temporary:
             server.wait(timeout=10)
         except subprocess.TimeoutExpired:
             server.kill(); server.wait()
+        drop_database(database)
