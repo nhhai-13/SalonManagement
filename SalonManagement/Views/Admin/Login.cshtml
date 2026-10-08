@@ -1,3 +1,4 @@
+@inject Microsoft.Extensions.Options.IOptions<SalonManagement.Models.AttendanceNavigation> AttendanceNavigation
 @{
     var portal = ViewData["Portal"]?.ToString() ?? "admin";
     var portalTitle = portal switch
@@ -52,7 +53,7 @@
                 <p>Nhập thông tin tài khoản @portalTitle.ToLower() để tiếp tục.</p>
             </div>
 
-            <form id="login-form" data-portal="@portal" data-redirect="@(portal == "admin" ? "/admin" : "/")" novalidate>
+            <form id="login-form" data-portal="@portal" data-redirect="@(portal == "admin" ? "/admin" : portal == "reception" ? AttendanceNavigation.Value.ReceptionPath : AttendanceNavigation.Value.StylistPath)" novalidate>
                 <div id="login-error" class="login-alert d-none" role="alert" aria-live="polite">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                     <span></span>

@@ -208,6 +208,12 @@ builder.Services.AddSingleton<
     PasswordResetRateLimiter>();
 
 builder.Services.AddControllersWithViews();
+builder.Services.Configure<AttendanceNavigation>(options =>
+{
+    if (options.ReceptionPath == "/") options.ReceptionPath = "/NoShows";
+});
+builder.Services.AddScoped<NoShowService>();
+builder.Services.AddScoped<DeskBookingService>();
 
 // =====================================
 // BUILD APPLICATION
