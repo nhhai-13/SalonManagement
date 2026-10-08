@@ -487,5 +487,143 @@ public class AppointmentRescheduleServiceTests
         var okRes = Assert.IsType<OkObjectResult>(resAction);
         var resDto = Assert.IsType<RescheduleResult>(okRes.Value);
         Assert.True(resDto.Success);
+
+        // Act 3: [AC4] Gọi endpoint change-history
+        var historyAction = await controller.GetChangeHistory(80, default);
+        var okHistory = Assert.IsType<OkObjectResult>(historyAction);
+        var historyList = Assert.IsType<List<AppointmentChangeLogDto>>(okHistory.Value);
+        Assert.Single(historyList);
+        Assert.Equal(80, historyList[0].AppointmentId);
+    }
+
+    [Fact]
+    public async Task RescheduleAppointment_WhenRescheduled_PersistsAppointmentChangeLog()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDbContext();
+
+        var svc = new Service { ServiceId = 1, ServiceName = "Uốn tóc", DurationMinutes = 60, Price = 300000m, IsActive = true };
+        db.Services.Add(svc);
+
+        var stylist1 = new Stylist { StylistId = 1, FullName = "Nguyễn Văn Thợ", IsActive = true };
+        var stylist2 = new Stylist { StylistId = 2, FullName = "Trần Thị Stylist", IsActive = true };
+        db.Stylists.AddRange(stylist1, stylist2);
+        db.StylistServices.AddRange(
+            new StylistService { StylistId = 1, ServiceId = 1 },
+            new StylistService { StylistId = 2, ServiceId = 1 }
+        );
+
+        var dateOld = DateTime.Today.AddDays(1);
+        var dateNew = DateTime.Today.AddDays(2);
+
+        db.WorkSchedules.Add(new WorkSchedule { WorkScheduleId = 1, StylistId = 2, WorkDate = dateNew, StartTime = new TimeSpan(8, 0, 0), EndTime = new TimeSpan(18, 0, 0), Status = "Working" });
+
+        var customer = new Customer { CustomerId = 1, FullName = "Lê Thị Khách", Phone = "0912345678" };
+        db.Customers.Add(customer);
+
+        var appt = new Appointment
+        {
+            AppointmentId = 90,
+            CustomerId = 1,
+            StylistId = 1,
+            AppointmentDate = dateOld,
+            StartTime = new TimeSpan(9, 0, 0),
+            EndTime = new TimeSpan(10, 0, 0),
+            Status = "Confirmed"
+        };
+        db.Appointments.Add(appt);
+        db.AppointmentServices.Add(new AppointmentService { AppointmentServiceId = 1, AppointmentId = 90, ServiceId = 1, DurationMinutes = 60, Price = 300000m });
+        await db.SaveChangesAsync();
+
+        var service = new AppointmentRescheduleService(db);
+
+        // Act
+        var request = new RescheduleAppointmentRequest
+        {
+            NewStylistId = 2,
+            NewDate = dateNew,
+            NewStartTime = new TimeSpan(14, 0, 0),
+            Reason = "Khách hàng đổi lịch vì bận việc đột xuất"
+        };
+
+        var result = await service.RescheduleAppointmentAsync(90, request, "user-receptionist-99", "letan@salon.vn");
+
+        // Assert
+        Assert.True(result.Success);
+
+        // Kiểm tra log được lưu trong DB
+        var logs = await db.AppointmentChangeLogs.Where(l => l.AppointmentId == 90).ToListAsync();
+        Assert.Single(logs);
+
+        var log = logs[0];
+        Assert.Equal(90, log.AppointmentId);
+        Assert.Equal("user-receptionist-99", log.ModifiedByUserId);
+        Assert.Equal("letan@salon.vn", log.ModifiedByUserName);
+        Assert.Equal(1, log.OldStylistId);
+        Assert.Equal(2, log.NewStylistId);
+        Assert.Equal("Nguyễn Văn Thợ", log.OldStylistName);
+        Assert.Equal("Trần Thị Stylist", log.NewStylistName);
+        Assert.Equal(dateOld.Date, log.OldDate.Date);
+        Assert.Equal(dateNew.Date, log.NewDate.Date);
+        Assert.Equal(new TimeSpan(9, 0, 0), log.OldStartTime);
+        Assert.Equal(new TimeSpan(14, 0, 0), log.NewStartTime);
+        Assert.Equal("Khách hàng đổi lịch vì bận việc đột xuất", log.Reason);
+
+        // Kiểm tra GetRescheduleHistoryAsync
+        var history = await service.GetRescheduleHistoryAsync(90);
+        Assert.Single(history);
+        Assert.Contains("Chuyển từ", history[0].FormattedChangeSummary);
+        Assert.NotEmpty(history[0].FormattedChangedAt);
+    }
+
+    [Fact]
+    public async Task GetRescheduleHistoryAsync_MultipleChanges_ReturnsOrderedDescending()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDbContext();
+
+        var baseTime = DateTime.UtcNow;
+        var log1 = new AppointmentChangeLog
+        {
+            AppointmentId = 95,
+            ModifiedByUserId = "u1",
+            ModifiedByUserName = "Lễ tân 1",
+            OldStylistId = 1,
+            NewStylistId = 2,
+            OldDate = DateTime.Today,
+            NewDate = DateTime.Today,
+            OldStartTime = new TimeSpan(9, 0, 0),
+            NewStartTime = new TimeSpan(10, 0, 0),
+            ChangedAtUtc = baseTime.AddMinutes(-30)
+        };
+
+        var log2 = new AppointmentChangeLog
+        {
+            AppointmentId = 95,
+            ModifiedByUserId = "u2",
+            ModifiedByUserName = "Lễ tân 2",
+            OldStylistId = 2,
+            NewStylistId = 3,
+            OldDate = DateTime.Today,
+            NewDate = DateTime.Today.AddDays(1),
+            OldStartTime = new TimeSpan(10, 0, 0),
+            NewStartTime = new TimeSpan(14, 0, 0),
+            ChangedAtUtc = baseTime
+        };
+
+        db.AppointmentChangeLogs.AddRange(log1, log2);
+        await db.SaveChangesAsync();
+
+        var service = new AppointmentRescheduleService(db);
+
+        // Act
+        var history = await service.GetRescheduleHistoryAsync(95);
+
+        // Assert
+        Assert.Equal(2, history.Count);
+        // Log mới hơn phải đứng trước
+        Assert.Equal("Lễ tân 2", history[0].ModifiedByUserName);
+        Assert.Equal("Lễ tân 1", history[1].ModifiedByUserName);
+        Assert.True(history[0].ChangedAtUtc > history[1].ChangedAtUtc);
     }
 }
