@@ -340,11 +340,50 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                 var totalDuration = appointment.AppointmentServices.Sum(s => s.DurationMinutes);
                 if (totalDuration <= 0) totalDuration = 30;
 
+                var oldStylistId = appointment.StylistId;
+                var oldStylistName = appointment.Stylist?.FullName ?? (await _db.Stylists.FindAsync(new object[] { oldStylistId }, cancellationToken))?.FullName;
+                var oldDate = appointment.AppointmentDate;
+                var oldStartTime = appointment.StartTime;
+                var oldEndTime = appointment.EndTime;
+
+                var newEndTime = request.NewStartTime.Add(TimeSpan.FromMinutes(totalDuration));
+                var newStylist = await _db.Stylists.FindAsync(new object[] { request.NewStylistId }, cancellationToken);
+                var newStylistName = newStylist?.FullName ?? string.Empty;
+
+                bool hasChanged = oldStylistId != request.NewStylistId
+                    || oldDate.Date != request.NewDate.Date
+                    || oldStartTime != request.NewStartTime;
+
+                // [AC4 - Audit Trail]: Ghi nhận nhật ký thay đổi lịch hẹn trong cùng transaction
+                if (hasChanged)
+                {
+                    var changeLog = new AppointmentChangeLog
+                    {
+                        AppointmentId = appointmentId,
+                        ModifiedByUserId = string.IsNullOrWhiteSpace(currentUserId) ? "SYSTEM" : currentUserId,
+                        ModifiedByUserName = string.IsNullOrWhiteSpace(currentUserName) ? "Lễ tân" : currentUserName,
+                        OldStylistId = oldStylistId,
+                        NewStylistId = request.NewStylistId,
+                        OldStylistName = oldStylistName,
+                        NewStylistName = newStylistName,
+                        OldDate = oldDate,
+                        NewDate = request.NewDate.Date,
+                        OldStartTime = oldStartTime,
+                        NewStartTime = request.NewStartTime,
+                        OldEndTime = oldEndTime,
+                        NewEndTime = newEndTime,
+                        Reason = request.Reason?.Trim(),
+                        ChangedAtUtc = DateTime.UtcNow
+                    };
+
+                    _db.AppointmentChangeLogs.Add(changeLog);
+                }
+
                 // Cập nhật thông tin lịch hẹn
                 appointment.StylistId = request.NewStylistId;
                 appointment.AppointmentDate = request.NewDate.Date;
                 appointment.StartTime = request.NewStartTime;
-                appointment.EndTime = request.NewStartTime.Add(TimeSpan.FromMinutes(totalDuration));
+                appointment.EndTime = newEndTime;
                 appointment.UpdatedAt = DateTime.UtcNow;
 
                 if (!string.IsNullOrWhiteSpace(request.Reason))
@@ -360,8 +399,6 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                 {
                     await transaction.CommitAsync(cancellationToken);
                 }
-
-                var newStylistName = (await _db.Stylists.FindAsync(new object[] { appointment.StylistId }, cancellationToken))?.FullName ?? string.Empty;
 
                 var updatedCard = new AppointmentCalendarCardDto
                 {
@@ -405,4 +442,65 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
             }
         });
     }
+
+    public async Task<List<AppointmentChangeLogDto>> GetRescheduleHistoryAsync(int appointmentId, CancellationToken cancellationToken = default)
+    {
+        var logs = await _db.AppointmentChangeLogs.AsNoTracking()
+            .Where(l => l.AppointmentId == appointmentId)
+            .OrderByDescending(l => l.ChangedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return logs.Select(l =>
+        {
+            var localTime = ToVietnamTime(l.ChangedAtUtc);
+            var oldInfo = $"{l.OldStylistName ?? $"Thợ #{l.OldStylistId}"} ({l.OldDate:dd/MM/yyyy} {l.OldStartTime:hh\\:mm}-{l.OldEndTime:hh\\:mm})";
+            var newInfo = $"{l.NewStylistName ?? $"Thợ #{l.NewStylistId}"} ({l.NewDate:dd/MM/yyyy} {l.NewStartTime:hh\\:mm}-{l.NewEndTime:hh\\:mm})";
+            var summary = $"Chuyển từ [{oldInfo}] sang [{newInfo}]";
+
+            return new AppointmentChangeLogDto
+            {
+                Id = l.Id,
+                AppointmentId = l.AppointmentId,
+                ModifiedByUserId = l.ModifiedByUserId,
+                ModifiedByUserName = l.ModifiedByUserName,
+                OldStylistId = l.OldStylistId,
+                NewStylistId = l.NewStylistId,
+                OldStylistName = l.OldStylistName,
+                NewStylistName = l.NewStylistName,
+                OldDate = l.OldDate,
+                NewDate = l.NewDate,
+                OldStartTime = l.OldStartTime,
+                NewStartTime = l.NewStartTime,
+                OldEndTime = l.OldEndTime,
+                NewEndTime = l.NewEndTime,
+                Reason = l.Reason,
+                ChangedAtUtc = l.ChangedAtUtc,
+                ChangedAtLocal = localTime,
+                FormattedChangedAt = localTime.ToString("dd/MM/yyyy HH:mm:ss"),
+                FormattedChangeSummary = summary
+            };
+        }).ToList();
+    }
+
+    private static DateTime ToVietnamTime(DateTime utcDateTime)
+    {
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), tz);
+        }
+        catch
+        {
+            try
+            {
+                var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+                return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), tz);
+            }
+            catch
+            {
+                return utcDateTime.AddHours(7);
+            }
+        }
+    }
 }
+
