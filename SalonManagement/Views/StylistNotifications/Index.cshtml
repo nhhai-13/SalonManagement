@@ -1,0 +1,9 @@
+@model List<SalonManagement.Models.StylistNotification>
+@{ ViewData["Title"] = "Thông báo khách đến"; }
+<h1>Thông báo khách đến</h1>
+<p role="status">Thông báo tự cập nhật mỗi 10 giây.</p>
+@foreach (var n in Model) {
+    <div class="alert alert-info">@n.Message <small>@n.CreatedAt.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm 'ngày' dd/MM/yyyy")</small></div>
+}
+@if (Model.Count == 0) { <p>Chưa có thông báo. Tài khoản thợ cần được liên kết với hồ sơ thợ.</p> }
+@section Scripts { <script>setTimeout(() => location.reload(), 10000);</script> }

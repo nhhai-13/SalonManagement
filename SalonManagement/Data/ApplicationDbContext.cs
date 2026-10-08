@@ -33,9 +33,18 @@ namespace SalonManagement.Data
 
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
 
+        public DbSet<AppointmentAudit> AppointmentAudits => Set<AppointmentAudit>();
+        public DbSet<StylistNotification> StylistNotifications => Set<StylistNotification>();
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            builder.Entity<ApplicationUser>().HasOne(u => u.Stylist).WithMany().HasForeignKey(u => u.StylistId).OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<Appointment>().Property(a => a.Version).IsConcurrencyToken();
+            builder.Entity<AppointmentAudit>().Property(a => a.ActorId).HasMaxLength(450);
+            builder.Entity<AppointmentAudit>().HasIndex(a => new { a.AppointmentId, a.OccurredAt });
+            builder.Entity<StylistNotification>().HasIndex(n => new { n.StylistId, n.CreatedAt });
+
 
             builder.Entity<RefreshToken>(entity =>
             {

@@ -55,7 +55,13 @@
                             </a>
                         </li>
 
-                        <!-- Menu Dịch vụ -->
+                        @if (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)) {
+<li class="nav-item"><a class="nav-link" asp-controller="Appointments" asp-action="Index">Lịch hẹn tại quầy</a></li>
+}
+@if (User.IsInRole(UserRoles.Stylist)) {
+<li class="nav-item"><a class="nav-link" asp-controller="StylistNotifications" asp-action="Index">Thông báo khách đến</a></li>
+}
+<!-- Menu Dịch vụ -->
                         <li class="nav-item">
                             <a class="nav-link text-dark"
                                asp-controller="Services"
