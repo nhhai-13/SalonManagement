@@ -42,6 +42,8 @@ public ApplicationDbContext(
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
         
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+        public DbSet<AppointmentChangeLog> AppointmentChangeLogs => Set<AppointmentChangeLog>();
 public override int SaveChanges()
 {
     return SaveChangesAsync().GetAwaiter().GetResult();
@@ -362,6 +364,24 @@ private class AuditEntry
                 entity.HasOne(payment => payment.Invoice)
                     .WithMany(invoice => invoice.Payments)
                     .HasForeignKey(payment => payment.InvoiceId);
+            });
+
+            builder.Entity<AppointmentChangeLog>(entity =>
+            {
+                entity.HasKey(log => log.Id);
+                entity.Property(log => log.ModifiedByUserId).HasMaxLength(450);
+                entity.Property(log => log.ModifiedByUserName).HasMaxLength(256);
+                entity.Property(log => log.OldStylistName).HasMaxLength(150);
+                entity.Property(log => log.NewStylistName).HasMaxLength(150);
+                entity.Property(log => log.Reason).HasMaxLength(500);
+
+                entity.HasOne(log => log.Appointment)
+                    .WithMany()
+                    .HasForeignKey(log => log.AppointmentId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(log => log.AppointmentId);
+                entity.HasIndex(log => log.ChangedAtUtc);
             });
         }
     }
