@@ -197,6 +197,8 @@ builder.Services.AddScoped<
     ITokenService,
     TokenService>();
 
+builder.Services.AddScoped<CheckInService>();
+builder.Services.AddSingleton<AppointmentNotificationBus>();
 builder.Services.AddMemoryCache();
 
 builder.Services.AddScoped<

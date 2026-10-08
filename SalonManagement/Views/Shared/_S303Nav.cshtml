@@ -1,1 +1,9 @@
-@* Navigation supplied by the corresponding attendance feature. *@
+@if (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)) {
+<li class="nav-item"><a class="nav-link" asp-controller="Appointments" asp-action="Index">Check-in khách</a></li>
+}
+@if (User.IsInRole(UserRoles.Stylist)) {
+<li class="nav-item"><a class="nav-link" asp-controller="StylistNotifications" asp-action="Index">Thông báo khách đến</a></li>
+}
+@if (User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)) {
+<li class="nav-item"><a class="nav-link" asp-controller="StylistLinks" asp-action="Index">Liên kết thợ</a></li>
+}
