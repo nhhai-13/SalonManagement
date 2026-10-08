@@ -182,8 +182,9 @@
 </div>
 
 <!-- Toast thông báo kết quả -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="reception-toast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">
+    <!-- Toast thành công -->
+    <div id="reception-toast" class="toast align-items-center text-bg-success border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="d-flex">
             <div class="toast-body" id="reception-toast-message">
                 Thao tác thành công.
@@ -191,7 +192,47 @@
             <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
     </div>
+    <!-- Toast lỗi (AC1 Drag & Drop) -->
+    <div id="reception-toast-error" class="toast align-items-center text-bg-danger border-0 shadow-lg mt-2" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body" id="reception-toast-error-message">
+                Đã xảy ra lỗi khi thực hiện thao tác.
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
 </div>
+
+<style>
+    .appointment-card.draggable-card {
+        cursor: grab;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
+    }
+    .appointment-card.draggable-card:hover {
+        box-shadow: 0 4px 10px rgba(0,0,0,0.12) !important;
+        transform: translateY(-2px);
+    }
+    .appointment-card.draggable-card:active {
+        cursor: grabbing;
+    }
+    .appointment-card.dragging {
+        opacity: 0.35 !important;
+        border: 2px dashed #0d6efd !important;
+        transform: scale(0.96) !important;
+    }
+    .drop-zone {
+        min-height: 120px;
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+    .drop-zone.drop-target-valid {
+        border: 2px dashed #198754 !important;
+        background-color: #f0fdf4 !important;
+    }
+    .drop-zone.drop-target-invalid {
+        border: 2px dashed #dc3545 !important;
+        background-color: #fef2f2 !important;
+    }
+</style>
 
 @section Scripts {
     <script src="~/js/auth.js" asp-append-version="true"></script>

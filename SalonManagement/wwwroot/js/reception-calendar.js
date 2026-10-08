@@ -140,7 +140,7 @@ window.ReceptionCalendar = (() => {
                                 </small>
                             </div>
                         </div>
-                        <div class="card-body p-2 d-flex flex-column gap-2" style="max-height: 700px; overflow-y: auto;">
+                        <div class="card-body p-2 d-flex flex-column gap-2 drop-zone" data-stylist-id="${stylist.stylistId}" data-stylist-name="${escapeHtml(stylist.fullName)}" data-has-shifts="${hasShift ? 'true' : 'false'}" style="max-height: 700px; overflow-y: auto;">
             `;
 
             if (!stylist.appointments || stylist.appointments.length === 0) {
@@ -155,7 +155,13 @@ window.ReceptionCalendar = (() => {
                     const canEdit = appt.canReschedule;
 
                     html += `
-                        <div class="card border rounded-3 p-2 bg-white appointment-card shadow-xs position-relative" data-appointment-id="${appt.appointmentId}">
+                        <div class="card border rounded-3 p-2 bg-white appointment-card shadow-xs position-relative ${canEdit ? 'draggable-card' : ''}" 
+                             data-appointment-id="${appt.appointmentId}"
+                             data-stylist-id="${appt.stylistId}"
+                             data-date="${appt.appointmentDate}"
+                             data-start-time="${appt.startTime}"
+                             data-end-time="${appt.endTime}"
+                             ${canEdit ? 'draggable="true"' : ''}>
                             <div class="d-flex justify-content-between align-items-start mb-1">
                                 <span class="badge bg-light text-dark border fw-semibold">
                                     <i class="bi bi-clock me-1 text-primary"></i>${appt.formattedTimeRange}
@@ -201,6 +207,9 @@ window.ReceptionCalendar = (() => {
                 openRescheduleModal(apptId);
             });
         });
+
+        // Gắn sự kiện Kéo - Thả (Drag & Drop) đổi thợ (AC1)
+        bindDragAndDropEvents(gridContainer, scheduleData);
     }
 
     function getStatusBadge(status) {
@@ -565,6 +574,143 @@ window.ReceptionCalendar = (() => {
             `).join("");
         } catch (err) {
             console.error("Lỗi tải lịch sử thay đổi:", err);
+        }
+    }
+
+    let activeDraggedCard = null;
+
+    function bindDragAndDropEvents(gridContainer, scheduleData) {
+        const cards = gridContainer.querySelectorAll(".appointment-card.draggable-card");
+        const dropZones = gridContainer.querySelectorAll(".drop-zone");
+
+        cards.forEach(card => {
+            card.addEventListener("dragstart", (e) => {
+                activeDraggedCard = {
+                    element: card,
+                    appointmentId: parseInt(card.dataset.appointmentId, 10),
+                    stylistId: parseInt(card.dataset.stylistId, 10),
+                    date: card.dataset.date,
+                    startTime: card.dataset.startTime
+                };
+
+                e.dataTransfer.setData("text/plain", card.dataset.appointmentId);
+                e.dataTransfer.effectAllowed = "move";
+
+                setTimeout(() => {
+                    card.classList.add("dragging");
+                }, 0);
+            });
+
+            card.addEventListener("dragend", () => {
+                card.classList.remove("dragging");
+                dropZones.forEach(dz => {
+                    dz.classList.remove("drop-target-valid", "drop-target-invalid");
+                });
+                activeDraggedCard = null;
+            });
+        });
+
+        dropZones.forEach(zone => {
+            zone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                if (!activeDraggedCard) return;
+
+                e.dataTransfer.dropEffect = "move";
+
+                const targetStylistId = parseInt(zone.dataset.stylistId, 10);
+                const hasShifts = zone.dataset.hasShifts === "true";
+
+                if (targetStylistId === activeDraggedCard.stylistId) {
+                    zone.classList.remove("drop-target-valid", "drop-target-invalid");
+                } else if (!hasShifts) {
+                    zone.classList.remove("drop-target-valid");
+                    zone.classList.add("drop-target-invalid");
+                } else {
+                    zone.classList.remove("drop-target-invalid");
+                    zone.classList.add("drop-target-valid");
+                }
+            });
+
+            zone.addEventListener("dragleave", (e) => {
+                if (!zone.contains(e.relatedTarget)) {
+                    zone.classList.remove("drop-target-valid", "drop-target-invalid");
+                }
+            });
+
+            zone.addEventListener("drop", async (e) => {
+                e.preventDefault();
+                zone.classList.remove("drop-target-valid", "drop-target-invalid");
+
+                if (!activeDraggedCard) return;
+
+                const targetStylistId = parseInt(zone.dataset.stylistId, 10);
+                const targetStylistName = zone.dataset.stylistName || "Thợ mới";
+
+                if (targetStylistId === activeDraggedCard.stylistId) {
+                    return; // Cùng thợ, bỏ qua
+                }
+
+                const { appointmentId, date, startTime } = activeDraggedCard;
+                await handleDragDropReschedule(appointmentId, targetStylistId, date, startTime, targetStylistName);
+            });
+        });
+    }
+
+    async function handleDragDropReschedule(appointmentId, newStylistId, newDate, newStartTime, newStylistName) {
+        const loadingIndicator = document.getElementById("calendar-loading");
+        if (loadingIndicator) loadingIndicator.classList.remove("d-none");
+
+        const payload = {
+            newStylistId: newStylistId,
+            newDate: newDate,
+            newStartTime: newStartTime,
+            reason: `[Kéo thả lịch ngày] Đổi sang thợ ${newStylistName}`
+        };
+
+        try {
+            const res = await authFetch(`/api/reception/appointments/${appointmentId}/reschedule`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await res.json();
+
+            if (!res.ok || !result.success) {
+                const validation = result.validation;
+                const code = validation?.errorCode || "ERROR";
+                const message = validation?.errorMessage || result.message || "Không thể dời lịch.";
+
+                if (code === "F33") {
+                    showToastError(`[Mã F33 - Thiếu kỹ năng]: Thợ ${newStylistName} không thể thực hiện dịch vụ này. ${validation?.errorMessage || ""}`);
+                } else if (code === "OVERLAP") {
+                    showToastError(`[Trùng lịch]: Khung giờ đã chọn trùng lấn với lịch hẹn khác của thợ ${newStylistName}.`);
+                } else if (code === "OUT_OF_SHIFT") {
+                    showToastError(`[Ngoài ca làm]: Khung giờ nằm ngoài ca làm việc của thợ ${newStylistName}.`);
+                } else {
+                    showToastError(`Lỗi đổi thợ: ${message}`);
+                }
+            } else {
+                showToastSuccess(`Đã chuyển thành công lịch hẹn #${appointmentId} sang thợ ${newStylistName}!`);
+                await loadDailySchedule(currentDate);
+            }
+        } catch (err) {
+            console.error("Lỗi kéo thả đổi lịch:", err);
+            showToastError("Đã xảy ra lỗi mạng khi dời lịch.");
+        } finally {
+            if (loadingIndicator) loadingIndicator.classList.add("d-none");
+        }
+    }
+
+    function showToastError(message) {
+        const toastEl = document.getElementById("reception-toast-error");
+        if (toastEl) {
+            const msgEl = document.getElementById("reception-toast-error-message");
+            if (msgEl) msgEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i> ${escapeHtml(message)}`;
+            const toast = new bootstrap.Toast(toastEl, { delay: 6000 });
+            toast.show();
+        } else {
+            alert(message);
         }
     }
 
