@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
 using SalonManagement.Services;
+using SalonManagement.Services.Appointments;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
@@ -194,6 +195,7 @@ builder.Services.AddSingleton<
     PasswordResetRateLimiter>();
 
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<IAppointmentRescheduleService, AppointmentRescheduleService>();
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
 builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
