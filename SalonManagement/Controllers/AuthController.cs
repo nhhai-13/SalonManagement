@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
@@ -13,10 +14,15 @@ public class AuthController(
     UserManager<ApplicationUser> userManager,
     ApplicationDbContext dbContext,
     ITokenService tokenService,
-    TimeProvider timeProvider) : ControllerBase
+    TimeProvider timeProvider,
+    SignInManager<ApplicationUser> signInManager) : ControllerBase
 {
     private const string InvalidCredentialsMessage = "Email hoặc mật khẩu không chính xác.";
     private const string LockedAccountMessage = "Tài khoản đã bị khóa tạm thời do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.";
+
+    [Authorize(Roles = RoleGroups.Management)]
+    [HttpGet("management-session")]
+    public IActionResult ManagementSession() => Ok(new { authenticated = true });
 
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterStaffRequest request)
@@ -106,7 +112,13 @@ public class AuthController(
 
         await userManager.ResetAccessFailedCountAsync(user);
 
-        return Ok(await IssueTokens(user));
+        var tokens = await IssueTokens(user);
+        await signInManager.SignInAsync(user, new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+        {
+            IsPersistent = request.Remember,
+            ExpiresUtc = new DateTimeOffset(DateTime.SpecifyKind(tokens.AccessTokenExpiresAtUtc, DateTimeKind.Utc))
+        });
+        return Ok(tokens);
     }
 
     [HttpPost("refresh")]
@@ -122,7 +134,13 @@ public class AuthController(
         }
 
         storedToken.RevokedAtUtc = now;
-        return Ok(await IssueTokens(storedToken.User));
+        var tokens = await IssueTokens(storedToken.User);
+        await signInManager.SignInAsync(storedToken.User, new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+        {
+            IsPersistent = request.Remember,
+            ExpiresUtc = new DateTimeOffset(DateTime.SpecifyKind(tokens.AccessTokenExpiresAtUtc, DateTimeKind.Utc))
+        });
+        return Ok(tokens);
     }
 
     [HttpPost("logout")]
@@ -135,6 +153,7 @@ public class AuthController(
             storedToken.RevokedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
             await dbContext.SaveChangesAsync();
         }
+        await signInManager.SignOutAsync();
         return NoContent();
     }
 

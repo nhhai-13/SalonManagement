@@ -179,6 +179,19 @@ builder.Services.AddAuthentication(options =>
 // =====================================
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/admin/login";
+    options.Events.OnValidatePrincipal = async context =>
+    {
+        await SecurityStampValidator.ValidatePrincipalAsync(context);
+        if (context.Principal == null) return;
+        var manager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await manager.GetUserAsync(context.Principal);
+        if (user == null || !user.IsActive) context.RejectPrincipal();
+    };
+});
 
 builder.Services.AddScoped<
     ITokenService,

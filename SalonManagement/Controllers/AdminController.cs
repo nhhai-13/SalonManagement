@@ -42,11 +42,11 @@ public class AdminController : Controller
         return View("Register");
     }
 
-    [Authorize(Roles = UserRoles.Admin)]
+    [Authorize(Roles = RoleGroups.Management, AuthenticationSchemes = "Identity.Application")]
     [HttpGet("admin")]
     public IActionResult Index() => View();
 
-    [Authorize(Roles = UserRoles.Admin)]
+    [Authorize(Roles = RoleGroups.Management, AuthenticationSchemes = "Identity.Application")]
     [HttpGet("admin/business-hours")]
     public IActionResult BusinessHours() => View();
 }

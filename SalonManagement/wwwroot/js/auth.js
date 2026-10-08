@@ -59,7 +59,7 @@ window.SalonAuth = (() => {
             const response = await fetch("/api/auth/refresh", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ refreshToken })
+                body: JSON.stringify({ refreshToken, remember: storage === localStorage })
             });
             if (!response.ok) return false;
             saveSession(await response.json(), undefined, storage.getItem(portalKey));
@@ -90,6 +90,14 @@ window.SalonAuth = (() => {
     return {
         authenticatedFetch,
         redirectToLogin,
+        startSessionRefresh: scheduleRefresh,
+        async logout() {
+            const refreshToken = activeStorage().getItem(refreshKey);
+            try {
+                await fetch("/api/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ refreshToken: refreshToken || "browser-session" }) });
+            } finally { redirectToLogin(); }
+        },
         bindLoginForm() {
             const form = document.getElementById("login-form");
             const email = document.getElementById("email");
@@ -140,7 +148,8 @@ window.SalonAuth = (() => {
                         body: JSON.stringify({
                             email: email.value.trim(),
                             password: password.value,
-                            portal: form.dataset.portal || null
+                            portal: form.dataset.portal || null,
+                            remember: document.getElementById("remember")?.checked === true
                         })
                     });
                     if (!response.ok) {
@@ -233,7 +242,7 @@ window.SalonAuth = (() => {
             });
         },
         async requireSession() {
-            const response = await authenticatedFetch("/api/admin/session");
+            const response = await authenticatedFetch("/api/auth/management-session");
             if (!response.ok) return redirectToLogin("Phiên đăng nhập đã hết hạn.");
             scheduleRefresh();
             document.getElementById("admin-content").classList.remove("d-none");

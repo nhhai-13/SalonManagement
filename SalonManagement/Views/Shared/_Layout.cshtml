@@ -55,7 +55,9 @@
                             </a>
                         </li>
 
-                        <!-- Menu Dịch vụ -->
+                        @await Html.PartialAsync("_S303Nav")
+@await Html.PartialAsync("_S306Nav")
+<!-- Menu Dịch vụ -->
                         <li class="nav-item">
                             <a class="nav-link text-dark"
                                asp-controller="Services"
@@ -95,6 +97,11 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
 
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>
+        SalonAuth.startSessionRefresh();
+        document.getElementById('browser-logout')?.addEventListener('click', () => SalonAuth.logout());
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
