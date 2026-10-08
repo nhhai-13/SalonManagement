@@ -5,7 +5,8 @@ namespace SalonManagement.Models;
 public sealed record LoginRequest(
     [Required, EmailAddress] string Email,
     [Required] string Password,
-    string? Portal = null);
+    string? Portal = null,
+    bool Remember = false);
 
 public sealed record RegisterStaffRequest(
     [Required, EmailAddress] string Email,
@@ -17,7 +18,7 @@ public sealed record CreateStaffAccountRequest(
     [Required, MinLength(8)] string Password,
     [Required] string Role);
 
-public sealed record RefreshRequest([Required] string RefreshToken);
+public sealed record RefreshRequest([Required] string RefreshToken, bool Remember = false);
 
 public sealed record TokenResponse(
     string AccessToken,

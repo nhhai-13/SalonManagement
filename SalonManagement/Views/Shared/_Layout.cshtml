@@ -61,6 +61,9 @@
 @if (User.IsInRole(UserRoles.Stylist)) {
 <li class="nav-item"><a class="nav-link" asp-controller="StylistNotifications" asp-action="Index">Thông báo khách đến</a></li>
 }
+@if (User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)) {
+<li class="nav-item"><a class="nav-link" asp-controller="StylistLinks" asp-action="Index">Liên kết thợ</a></li>
+}
 <!-- Menu Dịch vụ -->
                         <li class="nav-item">
                             <a class="nav-link text-dark"
@@ -101,6 +104,11 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
 
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>
+        SalonAuth.startSessionRefresh();
+        document.getElementById('browser-logout')?.addEventListener('click', () => SalonAuth.logout());
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

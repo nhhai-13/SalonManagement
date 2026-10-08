@@ -28,6 +28,34 @@ public class AppointmentsController(ApplicationDbContext db, AppointmentOperatio
     }
 
     [HttpGet]
+    public async Task<IActionResult> Create()
+    {
+        await BookingLists();
+        return View(new DeskBookingRequest { StartsAt = clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime.AddMinutes(15) });
+    }
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(DeskBookingRequest request, [FromServices] DeskBookingService bookings)
+    {
+        if (ModelState.IsValid)
+        {
+            try
+            {
+                var appointment = await bookings.Create(request, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "");
+                TempData["Success"] = "Đã đặt lịch tại quầy.";
+                return RedirectToAction(nameof(Index), new { date = appointment.AppointmentDate.ToString("yyyy-MM-dd") });
+            }
+            catch (InvalidOperationException e) { ModelState.AddModelError("", e.Message); }
+        }
+        await BookingLists();
+        return View(request);
+    }
+    private async Task BookingLists()
+    {
+        ViewBag.Stylists = await db.Stylists.Where(s => s.IsActive).OrderBy(s => s.FullName).ToListAsync();
+        ViewBag.Services = await db.Services.Where(s => s.IsActive).OrderBy(s => s.ServiceName).ToListAsync();
+    }
+
+    [HttpGet]
     public async Task<IActionResult> CustomerWarning(string phone)
     {
         if (string.IsNullOrWhiteSpace(phone) || phone.Length > 20) return BadRequest(new { message = "Số điện thoại không hợp lệ." });
@@ -36,9 +64,9 @@ public class AppointmentsController(ApplicationDbContext db, AppointmentOperatio
     }
 
     [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> Change(int id, string action, DateTime date)
+    public async Task<IActionResult> Change(int id, string operation, DateTime date)
     {
-        try { await operations.Apply(id, action, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? ""); TempData["Success"] = "Đã cập nhật lịch hẹn."; }
+        try { await operations.Apply(id, operation, User.FindFirstValue(ClaimTypes.NameIdentifier) ?? ""); TempData["Success"] = "Đã cập nhật lịch hẹn."; }
         catch (KeyNotFoundException e) { return NotFound(e.Message); }
         catch (InvalidOperationException e) { TempData["Error"] = e.Message; }
         catch (DbUpdateConcurrencyException) { TempData["Error"] = "Lịch hẹn vừa được thay đổi. Vui lòng tải lại trang."; }
@@ -49,12 +77,12 @@ public class AppointmentsController(ApplicationDbContext db, AppointmentOperatio
 [ApiController, Route("api/appointments"), Authorize(Roles = RoleGroups.FrontDesk)]
 public class AppointmentOperationsController(AppointmentOperationsService operations) : ControllerBase
 {
-    [HttpPost("{id:int}/{action}")]
-    public async Task<IActionResult> Change(int id, string action)
+    [HttpPost("{id:int}/{operation}")]
+    public async Task<IActionResult> Change(int id, string operation)
     {
         try
         {
-            var a = await operations.Apply(id, action, User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "");
+            var a = await operations.Apply(id, operation, User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "");
             return Ok(new { a.AppointmentId, a.Status, a.CheckedInAt, a.LateMinutes, a.NoShowAt });
         }
         catch (KeyNotFoundException e) { return NotFound(new { message = e.Message }); }

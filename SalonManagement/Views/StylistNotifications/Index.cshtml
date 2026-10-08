@@ -1,9 +1,33 @@
 @model List<SalonManagement.Models.StylistNotification>
 @{ ViewData["Title"] = "Thông báo khách đến"; }
 <h1>Thông báo khách đến</h1>
-<p role="status">Thông báo tự cập nhật mỗi 10 giây.</p>
+<p id="connection-status" role="status">Đang kết nối thông báo trực tiếp…</p>
+<div id="notifications" aria-live="polite">
 @foreach (var n in Model) {
-    <div class="alert alert-info">@n.Message <small>@n.CreatedAt.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm 'ngày' dd/MM/yyyy")</small></div>
+    <div class="alert alert-info" data-id="@n.Id">@n.Message <small>@n.CreatedAt.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm 'ngày' dd/MM/yyyy")</small></div>
 }
-@if (Model.Count == 0) { <p>Chưa có thông báo. Tài khoản thợ cần được liên kết với hồ sơ thợ.</p> }
-@section Scripts { <script>setTimeout(() => location.reload(), 10000);</script> }
+</div>
+@if (Model.Count == 0) { <p id="empty">Chưa có thông báo. Tài khoản thợ cần được liên kết với hồ sơ thợ.</p> }
+@section Scripts {
+<script>
+const stream = new EventSource('@Url.Action("Stream")');
+const status = document.getElementById('connection-status');
+stream.onopen = async () => {
+    status.textContent = 'Đã kết nối thông báo trực tiếp.';
+    try {
+        const response = await fetch('@Url.Action("Latest")');
+        if (response.ok) for (const item of (await response.json()).reverse()) display({ Id: item.id, Message: item.message });
+        else if (response.status === 409) { stream.close(); status.textContent = 'Tài khoản chưa liên kết hồ sơ thợ. Hãy liên hệ quản lý.'; }
+    } catch { status.textContent = 'Đã kết nối, chưa tải được lịch sử thông báo.'; }
+};
+stream.onerror = () => { status.textContent = 'Đang kết nối lại. Bạn có thể tải lại trang để xem thông báo đã lưu.'; };
+function display(n) {
+    if (document.querySelector('[data-id="' + n.Id + '"]')) return;
+    const item = document.createElement('div'); item.className = 'alert alert-info'; item.dataset.id = n.Id;
+    item.textContent = n.Message; document.getElementById('notifications').prepend(item);
+    document.getElementById('empty')?.remove();
+}
+stream.onmessage = e => display(JSON.parse(e.data));
+window.addEventListener('pagehide', () => stream.close());
+</script>
+}

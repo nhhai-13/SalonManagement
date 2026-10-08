@@ -9,6 +9,7 @@
     string Label(string status) => status switch { "Pending" => "Chờ xác nhận", "Confirmed" => "Đã xác nhận", "Arrived" => "Đã đến", "NoShow" => "Không đến", "Cancelled" => "Đã huỷ", "Completed" => "Hoàn tất", _ => status };
 }
 <h1>Lịch hẹn tại quầy</h1>
+<p><a class="btn btn-primary" asp-action="Create">Đặt lịch tại quầy</a></p>
 @if (TempData["Error"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
 @if (TempData["Success"] is string success) { <div class="alert alert-success" role="status">@success</div> }
 <form method="get" class="mb-3"><label for="date">Ngày xem lịch</label> <input type="date" id="date" name="date" value="@day.ToString("yyyy-MM-dd")" required /> <button class="btn btn-primary">Xem lịch</button></form>
@@ -28,9 +29,9 @@
         @if (counts.GetValueOrDefault(a.Customer.Phone) > 0) { <p class="text-danger">Cảnh báo: khách đã không đến @counts[a.Customer.Phone] lần.</p> }
         <form asp-action="Change" method="post" class="d-flex flex-wrap gap-2">
             <input type="hidden" name="id" value="@a.AppointmentId" /><input type="hidden" name="date" value="@day.ToString("yyyy-MM-dd")" />
-            <button class="btn btn-success" name="action" value="check-in" disabled="@(!AppointmentOperationsService.CanCheckIn(a, now))">Check-in</button>
-            <button class="btn btn-outline-danger" name="action" value="no-show" disabled="@(!AppointmentOperationsService.CanMarkNoShow(a, now))">Không đến</button>
-            @if (a.Status == AppointmentStatuses.NoShow) { <button class="btn btn-outline-secondary" name="action" value="undo-no-show" disabled="@(!AppointmentOperationsService.CanUndo(a, now))">Hoàn tác không đến</button> }
+            <button class="btn btn-success" name="operation" value="check-in" disabled="@(!AppointmentOperationsService.CanCheckIn(a, now))">Check-in</button>
+            <button class="btn btn-outline-danger" name="operation" value="no-show" disabled="@(!AppointmentOperationsService.CanMarkNoShow(a, now))">Không đến</button>
+            @if (a.Status == AppointmentStatuses.NoShow) { <button class="btn btn-outline-secondary" name="operation" value="undo-no-show" disabled="@(!AppointmentOperationsService.CanUndo(a, now))">Hoàn tác không đến</button> }
         </form>
     </div></article>
 }
