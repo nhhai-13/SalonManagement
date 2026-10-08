@@ -197,6 +197,11 @@ builder.Services.AddScoped<
     ITokenService,
     TokenService>();
 
+builder.Services.Configure<AttendanceNavigation>(options =>
+{
+    options.ReceptionPath = "/Appointments";
+    options.StylistPath = "/StylistNotifications";
+});
 builder.Services.AddScoped<CheckInService>();
 builder.Services.AddSingleton<AppointmentNotificationBus>();
 builder.Services.AddMemoryCache();
