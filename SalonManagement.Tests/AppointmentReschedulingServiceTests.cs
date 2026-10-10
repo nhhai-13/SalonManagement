@@ -17,13 +17,19 @@ public sealed class AppointmentReschedulingServiceTests
         var fixture = await SeedAsync(db);
 
         var result = await new AppointmentReschedulingService(db, TimeProvider.System)
-            .RescheduleAsync(fixture.AppointmentId, new RescheduleAppointmentRequest(fixture.AlternateStylistId, TimeSpan.FromHours(11)));
+            .RescheduleAsync(fixture.AppointmentId, new RescheduleAppointmentRequest(fixture.AlternateStylistId, TimeSpan.FromHours(11)), new AppointmentChangeActor("reception-1", "Lễ tân"));
 
         Assert.IsTrue(result.Succeeded);
         var saved = await db.Appointments.SingleAsync();
         Assert.AreEqual(fixture.AlternateStylistId, saved.StylistId);
         Assert.AreEqual(TimeSpan.FromHours(11), saved.StartTime);
         Assert.AreEqual(TimeSpan.FromHours(11.5), saved.EndTime);
+        var log = await db.AppointmentChangeLogs.SingleAsync();
+        Assert.AreEqual("reception-1", log.ActorId);
+        Assert.AreEqual(fixture.OriginalStylistId, log.OldStylistId);
+        Assert.AreEqual(fixture.AlternateStylistId, log.NewStylistId);
+        Assert.AreEqual(TimeSpan.FromHours(9), log.OldStartTime);
+        Assert.AreEqual(TimeSpan.FromHours(11), log.NewStartTime);
     }
 
     [TestMethod]
@@ -41,6 +47,7 @@ public sealed class AppointmentReschedulingServiceTests
         var saved = await db.Appointments.SingleAsync();
         Assert.AreEqual(fixture.OriginalStylistId, saved.StylistId);
         Assert.AreEqual(TimeSpan.FromHours(9), saved.StartTime);
+        Assert.AreEqual(0, await db.AppointmentChangeLogs.CountAsync());
     }
 
     [TestMethod]
@@ -60,6 +67,20 @@ public sealed class AppointmentReschedulingServiceTests
         Assert.AreEqual("outside_shift", outsideShift.ErrorCode);
         var saved = await db.Appointments.SingleAsync(item => item.AppointmentId == fixture.AppointmentId);
         Assert.AreEqual(TimeSpan.FromHours(9), saved.StartTime);
+        Assert.AreEqual(0, await db.AppointmentChangeLogs.CountAsync());
+    }
+
+    [TestMethod]
+    public async Task Reschedule_without_changes_does_not_create_a_history_entry()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedAsync(db);
+
+        var result = await new AppointmentReschedulingService(db, TimeProvider.System)
+            .RescheduleAsync(fixture.AppointmentId, new RescheduleAppointmentRequest(fixture.OriginalStylistId, TimeSpan.FromHours(9)), new AppointmentChangeActor("reception-1", "Lễ tân"));
+
+        Assert.IsTrue(result.Succeeded);
+        Assert.AreEqual(0, await db.AppointmentChangeLogs.CountAsync());
     }
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());

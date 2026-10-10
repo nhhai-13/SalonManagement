@@ -321,6 +321,28 @@ namespace SalonManagement.Data.Migrations
                     b.ToTable("Appointments");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.AppointmentChangeLog", b =>
+                {
+                    b.Property<int>("AppointmentChangeLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:IdentityIncrement", 1)
+                        .HasAnnotation("SqlServer:IdentitySeed", 1L)
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<string>("ActorId").IsRequired().HasMaxLength(450).HasColumnType("nvarchar(450)");
+                    b.Property<string>("ActorName").IsRequired().HasMaxLength(256).HasColumnType("nvarchar(256)");
+                    b.Property<int>("AppointmentId").HasColumnType("int");
+                    b.Property<DateTime>("ChangedAt").HasColumnType("datetime2");
+                    b.Property<int?>("NewStylistId").HasColumnType("int");
+                    b.Property<TimeSpan?>("NewStartTime").HasColumnType("time");
+                    b.Property<int?>("OldStylistId").HasColumnType("int");
+                    b.Property<TimeSpan?>("OldStartTime").HasColumnType("time");
+                    b.HasKey("AppointmentChangeLogId");
+                    b.HasIndex("AppointmentId", "ChangedAt");
+                    b.ToTable("AppointmentChangeLogs", (string)null);
+                });
+
             modelBuilder.Entity("SalonManagement.Models.AppointmentService", b =>
                 {
                     b.Property<int>("AppointmentServiceId")

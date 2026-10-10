@@ -35,6 +35,8 @@ public ApplicationDbContext(
 
         public DbSet<Appointment> Appointments => Set<Appointment>();
 
+        public DbSet<AppointmentChangeLog> AppointmentChangeLogs => Set<AppointmentChangeLog>();
+
         public DbSet<AppointmentService> AppointmentServices => Set<AppointmentService>();
 
         public DbSet<Invoice> Invoices => Set<Invoice>();
@@ -355,6 +357,14 @@ private class AuditEntry
                         appointment.AppointmentDate,
                         appointment.StartTime
                     });
+            });
+
+            builder.Entity<AppointmentChangeLog>(entity =>
+            {
+                entity.HasKey(log => log.AppointmentChangeLogId);
+                entity.Property(log => log.ActorId).HasMaxLength(450).IsRequired();
+                entity.Property(log => log.ActorName).HasMaxLength(256).IsRequired();
+                entity.HasIndex(log => new { log.AppointmentId, log.ChangedAt });
             });
 
             builder.Entity<AppointmentService>(entity =>

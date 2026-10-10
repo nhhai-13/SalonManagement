@@ -5,6 +5,7 @@ using SalonManagement.Models;
 namespace SalonManagement.Services;
 
 public sealed record RescheduleAppointmentRequest(int StylistId, TimeSpan StartTime);
+public sealed record AppointmentChangeActor(string Id, string Name);
 public sealed record RescheduleAppointmentResult(bool Succeeded, string? ErrorCode, string? Error, Appointment? Appointment)
 {
     public static RescheduleAppointmentResult Rejected(string code, string error) => new(false, code, error, null);
@@ -15,7 +16,7 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
 {
     private static readonly string[] UnavailableStatuses = ["Cancelled", "Rejected", "NoShow", "Completed", "InProgress"];
 
-    public async Task<RescheduleAppointmentResult> RescheduleAsync(int appointmentId, RescheduleAppointmentRequest request)
+    public async Task<RescheduleAppointmentResult> RescheduleAsync(int appointmentId, RescheduleAppointmentRequest request, AppointmentChangeActor? actor = null)
     {
         var appointment = await db.Appointments
             .Include(item => item.AppointmentServices)
@@ -56,10 +57,28 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
         if (conflict is not null)
             return RescheduleAppointmentResult.Rejected("overlap", $"Khung giờ bị chồng lấn với lịch của {conflict.Customer.FullName} lúc {conflict.StartTime:hh\\:mm}–{conflict.EndTime:hh\\:mm}.");
 
+        var oldStylistId = appointment.StylistId;
+        var oldStartTime = appointment.StartTime;
+        var hasChanges = oldStylistId != stylist.StylistId || oldStartTime != request.StartTime;
+        if (!hasChanges) return RescheduleAppointmentResult.Success(appointment);
+
         appointment.StylistId = stylist.StylistId;
         appointment.StartTime = request.StartTime;
         appointment.EndTime = endTime;
         appointment.UpdatedAt = SalonClock.GetLocalNow(timeProvider);
+        var changedAt = appointment.UpdatedAt.Value;
+        var changedBy = actor ?? new AppointmentChangeActor("system", "Hệ thống");
+        db.AppointmentChangeLogs.Add(new AppointmentChangeLog
+        {
+            AppointmentId = appointment.AppointmentId,
+            ActorId = changedBy.Id,
+            ActorName = changedBy.Name,
+            ChangedAt = changedAt,
+            OldStylistId = oldStylistId == stylist.StylistId ? null : oldStylistId,
+            NewStylistId = oldStylistId == stylist.StylistId ? null : stylist.StylistId,
+            OldStartTime = oldStartTime == request.StartTime ? null : oldStartTime,
+            NewStartTime = oldStartTime == request.StartTime ? null : request.StartTime
+        });
         try
         {
             await db.SaveChangesAsync();
