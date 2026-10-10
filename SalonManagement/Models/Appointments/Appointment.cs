@@ -24,6 +24,10 @@
 
         public DateTime? UpdatedAt { get; set; }
 
+        public string? ConfirmedByUserId { get; set; }
+
+        public DateTime? ConfirmedAt { get; set; }
+
         public Customer Customer { get; set; } = null!;
 
         public Stylist Stylist { get; set; } = null!;

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Security.Claims;
 using SalonManagement.Controllers.Reception;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -66,7 +67,7 @@ public sealed class PendingOnlineAppointmentsTests
             onlineSooner);
         await db.SaveChangesAsync();
 
-        var action = await new PendingAppointmentsController(db).Get();
+        var action = await new PendingAppointmentsController(db, TimeProvider.System).Get();
         var response = action.Result as OkObjectResult;
         Assert.IsNotNull(response);
         var items = response.Value as List<PendingAppointmentResponse>;
@@ -79,6 +80,47 @@ public sealed class PendingOnlineAppointmentsTests
         CollectionAssert.AreEqual(new[] { "Cắt kiểm thử" }, items[0].Services.ToList());
         Assert.AreEqual("PendingConfirmation", items[0].Status);
         Assert.AreEqual("ONLINE02", items[1].Reference);
+    }
+
+    [TestMethod]
+    public async Task Confirm_pending_appointment_sets_status_actor_and_timestamp()
+    {
+        await using var db = CreateDb();
+        var date = new DateTime(2031, 2, 3);
+        await SeedBookableStylistAsync(db, date);
+        var appointment = new Appointment { Customer = new Customer { FullName = "Khách", Phone = "0900000003" }, StylistId = (await db.Stylists.SingleAsync()).StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "PendingConfirmation", BookingReference = "ONLINE03" };
+        db.Appointments.Add(appointment); await db.SaveChangesAsync();
+        var controller = new PendingAppointmentsController(db, TimeProvider.System) { ControllerContext = new ControllerContext { HttpContext = AuthenticatedContext("reception-1") } };
+
+        var action = await controller.Confirm(appointment.AppointmentId);
+
+        Assert.IsInstanceOfType<OkObjectResult>(action);
+        var saved = await db.Appointments.SingleAsync();
+        Assert.AreEqual("Confirmed", saved.Status);
+        Assert.AreEqual("reception-1", saved.ConfirmedByUserId);
+        Assert.IsNotNull(saved.ConfirmedAt);
+    }
+
+    [TestMethod]
+    public async Task Confirm_processed_appointment_is_rejected_without_overwriting_confirmation()
+    {
+        await using var db = CreateDb();
+        var appointment = new Appointment { Customer = new Customer { FullName = "Khách", Phone = "0900000004" }, StylistId = 1, AppointmentDate = new DateTime(2031, 2, 3), StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "Confirmed", BookingReference = "ONLINE04", ConfirmedByUserId = "first", ConfirmedAt = new DateTime(2031, 2, 1) };
+        db.Appointments.Add(appointment); await db.SaveChangesAsync();
+        var controller = new PendingAppointmentsController(db, TimeProvider.System) { ControllerContext = new ControllerContext { HttpContext = AuthenticatedContext("second") } };
+
+        var action = await controller.Confirm(appointment.AppointmentId);
+
+        Assert.IsInstanceOfType<ConflictObjectResult>(action);
+        var saved = await db.Appointments.SingleAsync();
+        Assert.AreEqual("first", saved.ConfirmedByUserId);
+    }
+
+    private static DefaultHttpContext AuthenticatedContext(string userId)
+    {
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, userId)], "test"));
+        return context;
     }
 
     private static ApplicationDbContext CreateDb()
