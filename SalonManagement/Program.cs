@@ -217,6 +217,7 @@ builder.Services.AddSingleton<
 
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<AppointmentBookingService>();
+builder.Services.AddScoped<AppointmentReschedulingService>();
 builder.Services.AddScoped<BookingEmailVerificationService>();
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
