@@ -17,6 +17,12 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
     private static readonly string[] UnavailableStatuses = ["Cancelled", "Rejected", "NoShow", "Completed", "InProgress"];
 
     public async Task<RescheduleAppointmentResult> RescheduleAsync(int appointmentId, RescheduleAppointmentRequest request, AppointmentChangeActor? actor = null)
+        => await ProcessAsync(appointmentId, request, actor, true);
+
+    public async Task<RescheduleAppointmentResult> PreviewAsync(int appointmentId, RescheduleAppointmentRequest request)
+        => await ProcessAsync(appointmentId, request, null, false);
+
+    private async Task<RescheduleAppointmentResult> ProcessAsync(int appointmentId, RescheduleAppointmentRequest request, AppointmentChangeActor? actor, bool persist)
     {
         var appointment = await db.Appointments
             .Include(item => item.AppointmentServices)
@@ -62,6 +68,7 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
         var oldStartTime = appointment.StartTime;
         var hasChanges = oldStylistId != stylist.StylistId || oldStartTime != request.StartTime;
         if (!hasChanges) return RescheduleAppointmentResult.Success(appointment);
+        if (!persist) return RescheduleAppointmentResult.Success(appointment);
 
         appointment.StylistId = stylist.StylistId;
         appointment.StartTime = request.StartTime;

@@ -1,0 +1,14 @@
+@model SalonManagement.Models.ViewModels.Reception.DailyScheduleViewModel
+@{ ViewData["Title"] = "Lịch ngày"; var start = TimeSpan.FromHours(8); var end = TimeSpan.FromHours(18); }
+<style>
+.daily-grid{display:grid;grid-template-columns:repeat(var(--columns),minmax(220px,1fr));gap:12px;overflow:auto}.schedule-column{display:grid;grid-template-rows:40px repeat(40,24px);min-width:220px;position:relative}.schedule-slot{border:1px solid #e9ecef;grid-column:1;min-height:24px}.outside-shift{background:#f1f3f5}.appointment-card{grid-column:1;margin:1px 4px;z-index:2;padding:4px 6px;background:#dbeafe;border-radius:4px;cursor:grab;overflow:hidden;font-size:.8rem}.appointment-card small{display:block}.dragging{opacity:.4}.selected{outline:3px solid #0d6efd}.preview-valid{background:#d1e7dd}.preview-invalid{background:#f8d7da}
+</style>
+<div class="container-fluid py-4" id="daily-schedule">
+<div class="d-flex justify-content-between mb-3"><a class="btn btn-outline-secondary" href="?date=@Model.Date.AddDays(-1).ToString("yyyy-MM-dd")">← Hôm trước</a><h1 class="h3">Lịch ngày @Model.Date.ToString("dd/MM/yyyy")</h1><a class="btn btn-outline-secondary" href="?date=@Model.Date.AddDays(1).ToString("yyyy-MM-dd")">Hôm sau →</a></div>
+<div id="schedule-message" class="alert d-none" role="alert"></div><p class="text-muted">Kéo thẻ sang ô giờ/thợ mới. Hoặc chọn thẻ bằng Enter rồi chọn ô đích.</p>
+<div class="daily-grid" style="--columns:@Math.Max(Model.Stylists.Count,1)">
+@foreach(var stylist in Model.Stylists){<section class="schedule-column"><h2 class="h6 bg-white mb-0">@stylist.Name</h2>
+@for(var time=start;time<end;time+=TimeSpan.FromMinutes(15)){<div class="schedule-slot @(time < stylist.StartTime || time >= stylist.EndTime ? "outside-shift" : "")" data-stylist-id="@stylist.StylistId" data-start="@time.ToString(@"hh\:mm")"></div>}
+@foreach(var appointment in Model.Appointments.Where(item=>item.StylistId==stylist.StylistId)){var rows=Math.Max(1,(int)((appointment.EndTime-appointment.StartTime).TotalMinutes/15));var position=(int)((appointment.StartTime-start).TotalMinutes/15)+2;<article class="appointment-card" draggable="true" tabindex="0" role="button" data-appointment-id="@appointment.AppointmentId" data-stylist-id="@appointment.StylistId" data-start="@appointment.StartTime.ToString(@"hh\:mm")" style="grid-row:@position / span @rows"><strong>@appointment.CustomerName</strong><small>@appointment.Services</small><small>@appointment.StartTime.ToString(@"hh\:mm")–@appointment.EndTime.ToString(@"hh\:mm")</small></article>}</section>}
+</div></div>
+@section Scripts { <script src="~/js/appointment-reschedule-dragdrop.js" asp-append-version="true"></script> }

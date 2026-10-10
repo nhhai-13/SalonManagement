@@ -107,6 +107,23 @@ public sealed class AppointmentReschedulingServiceTests
         Assert.AreEqual("NotRequired", (await db.AppointmentChangeLogs.SingleAsync()).EmailStatus);
     }
 
+    [TestMethod]
+    public async Task Preview_validates_without_changing_appointment_or_creating_notifications()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedAsync(db);
+
+        var result = await new AppointmentReschedulingService(db, TimeProvider.System)
+            .PreviewAsync(fixture.AppointmentId, new RescheduleAppointmentRequest(fixture.AlternateStylistId, TimeSpan.FromHours(11)));
+
+        Assert.IsTrue(result.Succeeded);
+        var appointment = await db.Appointments.SingleAsync();
+        Assert.AreEqual(fixture.OriginalStylistId, appointment.StylistId);
+        Assert.AreEqual(TimeSpan.FromHours(9), appointment.StartTime);
+        Assert.AreEqual(0, await db.AppointmentChangeLogs.CountAsync());
+        Assert.AreEqual(0, await db.AppointmentChangeEmails.CountAsync());
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 
     private static async Task<(int AppointmentId, int OriginalStylistId, int AlternateStylistId, int UnqualifiedStylistId, DateTime Date)> SeedAsync(ApplicationDbContext db)

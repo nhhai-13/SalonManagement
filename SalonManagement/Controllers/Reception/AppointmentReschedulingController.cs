@@ -13,6 +13,13 @@ namespace SalonManagement.Controllers.Reception;
 [Route("api/reception/appointments")]
 public sealed class AppointmentReschedulingController(AppointmentReschedulingService service, ApplicationDbContext db) : ControllerBase
 {
+    [HttpPost("{appointmentId:int}/reschedule-preview")]
+    public async Task<IActionResult> Preview(int appointmentId, [FromBody] RescheduleAppointmentRequest request)
+    {
+        var result = await service.PreviewAsync(appointmentId, request);
+        return result.Succeeded ? Ok(new { valid = true }) : BadRequest(new { valid = false, code = result.ErrorCode, error = result.Error });
+    }
+
     [HttpPut("{appointmentId:int}/reschedule")]
     public async Task<IActionResult> Reschedule(int appointmentId, [FromBody] RescheduleAppointmentRequest request)
     {
