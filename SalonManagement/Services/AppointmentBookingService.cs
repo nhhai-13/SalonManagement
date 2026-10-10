@@ -35,9 +35,13 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
         if (services.Count != request.ServiceIds.Distinct().Count()) return BookingCreationResult.Rejected("invalid_services", "Dịch vụ đã chọn không còn khả dụng.");
         var endTime = request.StartTime.Add(TimeSpan.FromMinutes(services.Sum(item => item.DurationMinutes)));
         var stylists = await db.Stylists.Where(item => item.IsActive).Include(item => item.Services).Include(item => item.WorkSchedules.Where(schedule => schedule.WorkDate == request.Date.Date)).ToListAsync();
+        var dayOffStylistIds = await db.StylistDaysOff.AsNoTracking()
+            .Where(item => item.OffDate == request.Date.Date)
+            .Select(item => item.StylistId)
+            .ToListAsync();
         var required = request.ServiceIds.Distinct().ToHashSet();
         var appointments = await db.Appointments.Where(item => item.AppointmentDate == request.Date.Date && item.Status != "Cancelled" && item.Status != "NoShow" && item.Status != "Rejected").ToListAsync();
-        var stylist = stylists.FirstOrDefault(candidate => required.All(serviceId => candidate.Services.Any(skill => skill.ServiceId == serviceId)) && candidate.WorkSchedules.Any(schedule => schedule.StartTime <= request.StartTime && endTime <= schedule.EndTime) && !appointments.Where(item => item.StylistId == candidate.StylistId).Any(item => item.StartTime < endTime && request.StartTime < item.EndTime));
+        var stylist = stylists.FirstOrDefault(candidate => !dayOffStylistIds.Contains(candidate.StylistId) && required.All(serviceId => candidate.Services.Any(skill => skill.ServiceId == serviceId)) && candidate.WorkSchedules.Any(schedule => schedule.StartTime <= request.StartTime && endTime <= schedule.EndTime) && !appointments.Where(item => item.StylistId == candidate.StylistId).Any(item => item.StartTime < endTime && request.StartTime < item.EndTime));
         if (stylist is null) return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác.");
 
         await ConfirmationLock.WaitAsync();

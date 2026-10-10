@@ -18,7 +18,28 @@ public sealed class ReceptionScheduleController(ApplicationDbContext db) : Contr
         var hours = await db.BusinessHours.AsNoTracking().SingleOrDefaultAsync(item => item.DayOfWeek == selectedDate.DayOfWeek);
         var opensAt = hours?.OpensAt?.ToTimeSpan() ?? TimeSpan.FromHours(8);
         var closesAt = hours?.ClosesAt?.ToTimeSpan() ?? TimeSpan.FromHours(18);
-        var stylists = await db.WorkSchedules.AsNoTracking().Where(item => item.WorkDate.Date == selectedDate && item.Status == "Working" && item.Stylist.IsActive).OrderBy(item => item.Stylist.FullName).Select(item => new DailyScheduleStylist(item.StylistId, item.Stylist.FullName, item.StartTime, item.EndTime)).ToListAsync();
+        var shifts = await db.WorkSchedules.AsNoTracking()
+            .Where(item => item.WorkDate.Date == selectedDate && item.Status == "Working")
+            .Select(item => new { item.StylistId, item.StartTime, item.EndTime })
+            .ToListAsync();
+        var dayOffStylistIds = await db.StylistDaysOff.AsNoTracking()
+            .Where(item => item.OffDate == selectedDate)
+            .Select(item => item.StylistId)
+            .ToListAsync();
+        var displayedStylistIds = shifts.Select(item => item.StylistId).Union(dayOffStylistIds).ToList();
+        var stylistNames = await db.Stylists.AsNoTracking()
+            .Where(item => item.IsActive && displayedStylistIds.Contains(item.StylistId))
+            .OrderBy(item => item.FullName)
+            .Select(item => new { item.StylistId, item.FullName })
+            .ToListAsync();
+        var dayOffSet = dayOffStylistIds.ToHashSet();
+        var stylists = stylistNames.Select(stylist => new DailyScheduleStylist(
+            stylist.StylistId,
+            stylist.FullName,
+            shifts.Where(shift => shift.StylistId == stylist.StylistId)
+                .OrderBy(shift => shift.StartTime)
+                .Select(shift => new DailyScheduleShift(shift.StartTime, shift.EndTime)).ToList(),
+            dayOffSet.Contains(stylist.StylistId))).ToList();
         var appointments = (await db.Appointments.AsNoTracking()
             .Include(item => item.Customer)
             .Include(item => item.AppointmentServices).ThenInclude(item => item.Service)

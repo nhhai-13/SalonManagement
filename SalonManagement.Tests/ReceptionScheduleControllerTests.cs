@@ -39,4 +39,27 @@ public sealed class ReceptionScheduleControllerTests
         Assert.AreEqual(new TimeSpan(9, 10, 0), appointment.StartTime);
         Assert.AreEqual(new TimeSpan(9, 55, 0), appointment.EndTime);
     }
+
+    [TestMethod]
+    public async Task Index_marks_day_off_and_preserves_multiple_work_intervals()
+    {
+        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
+        var date = new DateTime(2031, 2, 3);
+        var working = new Stylist { FullName = "Thợ chia ca", Phone = "0900000011" };
+        var off = new Stylist { FullName = "Thợ nghỉ", Phone = "0900000012" };
+        db.Stylists.AddRange(working, off); await db.SaveChangesAsync();
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { StylistId = working.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) },
+            new WorkSchedule { StylistId = working.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(13), EndTime = TimeSpan.FromHours(17) });
+        db.StylistDaysOff.Add(new StylistDayOff { StylistId = off.StylistId, OffDate = date });
+        await db.SaveChangesAsync();
+
+        var result = await new ReceptionScheduleController(db).Index(date);
+        var model = (DailyScheduleViewModel)((ViewResult)result).Model!;
+
+        var workingSchedule = model.Stylists.Single(item => item.StylistId == working.StylistId);
+        Assert.IsFalse(workingSchedule.IsDayOff);
+        Assert.AreEqual(2, workingSchedule.Shifts.Count);
+        Assert.IsTrue(model.Stylists.Single(item => item.StylistId == off.StylistId).IsDayOff);
+    }
 }

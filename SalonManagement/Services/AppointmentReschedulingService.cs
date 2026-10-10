@@ -48,6 +48,10 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
         var duration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
         if (duration <= 0) return RescheduleAppointmentResult.Rejected("invalid_duration", "Lịch hẹn không có thời lượng dịch vụ hợp lệ.");
         var endTime = request.StartTime.Add(TimeSpan.FromMinutes(duration));
+        var isDayOff = await db.StylistDaysOff.AsNoTracking().AnyAsync(item =>
+            item.StylistId == stylist.StylistId && item.OffDate == appointment.AppointmentDate.Date);
+        if (isDayOff)
+            return RescheduleAppointmentResult.Rejected("day_off", "Thợ nghỉ trong ngày này, không thể xếp lịch hẹn.");
         var shifts = await db.WorkSchedules.AsNoTracking()
             .Where(shift => shift.StylistId == stylist.StylistId && shift.WorkDate.Date == appointment.AppointmentDate.Date && shift.Status == "Working")
             .ToListAsync();

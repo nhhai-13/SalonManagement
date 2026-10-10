@@ -124,6 +124,21 @@ public sealed class AppointmentReschedulingServiceTests
         Assert.AreEqual(0, await db.AppointmentChangeEmails.CountAsync());
     }
 
+    [TestMethod]
+    public async Task Reschedule_to_stylist_on_day_off_is_rejected()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedAsync(db);
+        db.StylistDaysOff.Add(new StylistDayOff { StylistId = fixture.AlternateStylistId, OffDate = fixture.Date });
+        await db.SaveChangesAsync();
+
+        var result = await new AppointmentReschedulingService(db, TimeProvider.System)
+            .PreviewAsync(fixture.AppointmentId, new RescheduleAppointmentRequest(fixture.AlternateStylistId, TimeSpan.FromHours(11)));
+
+        Assert.IsFalse(result.Succeeded);
+        Assert.AreEqual("day_off", result.ErrorCode);
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 
     private static async Task<(int AppointmentId, int OriginalStylistId, int AlternateStylistId, int UnqualifiedStylistId, DateTime Date)> SeedAsync(ApplicationDbContext db)

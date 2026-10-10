@@ -29,6 +29,22 @@ public sealed class PendingOnlineAppointmentsTests
     }
 
     [TestMethod]
+    public async Task Online_booking_is_rejected_when_only_matching_stylist_is_off()
+    {
+        await using var db = CreateDb();
+        var date = new DateTime(2031, 2, 3);
+        await SeedBookableStylistAsync(db, date);
+        db.StylistDaysOff.Add(new StylistDayOff { StylistId = (await db.Stylists.SingleAsync()).StylistId, OffDate = date });
+        await db.SaveChangesAsync();
+
+        var result = await new AppointmentBookingService(db, TimeProvider.System)
+            .CreateAsync(new BookingRequest(date, TimeSpan.FromHours(9), [1], "Khách online", "0912345678"));
+
+        Assert.IsNull(result.Confirmation);
+        Assert.AreEqual("slot_unavailable", result.ErrorCode);
+    }
+
+    [TestMethod]
     public async Task Pending_endpoint_returns_only_online_pending_appointments_in_priority_order()
     {
         await using var db = CreateDb();
