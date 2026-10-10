@@ -14,10 +14,12 @@ namespace SalonManagement.Controllers.Reception;
 public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeProvider timeProvider) : ControllerBase
 {
     private static readonly string[] RejectionReasons = ["Không còn thợ phù hợp", "Khung giờ không còn trống", "Không liên hệ được khách", "Yêu cầu của khách không phù hợp"];
+    private static readonly TimeSpan PendingOverdueAfter = TimeSpan.FromHours(12);
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PendingAppointmentResponse>>> Get()
     {
+        var now = SalonClock.GetLocalNow(timeProvider);
         var appointments = await db.Appointments.AsNoTracking()
             .Where(appointment => appointment.Status == "PendingConfirmation")
             .OrderBy(appointment => appointment.AppointmentDate)
@@ -40,7 +42,8 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
                 appointment.Status,
                 appointment.CreatedAt,
                 appointment.ConfirmedByUserId,
-                appointment.ConfirmedAt))
+                appointment.ConfirmedAt,
+                appointment.CreatedAt <= now.Subtract(PendingOverdueAfter)))
             .ToListAsync();
 
         return Ok(appointments);
@@ -107,4 +110,5 @@ public sealed record PendingAppointmentResponse(
     string Status,
     DateTime CreatedAt,
     string? ConfirmedByUserId = null,
-    DateTime? ConfirmedAt = null);
+    DateTime? ConfirmedAt = null,
+    bool IsOverdue = false);

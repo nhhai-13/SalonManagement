@@ -140,6 +140,26 @@ public sealed class PendingOnlineAppointmentsTests
         Assert.IsTrue(slots.Slots.Contains(saved.StartTime));
     }
 
+    [TestMethod]
+    public async Task Pending_endpoint_marks_only_appointments_waiting_at_least_twelve_hours_as_overdue()
+    {
+        await using var db = CreateDb();
+        var date = DateTime.Today.AddDays(1);
+        await SeedBookableStylistAsync(db, date);
+        var stylistId = (await db.Stylists.SingleAsync()).StylistId;
+        db.Appointments.AddRange(
+            new Appointment { Customer = new Customer { FullName = "Quá hạn", Phone = "0900000006" }, StylistId = stylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "PendingConfirmation", BookingReference = "ONLINE06", CreatedAt = DateTime.Now.AddHours(-12) },
+            new Appointment { Customer = new Customer { FullName = "Còn hạn", Phone = "0900000007" }, StylistId = stylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(10.5), Status = "PendingConfirmation", BookingReference = "ONLINE07", CreatedAt = DateTime.Now.AddHours(-11).AddMinutes(-59) });
+        await db.SaveChangesAsync();
+
+        var action = await new PendingAppointmentsController(db, TimeProvider.System).Get();
+        var response = action.Result as OkObjectResult;
+        var items = response!.Value as List<PendingAppointmentResponse>;
+
+        Assert.IsTrue(items!.Single(item => item.Reference == "ONLINE06").IsOverdue);
+        Assert.IsFalse(items.Single(item => item.Reference == "ONLINE07").IsOverdue);
+    }
+
     private static DefaultHttpContext AuthenticatedContext(string userId)
     {
         var context = new DefaultHttpContext();

@@ -31,7 +31,7 @@ window.ReceptionPendingAppointments = (() => {
                     <td>${appointment.services.map(escapeHtml).join("<br>")}</td>
                     <td>${escapeHtml(appointment.stylistName)}</td>
                     <td><strong>${date(appointment.appointmentDate)}</strong><br><small>${time(appointment.startTime)}–${time(appointment.endTime)}</small></td>
-                    <td><span class="badge text-bg-warning">Chờ xác nhận</span></td>
+                    <td><span class="badge text-bg-warning">Chờ xác nhận</span>${appointment.isOverdue ? '<br><span class="badge text-bg-danger mt-1">Quá hạn xử lý</span>' : ''}</td>
                     <td><div class="d-flex flex-column gap-1"><button class="btn btn-sm btn-success" type="button" data-confirm-appointment="${appointment.appointmentId}">Xác nhận</button><div class="input-group input-group-sm"><select class="form-select" aria-label="Lý do từ chối" data-rejection-reason><option value="">Chọn lý do…</option><option>Không còn thợ phù hợp</option><option>Khung giờ không còn trống</option><option>Không liên hệ được khách</option><option>Yêu cầu của khách không phù hợp</option></select><button class="btn btn-outline-danger" type="button" data-reject-appointment="${appointment.appointmentId}">Từ chối</button></div></div></td>
                 </tr>`).join("");
             list.querySelectorAll("[data-confirm-appointment]").forEach(button => button.addEventListener("click", async () => {
