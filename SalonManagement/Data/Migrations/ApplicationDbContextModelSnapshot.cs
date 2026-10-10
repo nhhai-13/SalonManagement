@@ -336,11 +336,30 @@ namespace SalonManagement.Data.Migrations
                     b.Property<DateTime>("ChangedAt").HasColumnType("datetime2");
                     b.Property<int?>("NewStylistId").HasColumnType("int");
                     b.Property<TimeSpan?>("NewStartTime").HasColumnType("time");
+                    b.Property<string>("EmailStatus").IsRequired().HasColumnType("nvarchar(max)");
                     b.Property<int?>("OldStylistId").HasColumnType("int");
                     b.Property<TimeSpan?>("OldStartTime").HasColumnType("time");
                     b.HasKey("AppointmentChangeLogId");
                     b.HasIndex("AppointmentId", "ChangedAt");
                     b.ToTable("AppointmentChangeLogs", (string)null);
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.AppointmentChangeEmail", b =>
+                {
+                    b.Property<int>("AppointmentChangeEmailId").ValueGeneratedOnAdd().HasColumnType("int").HasAnnotation("SqlServer:IdentityIncrement", 1).HasAnnotation("SqlServer:IdentitySeed", 1L).HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+                    b.Property<int>("AppointmentChangeLogId").HasColumnType("int");
+                    b.Property<DateTime>("AppointmentDate").HasColumnType("datetime2");
+                    b.Property<int>("AttemptCount").HasColumnType("int");
+                    b.Property<string>("LastError").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+                    b.Property<DateTime>("NextAttemptAt").HasColumnType("datetime2");
+                    b.Property<string>("RecipientEmail").IsRequired().HasMaxLength(256).HasColumnType("nvarchar(256)");
+                    b.Property<DateTime?>("SentAt").HasColumnType("datetime2");
+                    b.Property<TimeSpan>("StartTime").HasColumnType("time");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(20).HasColumnType("nvarchar(20)");
+                    b.Property<string>("StylistName").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+                    b.HasKey("AppointmentChangeEmailId");
+                    b.HasIndex("Status", "NextAttemptAt");
+                    b.ToTable("AppointmentChangeEmails", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.AppointmentService", b =>

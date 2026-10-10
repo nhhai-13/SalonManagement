@@ -30,6 +30,14 @@ public sealed class AppointmentReschedulingServiceTests
         Assert.AreEqual(fixture.AlternateStylistId, log.NewStylistId);
         Assert.AreEqual(TimeSpan.FromHours(9), log.OldStartTime);
         Assert.AreEqual(TimeSpan.FromHours(11), log.NewStartTime);
+        var email = await db.AppointmentChangeEmails.SingleAsync();
+        Assert.AreEqual("Queued", email.Status);
+        var sender = new FakeEmailService();
+        await new AppointmentChangeEmailProcessor(db, sender, TimeProvider.System).ProcessPendingAsync();
+        Assert.AreEqual("Sent", (await db.AppointmentChangeEmails.SingleAsync()).Status);
+        Assert.AreEqual("demo@example.test", sender.Recipient);
+        Assert.AreEqual("Thợ mới", sender.StylistName);
+        Assert.AreEqual("Sent", (await db.AppointmentChangeLogs.SingleAsync()).EmailStatus);
     }
 
     [TestMethod]
@@ -83,6 +91,22 @@ public sealed class AppointmentReschedulingServiceTests
         Assert.AreEqual(0, await db.AppointmentChangeLogs.CountAsync());
     }
 
+    [TestMethod]
+    public async Task Reschedule_without_customer_email_does_not_enqueue_notification()
+    {
+        await using var db = CreateDb();
+        var fixture = await SeedAsync(db);
+        (await db.Customers.SingleAsync()).Email = null;
+        await db.SaveChangesAsync();
+
+        var result = await new AppointmentReschedulingService(db, TimeProvider.System)
+            .RescheduleAsync(fixture.AppointmentId, new RescheduleAppointmentRequest(fixture.AlternateStylistId, TimeSpan.FromHours(11)));
+
+        Assert.IsTrue(result.Succeeded);
+        Assert.AreEqual(0, await db.AppointmentChangeEmails.CountAsync());
+        Assert.AreEqual("NotRequired", (await db.AppointmentChangeLogs.SingleAsync()).EmailStatus);
+    }
+
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
 
     private static async Task<(int AppointmentId, int OriginalStylistId, int AlternateStylistId, int UnqualifiedStylistId, DateTime Date)> SeedAsync(ApplicationDbContext db)
@@ -99,8 +123,21 @@ public sealed class AppointmentReschedulingServiceTests
             new WorkSchedule { StylistId = original.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(17) },
             new WorkSchedule { StylistId = alternate.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(17) },
             new WorkSchedule { StylistId = unqualified.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(17) });
-        var appointment = new Appointment { Customer = new Customer { FullName = "Khách sửa lịch", Phone = "0900000004" }, StylistId = original.StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "Confirmed", BookingReference = "RESCH001", AppointmentServices = [new AppointmentService { ServiceId = cut.ServiceId, Price = cut.Price, DurationMinutes = cut.DurationMinutes }] };
+        var appointment = new Appointment { Customer = new Customer { FullName = "Khách sửa lịch", Phone = "0900000004", Email = "demo@example.test" }, StylistId = original.StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "Confirmed", BookingReference = "RESCH001", AppointmentServices = [new AppointmentService { ServiceId = cut.ServiceId, Price = cut.Price, DurationMinutes = cut.DurationMinutes }] };
         db.Appointments.Add(appointment); await db.SaveChangesAsync();
         return (appointment.AppointmentId, original.StylistId, alternate.StylistId, unqualified.StylistId, date);
+    }
+
+    private sealed class FakeEmailService : IEmailService
+    {
+        public string? Recipient { get; private set; }
+        public string? StylistName { get; private set; }
+        public Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword) => Task.CompletedTask;
+        public Task SendPasswordResetEmailAsync(string toEmail, string resetLink) => Task.CompletedTask;
+        public Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode) => Task.CompletedTask;
+        public Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
+        {
+            Recipient = toEmail; StylistName = stylistName; return Task.CompletedTask;
+        }
     }
 }

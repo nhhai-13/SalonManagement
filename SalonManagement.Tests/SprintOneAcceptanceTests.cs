@@ -246,6 +246,7 @@ public sealed class SprintOneAcceptanceTests
         public bool Fail { get; init; }
         public Task SendTemporaryPasswordEmailAsync(string email, string password) { if (Fail) throw new InvalidOperationException("Test delivery failure"); Password = password; return Task.CompletedTask; }
         public Task SendPasswordResetEmailAsync(string email, string link) => Task.CompletedTask;
+        public Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime) => Task.CompletedTask;
         public Task SendEmailVerificationCodeAsync(string email, string code) => Task.CompletedTask;
     }
     private sealed class TempProvider : ITempDataProvider

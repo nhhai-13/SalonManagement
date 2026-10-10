@@ -36,7 +36,7 @@ public sealed class AppointmentReschedulingController(AppointmentReschedulingSer
         var items = await db.AppointmentChangeLogs.AsNoTracking()
             .Where(log => log.AppointmentId == appointmentId)
             .OrderByDescending(log => log.ChangedAt)
-            .Select(log => new { log.ActorName, log.ChangedAt, log.OldStylistId, log.NewStylistId, log.OldStartTime, log.NewStartTime })
+            .Select(log => new { log.ActorName, log.ChangedAt, log.OldStylistId, log.NewStylistId, log.OldStartTime, log.NewStartTime, log.EmailStatus })
             .ToListAsync();
         return Ok(items);
     }

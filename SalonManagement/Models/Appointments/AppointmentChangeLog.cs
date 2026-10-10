@@ -11,4 +11,5 @@ public sealed class AppointmentChangeLog
     public int? NewStylistId { get; set; }
     public TimeSpan? OldStartTime { get; set; }
     public TimeSpan? NewStartTime { get; set; }
+    public string EmailStatus { get; set; } = "NotRequired";
 }

@@ -36,6 +36,7 @@ public ApplicationDbContext(
         public DbSet<Appointment> Appointments => Set<Appointment>();
 
         public DbSet<AppointmentChangeLog> AppointmentChangeLogs => Set<AppointmentChangeLog>();
+        public DbSet<AppointmentChangeEmail> AppointmentChangeEmails => Set<AppointmentChangeEmail>();
 
         public DbSet<AppointmentService> AppointmentServices => Set<AppointmentService>();
 
@@ -365,6 +366,16 @@ private class AuditEntry
                 entity.Property(log => log.ActorId).HasMaxLength(450).IsRequired();
                 entity.Property(log => log.ActorName).HasMaxLength(256).IsRequired();
                 entity.HasIndex(log => new { log.AppointmentId, log.ChangedAt });
+            });
+
+            builder.Entity<AppointmentChangeEmail>(entity =>
+            {
+                entity.HasKey(email => email.AppointmentChangeEmailId);
+                entity.Property(email => email.RecipientEmail).HasMaxLength(256).IsRequired();
+                entity.Property(email => email.StylistName).HasMaxLength(150).IsRequired();
+                entity.Property(email => email.Status).HasMaxLength(20).IsRequired();
+                entity.Property(email => email.LastError).HasMaxLength(1000);
+                entity.HasIndex(email => new { email.Status, email.NextAttemptAt });
             });
 
             builder.Entity<AppointmentService>(entity =>

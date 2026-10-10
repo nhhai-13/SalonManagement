@@ -20,6 +20,7 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
     {
         var appointment = await db.Appointments
             .Include(item => item.AppointmentServices)
+            .Include(item => item.Customer)
             .SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
         if (appointment is null) return RescheduleAppointmentResult.Rejected("not_found", "Không tìm thấy lịch hẹn.");
         if (UnavailableStatuses.Contains(appointment.Status, StringComparer.Ordinal))
@@ -68,7 +69,7 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
         appointment.UpdatedAt = SalonClock.GetLocalNow(timeProvider);
         var changedAt = appointment.UpdatedAt.Value;
         var changedBy = actor ?? new AppointmentChangeActor("system", "Hệ thống");
-        db.AppointmentChangeLogs.Add(new AppointmentChangeLog
+        var changeLog = new AppointmentChangeLog
         {
             AppointmentId = appointment.AppointmentId,
             ActorId = changedBy.Id,
@@ -77,8 +78,22 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
             OldStylistId = oldStylistId == stylist.StylistId ? null : oldStylistId,
             NewStylistId = oldStylistId == stylist.StylistId ? null : stylist.StylistId,
             OldStartTime = oldStartTime == request.StartTime ? null : oldStartTime,
-            NewStartTime = oldStartTime == request.StartTime ? null : request.StartTime
-        });
+            NewStartTime = oldStartTime == request.StartTime ? null : request.StartTime,
+            EmailStatus = HasValidEmail(appointment.Customer.Email) ? "Queued" : "NotRequired"
+        };
+        db.AppointmentChangeLogs.Add(changeLog);
+        if (HasValidEmail(appointment.Customer.Email))
+        {
+            db.AppointmentChangeEmails.Add(new AppointmentChangeEmail
+            {
+                AppointmentChangeLog = changeLog,
+                RecipientEmail = appointment.Customer.Email!.Trim(),
+                StylistName = stylist.FullName,
+                AppointmentDate = appointment.AppointmentDate,
+                StartTime = request.StartTime,
+                NextAttemptAt = changedAt
+            });
+        }
         try
         {
             await db.SaveChangesAsync();
@@ -89,4 +104,6 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
             return RescheduleAppointmentResult.Rejected("overlap", "Khung giờ này vừa được một lễ tân khác sử dụng. Vui lòng chọn giờ khác.");
         }
     }
+
+    private static bool HasValidEmail(string? email) => !string.IsNullOrWhiteSpace(email) && System.Net.Mail.MailAddress.TryCreate(email.Trim(), out _);
 }

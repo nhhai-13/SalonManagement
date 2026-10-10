@@ -13,6 +13,33 @@ public sealed class EmailService(
     IConfiguration configuration,
     IWebHostEnvironment env) : IEmailService
 {
+    public async Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
+    {
+        var smtp = configuration.GetSection("SmtpSettings");
+        if (string.IsNullOrWhiteSpace(smtp["Server"]) || string.IsNullOrWhiteSpace(smtp["SenderEmail"]))
+        {
+            if (env.IsDevelopment() || env.IsStaging())
+            {
+                logger.LogInformation("[FALLBACK EMAIL] Lịch hẹn của {Email} đã đổi: thợ {Stylist}, {Date:dd/MM/yyyy} {Time:hh\\:mm}.", toEmail, stylistName, appointmentDate, startTime);
+                return;
+            }
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi email đổi lịch.");
+        }
+
+        using var client = new SmtpClient(smtp["Server"], smtp.GetValue<int>("Port", 587))
+        {
+            EnableSsl = true,
+            Credentials = new NetworkCredential(smtp["Username"], smtp["Password"]),
+            Timeout = 15000
+        };
+        using var message = new MailMessage(smtp["SenderEmail"]!, toEmail)
+        {
+            Subject = "Luminol Salon: lịch hẹn của bạn đã thay đổi",
+            Body = $"Xin chào,\n\nLịch hẹn của bạn đã được cập nhật.\nThợ phụ trách: {stylistName}\nThời gian mới: {appointmentDate:dd/MM/yyyy} lúc {startTime:hh\\:mm}.\n\nNếu cần hỗ trợ, vui lòng liên hệ Luminol Salon."
+        };
+        await client.SendMailAsync(message);
+    }
+
     public async Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword)
     {
         var smtp = configuration.GetSection("SmtpSettings");
