@@ -40,12 +40,18 @@ public sealed class ReceptionScheduleController(ApplicationDbContext db) : Contr
                 .OrderBy(shift => shift.StartTime)
                 .Select(shift => new DailyScheduleShift(shift.StartTime, shift.EndTime)).ToList(),
             dayOffSet.Contains(stylist.StylistId))).ToList();
-        var appointments = (await db.Appointments.AsNoTracking()
-            .Include(item => item.Customer)
-            .Include(item => item.AppointmentServices).ThenInclude(item => item.Service)
+        var appointmentRows = await db.Appointments.AsNoTracking()
             .Where(item => item.AppointmentDate.Date == selectedDate && item.Status != "Cancelled" && item.Status != "Rejected" && item.Status != "NoShow")
-            .ToListAsync())
-            .Select(item => new DailyScheduleAppointment(item.AppointmentId, item.StylistId, item.Customer.FullName, string.Join(", ", item.AppointmentServices.Select(service => service.Service.ServiceName)), item.StartTime, item.EndTime, item.Status))
+            .OrderBy(item => item.StartTime)
+            .Select(item => new
+            {
+                item.AppointmentId, item.StylistId, CustomerName = item.Customer.FullName,
+                Services = item.AppointmentServices.Select(service => service.Service.ServiceName).ToList(),
+                item.StartTime, item.EndTime, item.Status
+            })
+            .ToListAsync();
+        var appointments = appointmentRows
+            .Select(item => new DailyScheduleAppointment(item.AppointmentId, item.StylistId, item.CustomerName, string.Join(", ", item.Services), item.StartTime, item.EndTime, item.Status))
             .ToList();
         return View(new DailyScheduleViewModel(selectedDate, opensAt, closesAt, stylists, appointments));
     }

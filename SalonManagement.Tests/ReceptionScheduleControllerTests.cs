@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Diagnostics;
 using SalonManagement.Controllers.Reception;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -61,5 +62,32 @@ public sealed class ReceptionScheduleControllerTests
         Assert.IsFalse(workingSchedule.IsDayOff);
         Assert.AreEqual(2, workingSchedule.Shifts.Count);
         Assert.IsTrue(model.Stylists.Single(item => item.StylistId == off.StylistId).IsDayOff);
+    }
+
+    [TestMethod]
+    public async Task Index_loads_eight_stylists_and_sixty_appointments_within_two_seconds()
+    {
+        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
+        var date = new DateTime(2031, 2, 3);
+        var service = new Service { ServiceName = "Cắt", DurationMinutes = 30, Price = 100000 };
+        db.Services.Add(service);
+        for (var index = 0; index < 8; index++)
+        {
+            var stylist = new Stylist { FullName = $"Thợ {index + 1}", Phone = $"09000001{index:D2}" };
+            db.Stylists.Add(stylist); await db.SaveChangesAsync();
+            db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(18) });
+            for (var appointment = 0; appointment < 8 - (index == 7 ? 4 : 0); appointment++)
+                db.Appointments.Add(new Appointment { Customer = new Customer { FullName = $"Khách {index}-{appointment}", Phone = $"091{index:D1}{appointment:D6}" }, StylistId = stylist.StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(8 + appointment), EndTime = TimeSpan.FromHours(8.5 + appointment), Status = "Confirmed", BookingReference = $"LOAD{index}{appointment:D2}", AppointmentServices = [new AppointmentService { Service = service, Price = service.Price, DurationMinutes = service.DurationMinutes }] });
+        }
+        await db.SaveChangesAsync();
+        var stopwatch = Stopwatch.StartNew();
+
+        var result = await new ReceptionScheduleController(db).Index(date);
+
+        stopwatch.Stop();
+        var model = (DailyScheduleViewModel)((ViewResult)result).Model!;
+        Assert.AreEqual(8, model.Stylists.Count);
+        Assert.AreEqual(60, model.Appointments.Count);
+        Assert.IsTrue(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"Lịch tải mất {stopwatch.Elapsed.TotalMilliseconds:0} ms.");
     }
 }
