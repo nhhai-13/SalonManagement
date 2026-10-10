@@ -33,6 +33,16 @@ public sealed class DailyScheduleAvailabilityController(ApplicationDbContext db)
             stylistId = id, name = names[id], isDayOff = daysOffSet.Contains(id),
             shifts = shifts.Where(shift => shift.StylistId == id).Select(shift => new { startTime = shift.StartTime, endTime = shift.EndTime })
         });
-        return Ok(new { date = selectedDate, stylists });
+        var appointments = await db.Appointments.AsNoTracking()
+            .Include(item => item.Customer)
+            .Include(item => item.AppointmentServices).ThenInclude(item => item.Service)
+            .Where(item => item.AppointmentDate.Date == selectedDate && item.Status != "Cancelled" && item.Status != "Rejected" && item.Status != "NoShow")
+            .Select(item => new
+            {
+                item.AppointmentId, item.StylistId, customerName = item.Customer.FullName,
+                services = item.AppointmentServices.Select(service => service.Service.ServiceName), item.StartTime, item.EndTime, item.Status
+            })
+            .ToListAsync();
+        return Ok(new { date = selectedDate, stylists, appointments });
     }
 }
