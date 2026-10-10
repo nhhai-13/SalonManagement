@@ -1,0 +1,32 @@
+@using SalonManagement.Models
+@using SalonManagement.Services
+@model List<Appointment>
+@{
+    ViewData["Title"] = "Lịch hẹn tại quầy";
+    DateTime day = ViewBag.Day;
+    DateTimeOffset now = ViewBag.Now;
+    string Label(string status) => status switch { "Pending" => "Chờ xác nhận", "Confirmed" => "Đã xác nhận", "Arrived" => "Đã đến", "NoShow" => "Không đến", "Cancelled" => "Đã huỷ", "Completed" => "Hoàn tất", _ => status };
+}
+<h1>Lịch hẹn tại quầy</h1>
+@if (TempData["Error"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
+@if (TempData["Success"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+<form method="get" class="mb-3"><label for="date">Ngày xem lịch</label> <input type="date" id="date" name="date" value="@day.ToString("yyyy-MM-dd")" required /> <button class="btn btn-primary">Xem lịch</button></form>
+<p>Check-in trong ±60 phút giờ hẹn. Quá 15 phút đánh dấu đến muộn.</p>
+@if (Model.Count == 0) { <p>Không có lịch hẹn trong ngày.</p> }
+@foreach (var a in Model) {
+    <article class="card mb-3"><div class="card-body">
+        <h2 class="h5">@a.StartTime.ToString(@"hh\:mm") – @a.EndTime.ToString(@"hh\:mm") · @a.Customer.FullName</h2>
+        <p>@a.Customer.Phone · Thợ: @a.Stylist.FullName · <strong>@Label(a.Status)</strong></p>
+        @if (a.CheckedInAt.HasValue) { <p>Giờ đến: @a.CheckedInAt.Value.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm 'ngày' dd/MM/yyyy")</p> }
+        @if (a.LateMinutes > 0) { <p class="text-danger">Đến muộn @a.LateMinutes phút</p> }
+        <form asp-action="Change" method="post" class="d-flex flex-wrap gap-2">
+            <input type="hidden" name="id" value="@a.AppointmentId" /><input type="hidden" name="date" value="@day.ToString("yyyy-MM-dd")" />
+            <button class="btn btn-success" name="operation" value="check-in" disabled="@(!CheckInService.CanCheckIn(a, now))">Check-in</button>
+        </form>
+    </div></article>
+}
+@section Scripts {
+<script>
+setTimeout(() => { if (!document.querySelector('input:focus')) location.reload(); }, 30000);
+</script>
+}
