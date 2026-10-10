@@ -28,6 +28,12 @@
 
         public DateTime? ConfirmedAt { get; set; }
 
+        public string? RejectionReason { get; set; }
+
+        public string? RejectedByUserId { get; set; }
+
+        public DateTime? RejectedAt { get; set; }
+
         public Customer Customer { get; set; } = null!;
 
         public Stylist Stylist { get; set; } = null!;

@@ -286,6 +286,15 @@ namespace SalonManagement.Data.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RejectedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<TimeSpan>("StartTime")
                         .HasColumnType("time");
 

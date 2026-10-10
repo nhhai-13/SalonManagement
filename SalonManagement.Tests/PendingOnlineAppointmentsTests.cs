@@ -116,6 +116,30 @@ public sealed class PendingOnlineAppointmentsTests
         Assert.AreEqual("first", saved.ConfirmedByUserId);
     }
 
+    [TestMethod]
+    public async Task Reject_pending_appointment_requires_reason_and_releases_appointment()
+    {
+        await using var db = CreateDb();
+        var date = new DateTime(2031, 2, 3);
+        await SeedBookableStylistAsync(db, date);
+        var appointment = new Appointment { Customer = new Customer { FullName = "Khách", Phone = "0900000005" }, StylistId = (await db.Stylists.SingleAsync()).StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "PendingConfirmation", BookingReference = "ONLINE05" };
+        db.Appointments.Add(appointment); await db.SaveChangesAsync();
+        var controller = new PendingAppointmentsController(db, TimeProvider.System) { ControllerContext = new ControllerContext { HttpContext = AuthenticatedContext("reception-1") } };
+
+        var missingReason = await controller.Reject(appointment.AppointmentId, new RejectPendingAppointmentRequest(null));
+        var action = await controller.Reject(appointment.AppointmentId, new RejectPendingAppointmentRequest("Khung giờ không còn trống"));
+
+        Assert.IsInstanceOfType<BadRequestObjectResult>(missingReason);
+        Assert.IsInstanceOfType<OkObjectResult>(action);
+        var saved = await db.Appointments.SingleAsync();
+        Assert.AreEqual("Rejected", saved.Status);
+        Assert.AreEqual("Khung giờ không còn trống", saved.RejectionReason);
+        Assert.AreEqual("reception-1", saved.RejectedByUserId);
+        Assert.IsNotNull(saved.RejectedAt);
+        var slots = await new AvailabilityService(db, TimeProvider.System).GetSlotsAsync(date, [1]);
+        Assert.IsTrue(slots.Slots.Contains(saved.StartTime));
+    }
+
     private static DefaultHttpContext AuthenticatedContext(string userId)
     {
         var context = new DefaultHttpContext();

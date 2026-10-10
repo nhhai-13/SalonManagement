@@ -13,6 +13,8 @@ namespace SalonManagement.Controllers.Reception;
 [Route("api/reception/pending-appointments")]
 public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeProvider timeProvider) : ControllerBase
 {
+    private static readonly string[] RejectionReasons = ["Không còn thợ phù hợp", "Khung giờ không còn trống", "Không liên hệ được khách", "Yêu cầu của khách không phù hợp"];
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PendingAppointmentResponse>>> Get()
     {
@@ -61,7 +63,35 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         await db.SaveChangesAsync();
         return Ok(new { appointment.AppointmentId, appointment.Status, appointment.ConfirmedByUserId, appointment.ConfirmedAt });
     }
+
+    [HttpGet("rejection-reasons")]
+    public ActionResult<IReadOnlyList<string>> GetRejectionReasons() => Ok(RejectionReasons);
+
+    [HttpPost("{appointmentId:int}/reject")]
+    public async Task<IActionResult> Reject(int appointmentId, [FromBody] RejectPendingAppointmentRequest request)
+    {
+        var reason = request.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason) || !RejectionReasons.Contains(reason, StringComparer.Ordinal))
+            return BadRequest(new { error = "Vui lòng chọn một lý do từ chối hợp lệ." });
+
+        var appointment = await db.Appointments.SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
+        if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
+        if (appointment.Status != "PendingConfirmation") return Conflict(new { error = "Lịch hẹn này đã được xử lý." });
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+        appointment.Status = "Rejected";
+        appointment.RejectionReason = reason;
+        appointment.RejectedByUserId = userId;
+        appointment.RejectedAt = SalonClock.GetLocalNow(timeProvider);
+        appointment.UpdatedAt = appointment.RejectedAt;
+        await db.SaveChangesAsync();
+        return Ok(new { appointment.AppointmentId, appointment.Status, appointment.RejectionReason, appointment.RejectedByUserId, appointment.RejectedAt });
+    }
 }
+
+public sealed record RejectPendingAppointmentRequest(string? Reason);
 
 public sealed record PendingAppointmentResponse(
     int AppointmentId,

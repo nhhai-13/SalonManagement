@@ -32,7 +32,7 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
         var daysOff = await db.StylistDaysOff.AsNoTracking().Where(item => item.OffDate == date.Date).Select(item => item.StylistId).ToListAsync();
         var breaks = await db.StylistBreaks.AsNoTracking().Where(item => item.BreakDate == date.Date).ToListAsync();
         var eligible = candidates.Where(s => !daysOff.Contains(s.StylistId) && requiredIds.All(id => s.Services.Any(skill => skill.ServiceId == id))).ToList();
-        var appointments = await db.Appointments.AsNoTracking().Where(a => a.AppointmentDate == date.Date && a.Status != "Cancelled" && a.Status != "NoShow").ToListAsync();
+        var appointments = await db.Appointments.AsNoTracking().Where(a => a.AppointmentDate == date.Date && a.Status != "Cancelled" && a.Status != "NoShow" && a.Status != "Rejected").ToListAsync();
         var slots = eligible.SelectMany(stylist => stylist.WorkSchedules.SelectMany(shift => SlotsForShift(shift, duration, opensAt, closesAt)
                 .Where(slot => !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime) && !breaks.Where(b => b.StylistId == stylist.StylistId).Any(b => b.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < b.EndTime))))
             .Distinct().OrderBy(time => time).ToList();

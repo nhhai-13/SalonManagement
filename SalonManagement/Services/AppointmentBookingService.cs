@@ -36,7 +36,7 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
         var endTime = request.StartTime.Add(TimeSpan.FromMinutes(services.Sum(item => item.DurationMinutes)));
         var stylists = await db.Stylists.Where(item => item.IsActive).Include(item => item.Services).Include(item => item.WorkSchedules.Where(schedule => schedule.WorkDate == request.Date.Date)).ToListAsync();
         var required = request.ServiceIds.Distinct().ToHashSet();
-        var appointments = await db.Appointments.Where(item => item.AppointmentDate == request.Date.Date && item.Status != "Cancelled" && item.Status != "NoShow").ToListAsync();
+        var appointments = await db.Appointments.Where(item => item.AppointmentDate == request.Date.Date && item.Status != "Cancelled" && item.Status != "NoShow" && item.Status != "Rejected").ToListAsync();
         var stylist = stylists.FirstOrDefault(candidate => required.All(serviceId => candidate.Services.Any(skill => skill.ServiceId == serviceId)) && candidate.WorkSchedules.Any(schedule => schedule.StartTime <= request.StartTime && endTime <= schedule.EndTime) && !appointments.Where(item => item.StylistId == candidate.StylistId).Any(item => item.StartTime < endTime && request.StartTime < item.EndTime));
         if (stylist is null) return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác.");
 
@@ -50,12 +50,13 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
                 item.AppointmentDate == request.Date.Date &&
                 item.Status != "Cancelled" &&
                 item.Status != "NoShow" &&
+                item.Status != "Rejected" &&
                 item.Status != "Completed" &&
                 item.StartTime < endTime && request.StartTime < item.EndTime);
             if (collisionExists)
                 return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa có người đặt. Vui lòng chọn khung giờ khác.");
 
-            var activeCount = await db.Appointments.Include(item => item.Customer).CountAsync(item => item.Customer.Phone == phone && item.Status != "Cancelled" && item.Status != "Completed" && item.Status != "NoShow");
+            var activeCount = await db.Appointments.Include(item => item.Customer).CountAsync(item => item.Customer.Phone == phone && item.Status != "Cancelled" && item.Status != "Completed" && item.Status != "NoShow" && item.Status != "Rejected");
             if (activeCount >= 3) return BookingCreationResult.Rejected("appointment_limit", "Bạn đã có 3 lịch hẹn chưa hoàn tất. Vui lòng huỷ bớt lịch cũ hoặc liên hệ tiệm.");
             var customer = await db.Customers.FirstOrDefaultAsync(item => item.Phone == phone) ?? new Customer { FullName = name, Phone = phone!, Email = request.Email?.Trim() };
             if (customer.CustomerId == 0) db.Customers.Add(customer); else { customer.FullName = name; customer.Email = string.IsNullOrWhiteSpace(request.Email) ? customer.Email : request.Email.Trim(); }
