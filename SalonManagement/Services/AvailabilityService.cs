@@ -16,6 +16,11 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
         var services = await db.Services.AsNoTracking().Where(s => s.IsActive && serviceIds.Contains(s.ServiceId)).ToListAsync();
         if (services.Count != serviceIds.Distinct().Count()) return new AvailabilityResult(0, []);
         var duration = services.Sum(s => s.DurationMinutes);
+        var shopHolidayDates = await db.ShopHolidays.AsNoTracking()
+            .Select(holiday => holiday.HolidayDate)
+            .ToListAsync();
+        if (shopHolidayDates.Contains(DateOnly.FromDateTime(date)))
+            return new AvailabilityResult(duration, []);
         var requiredIds = serviceIds.Distinct().ToHashSet();
         var candidates = await db.Stylists.AsNoTracking().Where(s => s.IsActive)
             .Include(s => s.Services)

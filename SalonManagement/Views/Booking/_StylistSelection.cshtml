@@ -1,6 +1,7 @@
 <section id="stylist-selection" class="card p-3 my-4" hidden
          data-stylists-url="@Url.Action("Stylists", "StylistAvailability")"
          data-slots-url="@Url.Action("Slots", "StylistAvailability")"
+         data-day-notice-url="@Url.Action("DayNotice", "StylistAvailability")"
          data-assignment-url="@Url.Action("Assignment", "StylistAvailability")">
     <h2 class="h4">Chọn thợ và giờ hẹn</h2>
     <p>Chọn một thợ hoặc “Thợ bất kỳ” để xem giờ trống của các thợ làm được toàn bộ dịch vụ.</p>
@@ -17,7 +18,22 @@
         <h3 class="h5">Thông tin xác nhận</h3>
         <p id="assignment-message" role="status"></p>
         <p id="assignment-detail"></p>
-        <p class="text-muted mb-0">Lựa chọn này chưa giữ chỗ hoặc tạo lịch hẹn.</p>
+        <p class="text-muted mb-0">Hoàn tất thông tin bên dưới để giữ lịch hẹn.</p>
     </div>
+    <section id="booking-checkout" class="border rounded p-3 mt-3" hidden aria-live="polite">
+        <h3 class="h5">Hoàn tất đặt lịch</h3>
+        <div class="row g-3">
+            <div class="col-md-6"><label class="form-label" for="booking-full-name">Họ và tên</label><input id="booking-full-name" class="form-control" maxlength="100" autocomplete="name" required></div>
+            <div class="col-md-6"><label class="form-label" for="booking-phone">Số điện thoại</label><input id="booking-phone" class="form-control" type="tel" inputmode="numeric" pattern="0[0-9]{9}" autocomplete="tel" required></div>
+            <div class="col-md-8"><label class="form-label" for="booking-email">Email xác thực</label><input id="booking-email" class="form-control" type="email" autocomplete="email" required></div>
+            <div class="col-md-4 d-flex align-items-end"><button type="button" id="send-booking-email-code" class="btn btn-outline-primary w-100">Gửi mã xác thực</button></div>
+            <div class="col-md-6"><label class="form-label" for="booking-email-code">Mã xác thực</label><input id="booking-email-code" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" disabled required></div>
+            <div class="col-md-6 d-flex align-items-end"><button type="button" id="verify-booking-email-code" class="btn btn-outline-primary w-100" disabled>Xác thực email</button></div>
+            <div class="col-12"><label class="form-label" for="booking-notes">Ghi chú <span class="text-muted">(không bắt buộc)</span></label><textarea id="booking-notes" class="form-control" maxlength="300" rows="2"></textarea></div>
+        </div>
+        <p id="booking-email-message" class="mt-3 mb-0" role="status"></p>
+        <button type="button" id="place-booking" class="btn btn-primary w-100 mt-3" disabled>Đặt lịch</button>
+        <p id="booking-result" class="mt-3 mb-0" role="status"></p>
+    </section>
     <noscript>Bật JavaScript để chọn thợ và xem khung giờ trống.</noscript>
 </section>

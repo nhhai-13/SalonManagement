@@ -43,6 +43,27 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
             .Select(s => new StylistSlot(s.Start, s.End)).Distinct()
             .OrderBy(s => s.Start, StringComparer.Ordinal).ThenBy(s => s.End, StringComparer.Ordinal).ToList();
 
+    public async Task<string?> GetDayNoticeAsync(DateOnly date)
+    {
+        var day = date.ToDateTime(TimeOnly.MinValue);
+        if (day < SalonNow.Date) return "Ngày đã chọn đã qua. Vui lòng chọn ngày khác.";
+
+        var holiday = await db.ShopHolidays.AsNoTracking()
+            .Where(h => h.HolidayDate == date)
+            .Select(h => h.Reason)
+            .FirstOrDefaultAsync();
+        if (holiday != null)
+            return string.IsNullOrWhiteSpace(holiday)
+                ? "Tiệm nghỉ vào ngày đã chọn. Vui lòng chọn ngày khác."
+                : $"Tiệm nghỉ vào ngày đã chọn: {holiday}. Vui lòng chọn ngày khác.";
+
+        var hours = await db.BusinessHours.AsNoTracking()
+            .SingleOrDefaultAsync(h => h.DayOfWeek == day.DayOfWeek);
+        return hours == null || hours.IsClosed || hours.OpensAt == null || hours.ClosesAt == null
+            ? "Tiệm không hoạt động vào ngày đã chọn. Vui lòng chọn ngày khác."
+            : null;
+    }
+
     // Read-only assignment decision. The eventual appointment writer must revalidate under its transaction.
     public async Task<StylistAssignment?> AssignAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date, TimeOnly start)
     {
@@ -84,6 +105,7 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var day = date.ToDateTime(TimeOnly.MinValue);
         var now = SalonNow;
         if (day < now.Date || date == DateOnly.MaxValue) return [];
+        if (await db.ShopHolidays.AsNoTracking().AnyAsync(holiday => holiday.HolidayDate == date)) return [];
         var nextDay = day.AddDays(1);
         var hours = await db.BusinessHours.AsNoTracking().SingleOrDefaultAsync(h => h.DayOfWeek == day.DayOfWeek);
         if (hours == null || hours.IsClosed || hours.OpensAt == null || hours.ClosesAt == null) return [];

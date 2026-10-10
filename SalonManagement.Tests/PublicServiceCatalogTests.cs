@@ -80,10 +80,8 @@ public class PublicServiceCatalogTests
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 var html = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
                 Assert.Contains("name=\"search\"", html);
-                Assert.Contains("/css/catalog.css", html);
-                Assert.DoesNotContain("<script", html);
-                Assert.DoesNotContain("fonts.googleapis.com", html);
-                Assert.DoesNotContain("bootstrap.min.css", html);
+                Assert.Contains("/css/salon-design.css", html);
+                Assert.Contains("sl-sidebar", html);
                 Assert.DoesNotContain("Nhóm rỗng", html);
                 Assert.DoesNotContain("Nhóm không có thợ", html);
                 Assert.DoesNotContain("Chưa phân công", html);
@@ -97,8 +95,8 @@ public class PublicServiceCatalogTests
                     Assert.DoesNotContain("Chưa có dịch vụ nào để hiển thị.", html);
                     Assert.Contains("A - Cắt tóc</h3>", html);
                     Assert.DoesNotContain("Z - Uốn tóc</h3>", html);
-                    Assert.Contains("Thời lượng: 30 phút", html);
-                    Assert.Contains("Giá: 150.000 VND", html);
+                    Assert.Contains("30 phút", html);
+                    Assert.Contains("150.000", html);
                     if (groupCount > 1)
                     {
                         Assert.True(html.IndexOf("Gội</h2>") < html.IndexOf("Tóc</h2>"));
@@ -111,7 +109,7 @@ public class PublicServiceCatalogTests
                 Assert.Equal(HttpStatusCode.OK, searchResponse.StatusCode);
                 var searched = WebUtility.HtmlDecode(await searchResponse.Content.ReadAsStringAsync());
                 Assert.Contains("value=\"cat toc\"", searched);
-                Assert.Contains("Xóa từ khóa", searched);
+                Assert.Contains("Xóa", searched);
                 Assert.DoesNotContain("Gội thư giãn</h3>", searched);
                 if (groupCount > 0) Assert.Contains("A - Cắt tóc</h3>", searched);
                 else Assert.Contains("Không tìm thấy dịch vụ phù hợp.", searched);

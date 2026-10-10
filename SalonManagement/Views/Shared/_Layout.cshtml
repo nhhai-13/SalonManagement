@@ -128,6 +128,14 @@ else
                            href="/owner/business-hours">
                             <i class="bi bi-clock"></i> Giờ hoạt động
                         </a>
+                        <a class="sl-nav-link @(NavActive("TimeOff") ? "active" : "")"
+                           href="/owner/time-off">
+                            <i class="bi bi-calendar-x"></i> Ngày nghỉ
+                        </a>
+                        <a class="sl-nav-link @(NavActive("OwnerAppointments") ? "active" : "")"
+                           href="/owner/appointments">
+                            <i class="bi bi-bell"></i> Lịch hẹn mới
+                        </a>
                     </div>
                 }
 
@@ -198,9 +206,8 @@ else
                         <a class="sl-user-menu-action" asp-controller="Account" asp-action="ChangePassword">
                             <i class="bi bi-key"></i> Đổi mật khẩu
                         </a>
-                        <form asp-area="Identity" asp-page="/Account/Logout"
-                              asp-route-returnUrl="@Url.Action("Index","Home",new{area=""})" method="post">
-                            <button id="logout" class="sl-user-menu-action sl-user-menu-logout" type="submit">
+                        <form asp-controller="Account" asp-action="Logout" method="post">
+                            <button class="sl-user-menu-action sl-user-menu-logout" type="submit">
                                 <i class="bi bi-box-arrow-right"></i> Đăng xuất
                             </button>
                         </form>

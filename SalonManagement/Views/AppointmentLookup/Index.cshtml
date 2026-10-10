@@ -21,5 +21,49 @@
 </div>
 
 @section Scripts {
-    <script>const form=document.getElementById('lookup-form'),query=document.getElementById('lookup-query'),message=document.getElementById('lookup-message'),list=document.getElementById('lookup-list');form.addEventListener('submit',async e=>{e.preventDefault();const r=await fetch(`/appointments/lookup/search?query=${encodeURIComponent(query.value)}`),d=await r.json();list.replaceChildren();message.textContent=d.error||'';message.className=d.error?'alert alert-info mt-3':'mt-3';if(!d.error)list.replaceChildren(...d.appointments.map(a=>{const item=document.createElement('article');item.className='card mb-2 sl-appointment-item';item.innerHTML=`<div class="card-body"><strong>${a.reference}</strong><span class="sl-badge sl-badge-gray float-end">${a.status}</span><div class="mt-2">${a.services.join(', ')}</div><div>Thợ: ${a.stylistName}</div><div>${a.date} · ${a.startTime}–${a.endTime} · ${a.durationMinutes} phút</div></div>`;return item;}));});</script>
+    <script>
+        const form = document.getElementById('lookup-form');
+        const query = document.getElementById('lookup-query');
+        const message = document.getElementById('lookup-message');
+        const list = document.getElementById('lookup-list');
+        const showMessage = (text, isError) => {
+            message.textContent = text;
+            message.className = `alert ${isError ? 'alert-danger' : 'alert-success'} mt-3`;
+        };
+        const addText = (parent, tag, text, className = '') => {
+            const node = document.createElement(tag);
+            node.textContent = text;
+            if (className) node.className = className;
+            parent.append(node);
+        };
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            list.replaceChildren();
+            try {
+                const response = await fetch(`/appointments/lookup/search?query=${encodeURIComponent(query.value.trim())}`);
+                const data = await response.json();
+                if (!response.ok || data.error) return showMessage(data.error || 'Không thể tra cứu lịch hẹn. Vui lòng thử lại.', true);
+
+                const appointments = data.appointments || [];
+                showMessage(`Tìm thấy ${appointments.length} lịch hẹn.`, false);
+                appointments.forEach(appointment => {
+                    const item = document.createElement('article');
+                    item.className = 'card mb-2 sl-appointment-item';
+                    const body = document.createElement('div');
+                    body.className = 'card-body';
+                    const header = document.createElement('div');
+                    addText(header, 'strong', appointment.reference);
+                    addText(header, 'span', appointment.status, 'sl-badge sl-badge-gray float-end');
+                    body.append(header);
+                    addText(body, 'div', (appointment.services || []).join(', '), 'mt-2');
+                    addText(body, 'div', `Thợ: ${appointment.stylistName}`);
+                    addText(body, 'div', `${appointment.date} · ${appointment.startTime}–${appointment.endTime} · ${appointment.durationMinutes} phút`);
+                    item.append(body);
+                    list.append(item);
+                });
+            } catch {
+                showMessage('Không thể kết nối đến hệ thống. Vui lòng thử lại.', true);
+            }
+        });
+    </script>
 }

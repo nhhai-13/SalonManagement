@@ -26,6 +26,14 @@ public sealed class StylistAvailabilityController(StylistAvailabilityService ava
         catch (ArgumentException e) { return BadRequest(new { message = e.Message }); }
     }
 
+    [HttpGet("day-notice")]
+    public async Task<IActionResult> DayNotice(DateOnly date)
+    {
+        if (!ModelState.IsValid || date == default)
+            return BadRequest(new { message = "Vui lòng chọn ngày hợp lệ." });
+        return Ok(new { message = await availability.GetDayNoticeAsync(date) });
+    }
+
     [HttpGet("stylist-assignment")]
     public async Task<IActionResult> Assignment([FromQuery] int[] serviceIds, int? stylistId, DateOnly date, TimeOnly? start)
     {

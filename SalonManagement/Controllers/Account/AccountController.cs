@@ -35,6 +35,22 @@ public class AccountController(
         return View(LoginView);
     }
 
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Logout()
+    {
+        var user = await userManager.GetUserAsync(User);
+        if (user is not null)
+        {
+            await RevokeAllRefreshTokensAsync(user.Id);
+        }
+
+        Response.Cookies.Delete("salon.accessToken");
+        await signInManager.SignOutAsync();
+        return RedirectToAction("Index", "Home");
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // AC1: Đổi mật khẩu (yêu cầu đăng nhập)
     // ═══════════════════════════════════════════════════════════════

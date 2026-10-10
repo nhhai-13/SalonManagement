@@ -137,7 +137,8 @@ public class StylistAvailabilityTests
         {
             StylistId = x.a,
             OffDate = date,
-            IsFullDay = true
+            IsFullDay = true,
+            Reason = "Nghỉ phép"
         });
 
         Assert.IsType<ConflictObjectResult>(result);

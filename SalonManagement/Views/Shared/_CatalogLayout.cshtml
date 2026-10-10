@@ -25,9 +25,7 @@
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                     <a class="sl-btn sl-btn-ghost sl-btn-sm" asp-controller="Account" asp-action="ChangePassword">Đổi mật khẩu</a>
-                    <form asp-area="Identity" asp-page="/Account/Logout"
-                          asp-route-returnUrl="@Url.Action("Index","Home",new{area=""})"
-                          method="post" style="margin:0;">
+                    <form asp-controller="Account" asp-action="Logout" method="post" style="margin:0;">
                         <button type="submit" class="sl-btn sl-btn-outline sl-btn-sm">Đăng xuất</button>
                     </form>
                 }

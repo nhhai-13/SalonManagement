@@ -60,7 +60,9 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
             var customer = await db.Customers.FirstOrDefaultAsync(item => item.Phone == phone) ?? new Customer { FullName = name, Phone = phone!, Email = request.Email?.Trim() };
             if (customer.CustomerId == 0) db.Customers.Add(customer); else { customer.FullName = name; customer.Email = string.IsNullOrWhiteSpace(request.Email) ? customer.Email : request.Email.Trim(); }
             var reference = await CreateReferenceAsync();
-            db.Appointments.Add(new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "Confirmed", BookingReference = reference, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() });
+            // Bookings submitted from the public site must be reviewed by reception.
+            // Staff-created appointments continue to use their existing workflow/statuses.
+            db.Appointments.Add(new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "PendingConfirmation", BookingReference = reference, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() });
             try { await db.SaveChangesAsync(); } catch (DbUpdateException) { return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác."); }
             return new(new(reference, stylist.FullName, services.Select(item => item.ServiceName).ToList(), request.Date.Date, request.StartTime, endTime), null, null);
         }

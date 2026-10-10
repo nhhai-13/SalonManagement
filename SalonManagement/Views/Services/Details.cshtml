@@ -1,0 +1,29 @@
+@model SalonManagement.Models.Service
+@{ ViewData["Title"] = Model.ServiceName; Layout = "_Layout"; }
+
+@{ var imageIndex = Model.ServiceId % 6; var imageX = (imageIndex % 3) * 50; var imageY = (imageIndex / 3) * 100; }
+<div class="container py-4 py-lg-5">
+    <a class="sl-btn sl-btn-outline mb-4" asp-controller="Services" asp-action="Public">
+        <i class="bi bi-arrow-left"></i> Danh mục dịch vụ
+    </a>
+    <article class="sl-card p-4 p-lg-5">
+        <div class="service-photo mb-4" style="--image-x: @imageX%; --image-y: @imageY%; height: 280px;" role="img" aria-label="@Model.ServiceName"></div>
+        <span class="sl-eyebrow">@(Model.ServiceGroup?.GroupName ?? "Dịch vụ salon")</span>
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 mt-2">
+            <div>
+                <h1 class="sl-page-title mb-3">@Model.ServiceName</h1>
+                <p class="lead text-muted">@(string.IsNullOrWhiteSpace(Model.Description) ? "Dịch vụ được thực hiện bởi đội ngũ chuyên viên của salon." : Model.Description)</p>
+            </div>
+            <div class="text-lg-end">
+                <div class="sl-service-price fs-3">@Model.Price.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) VND</div>
+                <div class="text-muted mt-2"><i class="bi bi-clock"></i> @Model.DurationMinutes phút</div>
+            </div>
+        </div>
+        <hr class="my-4" />
+        <h2 class="h5">Thông tin gói dịch vụ</h2>
+        <p class="text-muted mb-4">Chọn đặt lịch để thêm dịch vụ này vào danh sách đã chọn, sau đó chọn thời gian và thợ phù hợp.</p>
+        <a class="sl-btn sl-btn-primary" href="/booking/select-services?serviceId=@Model.ServiceId">
+            <i class="bi bi-calendar-check"></i> Đặt lịch dịch vụ này
+        </a>
+    </article>
+</div>

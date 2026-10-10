@@ -1,10 +1,6 @@
 @model IEnumerable<ServiceGroup>
 @{ ViewData["Title"] = "Nhóm dịch vụ"; }
 <div class="container my-4 sl-body">
-    <div class="mb-3">
-        <a href="/owner" class="text-decoration-none sl-btn sl-btn-ghost sl-btn-sm">← Về khu vực chủ tiệm</a>
-    </div>
-
     <div class="sl-page-header d-flex justify-content-between align-items-center mb-3">
         <h1 class="sl-page-title">Nhóm dịch vụ</h1>
         <div class="d-flex gap-2">
@@ -15,8 +11,6 @@
 
     @if (TempData["Success"] is string success) { <div class="alert alert-success sl-alert sl-alert-success" role="status">@success</div> }
     @if (TempData["Error"] is string error) { <div class="alert alert-danger sl-alert sl-alert-danger" role="alert">@error</div> }
-    
-    <p class="text-muted">Nhóm có dịch vụ đang bán không thể xoá. Khi xoá nhóm, dịch vụ ngừng bán được giữ ở mục Chưa phân nhóm.</p>
     
     <div class="card shadow-sm sl-card">
         <div class="card-body p-0">

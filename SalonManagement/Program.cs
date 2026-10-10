@@ -30,9 +30,17 @@ var connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
         "Connection string 'DefaultConnection' not found.");
+var databaseProvider = builder.Configuration["DatabaseProvider"];
+var usesSqlite = string.Equals(databaseProvider, "SQLite", StringComparison.OrdinalIgnoreCase);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
+    if (usesSqlite)
+    {
+        options.UseSqlite(connectionString);
+        return;
+    }
+
     options.UseSqlServer(connectionString, sqlServerOptions =>
         sqlServerOptions.EnableRetryOnFailure());
 });
@@ -209,6 +217,7 @@ builder.Services.AddSingleton<
 
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<AppointmentBookingService>();
+builder.Services.AddScoped<BookingEmailVerificationService>();
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
 builder.Services.AddScoped<AvailabilityService>();
@@ -230,7 +239,14 @@ await using (var scope = app.Services.CreateAsyncScope())
         scope.ServiceProvider
             .GetRequiredService<ApplicationDbContext>();
 
-    await dbContext.Database.MigrateAsync();
+    if (usesSqlite)
+    {
+        await dbContext.Database.EnsureCreatedAsync();
+    }
+    else
+    {
+        await dbContext.Database.MigrateAsync();
+    }
 }
 
 // =====================================

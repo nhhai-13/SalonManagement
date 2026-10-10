@@ -31,30 +31,44 @@ public class ShopHolidaysController : ControllerBase
 
     // Thêm ngày nghỉ mới
     [HttpPost]
-    public async Task<IActionResult> Create(ShopHoliday request)
+    public async Task<IActionResult> Create(ShopHolidayRequest request)
     {
-        var exists = await _dbContext.ShopHolidays
-            .AnyAsync(h => h.HolidayDate == request.HolidayDate);
+        if (string.IsNullOrWhiteSpace(request.Reason))
+            return BadRequest(new { message = "Vui lòng nhập lý do nghỉ." });
+        if (request.ToDate < request.FromDate)
+            return BadRequest(new { message = "Ngày kết thúc phải từ ngày bắt đầu trở đi." });
 
-        if (exists)
+        var dates = Enumerable.Range(0, request.ToDate.DayNumber - request.FromDate.DayNumber + 1)
+            .Select(offset => request.FromDate.AddDays(offset))
+            .ToList();
+        var existing = await _dbContext.ShopHolidays
+            .Where(holiday => dates.Contains(holiday.HolidayDate))
+            .Select(holiday => holiday.HolidayDate)
+            .ToListAsync();
+
+        if (existing.Count > 0)
         {
             return BadRequest(new
             {
-                message = "Ngày này đã được thiết lập là ngày nghỉ."
+                message = $"Đã có ngày nghỉ trong khoảng đã chọn: {string.Join(", ", existing.Select(date => date.ToString("dd/MM/yyyy")))}."
             });
         }
 
-        var holiday = new ShopHoliday
-        {
-            HolidayDate = request.HolidayDate,
-            Reason = request.Reason,
-            CreatedAt = DateTime.UtcNow
-        };
+        var start = request.FromDate.ToDateTime(TimeOnly.MinValue);
+        var end = request.ToDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var affectedAppointments = await _dbContext.Appointments.AsNoTracking()
+            .Where(appointment => appointment.AppointmentDate >= start && appointment.AppointmentDate < end && appointment.Status != "Cancelled")
+            .OrderBy(appointment => appointment.AppointmentDate).ThenBy(appointment => appointment.StartTime)
+            .Select(appointment => new { appointment.AppointmentId, appointment.AppointmentDate, appointment.StartTime, appointment.EndTime, appointment.Status })
+            .ToListAsync();
+        if (affectedAppointments.Count > 0)
+            return Conflict(new { message = "Khoảng ngày nghỉ trùng với lịch hẹn đã có.", affectedAppointments });
 
-        _dbContext.ShopHolidays.Add(holiday);
+        var holidays = dates.Select(date => new ShopHoliday { HolidayDate = date, Reason = request.Reason.Trim(), CreatedAt = DateTime.UtcNow }).ToList();
+        _dbContext.ShopHolidays.AddRange(holidays);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(holiday);
+        return Ok(holidays);
     }
 
     // Xóa ngày nghỉ
@@ -78,3 +92,5 @@ public class ShopHolidaysController : ControllerBase
         return NoContent();
     }
 }
+
+public sealed record ShopHolidayRequest(DateOnly FromDate, DateOnly ToDate, string? Reason);
