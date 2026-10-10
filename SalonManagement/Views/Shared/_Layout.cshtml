@@ -55,12 +55,23 @@
                             </a>
                         </li>
 
+                        @await Html.PartialAsync("_S303Nav")
+                        @await Html.PartialAsync("_S306Nav")
                         <!-- Menu Dịch vụ -->
                         <li class="nav-item">
                             <a class="nav-link text-dark"
                                asp-controller="Services"
                                asp-action="Index">
                                 Dịch vụ
+                            </a>
+                        </li>
+
+                        <!-- Menu Đặt lịch -->
+                        <li class="nav-item">
+                            <a class="nav-link text-primary fw-semibold"
+                               asp-controller="Booking"
+                               asp-action="Index">
+                                <i class="bi bi-calendar-check me-1"></i>Đặt lịch
                             </a>
                         </li>
 

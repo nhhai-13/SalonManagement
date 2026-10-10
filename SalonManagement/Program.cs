@@ -175,6 +175,8 @@ builder.Services.AddAuthentication(options =>
 // =====================================
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddAttendanceModules();
+builder.Services.AddScoped<StylistAvailabilityService>();
 
 builder.Services.AddScoped<
     ITokenService,
@@ -193,6 +195,8 @@ builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
 builder.Services.AddSingleton<
     IPasswordResetRateLimiter,
     PasswordResetRateLimiter>();
+
+builder.Services.AddScoped<IBookingService, BookingService>();
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
 builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
@@ -320,6 +324,11 @@ using (var scope = app.Services.CreateScope())
     await SeedData.SeedAsync(
         dbContext,
         userManager);
+    if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
+    {
+        var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;
+        await StylistBookingDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
+    }
 }
 
 // =====================================

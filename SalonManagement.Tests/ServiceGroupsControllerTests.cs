@@ -109,6 +109,9 @@ public class ServiceGroupsControllerTests
         var second = new ServiceGroup { GroupName = "Gội", DisplayOrder = 1, Services = [new() { ServiceName = "A" }, new() { ServiceName = "Ẩn", IsActive = false }] };
         db.AddRange(first, second);
         db.Services.Add(new() { ServiceName = "Chưa phân nhóm" });
+        var stylist = new Stylist { FullName = "Thợ đang làm việc" };
+        foreach (var service in db.ChangeTracker.Entries<Service>().Select(entry => entry.Entity).ToList())
+            service.Stylists.Add(new StylistService { Service = service, Stylist = stylist });
         await db.SaveChangesAsync();
         var services = new ServicesController(db) { ControllerContext = new() { HttpContext = new DefaultHttpContext() } };
         async Task<string[]> PublicNames()
@@ -117,10 +120,10 @@ public class ServiceGroupsControllerTests
             Assert.Equal("Public", result.ViewName);
             return Assert.IsType<PublicServiceCatalog>(result.Model).Groups.SelectMany(g => g.Services).Select(s => s.ServiceName).ToArray();
         }
-        Assert.Equal(new[] { "Z", "A", "Ẩn", "Chưa phân nhóm" }, await PublicNames());
+        Assert.Equal(new[] { "Z", "A", "Chưa phân nhóm" }, await PublicNames());
         await Controller(db).Edit(second.ServiceGroupId, new() { ServiceGroupId = second.ServiceGroupId, GroupName = "Gội", DisplayOrder = 0 });
         await Controller(db).Edit(first.ServiceGroupId, new() { ServiceGroupId = first.ServiceGroupId, GroupName = "Tóc", DisplayOrder = 2 });
-        Assert.Equal(new[] { "A", "Ẩn", "Z", "Chưa phân nhóm" }, await PublicNames());
+        Assert.Equal(new[] { "A", "Z", "Chưa phân nhóm" }, await PublicNames());
         var home = new HomeController(NullLogger<HomeController>.Instance, db);
         var model = Assert.IsType<HomeViewModel>(Assert.IsType<ViewResult>(await home.Index()).Model);
         Assert.Equal(new[] { "A", "Z", "Chưa phân nhóm" }, model.Services.Select(s => s.ServiceName));

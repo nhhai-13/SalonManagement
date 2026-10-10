@@ -1,0 +1,16 @@
+@model List<SalonManagement.Models.ApplicationUser>
+@{ ViewData["Title"] = "Liên kết tài khoản thợ"; List<SalonManagement.Models.Stylist> stylists = ViewBag.Stylists; }
+<h1>Liên kết tài khoản thợ</h1>
+<p>Chọn hồ sơ để tài khoản nhận thông báo khách của đúng thợ phụ trách.</p>
+@if (TempData["Success"] is string success) { <p class="alert alert-success">@success</p> }
+@if (TempData["Error"] is string error) { <p class="alert alert-danger">@error</p> }
+@foreach (var user in Model) {
+<form asp-action="Link" method="post" class="card card-body mb-3">
+<input type="hidden" name="userId" value="@user.Id" />
+<label for="stylist-@user.Id">@user.Email</label>
+<select id="stylist-@user.Id" name="stylistId" class="form-select mb-2">
+<option value="">Chưa liên kết</option>
+@foreach (var stylist in stylists) { <option value="@stylist.StylistId" selected="@(user.StylistId == stylist.StylistId)">@stylist.FullName</option> }
+</select><button class="btn btn-primary">Lưu liên kết</button>
+</form>
+}
