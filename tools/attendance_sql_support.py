@@ -36,6 +36,10 @@ class Cursor:
         self.rows = []
         self.lastrowid = None
     def execute(self, statement, parameters=()):
+        if statement.startswith("INSERT INTO Appointments (") and "BookingReference" not in statement:
+            if sql(self.database, "SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'Appointments') AND name=N'BookingReference'"):
+                statement = statement.replace("INSERT INTO Appointments (", "INSERT INTO Appointments (BookingReference,", 1).replace("VALUES (", "VALUES (?,", 1)
+                parameters = (uuid.uuid4().hex[:8].upper(), *parameters)
         pieces = statement.split("?")
         if len(pieces) != len(parameters) + 1:
             raise ValueError("Parameter count mismatch")
