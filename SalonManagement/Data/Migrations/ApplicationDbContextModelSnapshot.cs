@@ -357,6 +357,74 @@ namespace SalonManagement.Data.Migrations
                     b.ToTable("AppointmentAudits");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.RescheduleChangeLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppointmentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModifiedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ModifiedByUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("NewDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan>("NewEndTime")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan>("NewStartTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("NewStylistId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NewStylistName")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("OldDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan>("OldEndTime")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan>("OldStartTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("OldStylistId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OldStylistName")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId");
+
+                    b.HasIndex("ChangedAtUtc");
+
+                    b.ToTable("RescheduleChangeLogs");
+                });
+
             modelBuilder.Entity("SalonManagement.Models.AppointmentService", b =>
                 {
                     b.Property<int>("AppointmentServiceId")
@@ -626,74 +694,6 @@ namespace SalonManagement.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("RefreshTokens");
-                });
-
-            modelBuilder.Entity("SalonManagement.Models.RescheduleChangeLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AppointmentId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ChangedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ModifiedByUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("ModifiedByUserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<DateTime>("NewDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<TimeSpan>("NewEndTime")
-                        .HasColumnType("time");
-
-                    b.Property<TimeSpan>("NewStartTime")
-                        .HasColumnType("time");
-
-                    b.Property<int>("NewStylistId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("NewStylistName")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateTime>("OldDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<TimeSpan>("OldEndTime")
-                        .HasColumnType("time");
-
-                    b.Property<TimeSpan>("OldStartTime")
-                        .HasColumnType("time");
-
-                    b.Property<int>("OldStylistId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("OldStylistName")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AppointmentId");
-
-                    b.HasIndex("ChangedAtUtc");
-
-                    b.ToTable("RescheduleChangeLogs");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Service", b =>
@@ -971,6 +971,17 @@ namespace SalonManagement.Data.Migrations
                     b.Navigation("Stylist");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.RescheduleChangeLog", b =>
+                {
+                    b.HasOne("SalonManagement.Models.Appointment", "Appointment")
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Appointment");
+                });
+
             modelBuilder.Entity("SalonManagement.Models.AppointmentService", b =>
                 {
                     b.HasOne("SalonManagement.Models.Appointment", "Appointment")
@@ -1021,17 +1032,6 @@ namespace SalonManagement.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SalonManagement.Models.RescheduleChangeLog", b =>
-                {
-                    b.HasOne("SalonManagement.Models.Appointment", "Appointment")
-                        .WithMany()
-                        .HasForeignKey("AppointmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Appointment");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Service", b =>
