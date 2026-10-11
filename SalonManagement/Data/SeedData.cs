@@ -318,6 +318,14 @@ public static class SeedData
                 }
             }
 
+            if (item.Role == UserRoles.Stylist && user.StylistId == null)
+            {
+                user.StylistId = await context.Stylists.Where(s => s.Email == "minhanh@salon.local")
+                    .Select(s => (int?)s.StylistId).SingleOrDefaultAsync();
+                var linked = await userManager.UpdateAsync(user);
+                if (!linked.Succeeded) throw new InvalidOperationException("Không thể liên kết tài khoản thợ mẫu.");
+            }
+
             // Kiểm tra role trước khi gán để chạy seed nhiều lần
             // không tạo dữ liệu role trùng.
             if (!await userManager.IsInRoleAsync(user, item.Role))
