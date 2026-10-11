@@ -2,28 +2,30 @@
 @using SalonManagement.Services
 @model List<Appointment>
 @{
-    ViewData["Title"] = "Lịch hẹn tại quầy";
+    ViewData["Title"] = "Khách không đến";
     DateTime day = ViewBag.Day;
     DateTimeOffset now = ViewBag.Now;
     Dictionary<string, int> counts = ViewBag.NoShowCounts;
     string Label(string status) => status switch { "Pending" => "Chờ xác nhận", "Confirmed" => "Đã xác nhận", "Arrived" => "Đã đến", "NoShow" => "Không đến", "Cancelled" => "Đã huỷ", "Completed" => "Hoàn tất", _ => status };
 }
-<h1>Lịch hẹn tại quầy</h1>
+<div class="attendance-page">
+@await Html.PartialAsync("_AttendanceStyles")
+<div class="attendance-heading"><div><span class="attendance-kicker">LUMINOL · LỄ TÂN</span><h1>Khách không đến</h1></div><span class="attendance-total">@Model.Count lịch hẹn</span></div>
 <p><a class="btn btn-primary" asp-action="Create">Đặt lịch tại quầy</a></p>
 @if (TempData["Error"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
 @if (TempData["Success"] is string success) { <div class="alert alert-success" role="status">@success</div> }
-<form method="get" class="mb-3"><label for="date">Ngày xem lịch</label> <input type="date" id="date" name="date" value="@day.ToString("yyyy-MM-dd")" required /> <button class="btn btn-primary">Xem lịch</button></form>
-<form id="customer-warning" class="mb-3">
+<form method="get" class="attendance-toolbar"><label for="date">Ngày xem lịch</label> <input class="form-control" type="date" id="date" name="date" value="@day.ToString("yyyy-MM-dd")" required /> <button class="btn btn-primary">Xem lịch</button></form>
+<form id="customer-warning" class="attendance-warning">
 <label for="phone">Kiểm tra khách trước khi đặt lịch</label>
-<input id="phone" name="phone" type="tel" maxlength="20" required placeholder="Số điện thoại" />
+<input class="form-control" id="phone" name="phone" type="tel" maxlength="20" required placeholder="Số điện thoại" />
 <button class="btn btn-outline-primary">Kiểm tra</button><p id="warning-result" role="status"></p>
 </form>
-<p>Không đến sau 30 phút khi chưa check-in; hoàn tác trong 15 phút.</p>
-@if (Model.Count == 0) { <p>Không có lịch hẹn trong ngày.</p> }
+
+@if (Model.Count == 0) { <div class="attendance-empty"><h2>Chưa có lịch hẹn</h2><p>Chọn ngày khác để xem lịch của khách.</p></div> }
 @foreach (var a in Model) {
-    <article class="card mb-3"><div class="card-body">
+    <article class="card attendance-card mb-3"><div class="card-body">
         <h2 class="h5">@a.StartTime.ToString(@"hh\:mm") – @a.EndTime.ToString(@"hh\:mm") · @a.Customer.FullName</h2>
-        <p>@a.Customer.Phone · Thợ: @a.Stylist.FullName · <strong>@Label(a.Status)</strong></p>
+        <p>@a.Customer.Phone · Thợ: @a.Stylist.FullName · <strong class="attendance-status attendance-status-@a.Status.ToLowerInvariant()">@Label(a.Status)</strong></p>
         @if (a.CheckedInAt.HasValue) { <p>Giờ đến: @a.CheckedInAt.Value.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm 'ngày' dd/MM/yyyy")</p> }
         @if (a.LateMinutes > 0) { <p class="text-danger">Đến muộn @a.LateMinutes phút</p> }
         @if (counts.GetValueOrDefault(a.Customer.Phone) > 0) { <p class="text-danger">Cảnh báo: khách đã không đến @counts[a.Customer.Phone] lần.</p> }
@@ -34,6 +36,7 @@
         </form>
     </div></article>
 }
+</div>
 @section Scripts {
 <script>
 document.getElementById('customer-warning').addEventListener('submit', async e => {
