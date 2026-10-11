@@ -296,7 +296,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
         return RescheduleValidationResult.Success();
     }
 
-    public async Task<RescheduleResult> RescheduleAppointmentAsync(int appointmentId, RescheduleAppointmentRequest request, string? currentUserId = null, string? currentUserName = null, CancellationToken cancellationToken = default)
+    public async Task<RescheduleResult> RescheduleAppointmentAsync(int appointmentId, CalendarRescheduleRequest request, string? currentUserId = null, string? currentUserName = null, CancellationToken cancellationToken = default)
     {
         var strategy = _db.Database.CreateExecutionStrategy();
 

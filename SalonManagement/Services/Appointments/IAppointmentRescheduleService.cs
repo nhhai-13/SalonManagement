@@ -22,7 +22,7 @@ public interface IAppointmentRescheduleService
     /// <summary>
     /// Thực thi dời giờ / đổi thợ trong transaction an toàn, chống race condition.
     /// </summary>
-    Task<RescheduleResult> RescheduleAppointmentAsync(int appointmentId, RescheduleAppointmentRequest request, string? currentUserId = null, string? currentUserName = null, CancellationToken cancellationToken = default);
+    Task<RescheduleResult> RescheduleAppointmentAsync(int appointmentId, CalendarRescheduleRequest request, string? currentUserId = null, string? currentUserName = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Lấy danh sách nhật ký thay đổi / audit history của lịch hẹn (sắp xếp giảm dần theo thời gian).

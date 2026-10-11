@@ -423,7 +423,7 @@ public class AppointmentRescheduleServiceTests
         var service = new AppointmentRescheduleService(db);
 
         // Act
-        var request = new RescheduleAppointmentRequest
+        var request = new CalendarRescheduleRequest
         {
             NewStylistId = 2,
             NewDate = dateNew,
@@ -479,7 +479,7 @@ public class AppointmentRescheduleServiceTests
         var controller = new ReceptionAppointmentsController(service);
 
         // Act 1: Gọi endpoint validate hợp lệ
-        var validReq = new RescheduleAppointmentRequest { NewStylistId = 1, NewDate = date, NewStartTime = new TimeSpan(10, 0, 0) };
+        var validReq = new CalendarRescheduleRequest { NewStylistId = 1, NewDate = date, NewStartTime = new TimeSpan(10, 0, 0) };
         var actionRes = await controller.ValidateReschedule(80, validReq, default);
         var okVal = Assert.IsType<OkObjectResult>(actionRes);
         var valResult = Assert.IsType<RescheduleValidationResult>(okVal.Value);
@@ -541,7 +541,7 @@ public class AppointmentRescheduleServiceTests
         var service = new AppointmentRescheduleService(db);
 
         // Act
-        var request = new RescheduleAppointmentRequest
+        var request = new CalendarRescheduleRequest
         {
             NewStylistId = 2,
             NewDate = dateNew,
@@ -719,7 +719,7 @@ public class AppointmentRescheduleServiceTests
         var service = new AppointmentRescheduleService(db, fakeQueue);
 
         // Act
-        var request = new RescheduleAppointmentRequest
+        var request = new CalendarRescheduleRequest
         {
             NewStylistId = 1,
             NewDate = date,
@@ -776,7 +776,7 @@ public class AppointmentRescheduleServiceTests
         var service = new AppointmentRescheduleService(db, fakeQueue);
 
         // Act
-        var request = new RescheduleAppointmentRequest
+        var request = new CalendarRescheduleRequest
         {
             NewStylistId = 1,
             NewDate = date,

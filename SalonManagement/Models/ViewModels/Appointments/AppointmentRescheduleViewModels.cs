@@ -1,6 +1,6 @@
 namespace SalonManagement.Models.ViewModels.Appointments;
 
-public class RescheduleAppointmentRequest
+public class CalendarRescheduleRequest
 {
     public int NewStylistId { get; set; }
     public DateTime NewDate { get; set; }
