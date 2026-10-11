@@ -21,6 +21,52 @@ window.ScheduleCoordinationPage = (() => {
         return cell;
     };
 
+    function renderPlan(plan) {
+        const cell = document.createElement("td");
+        if (!plan?.hasOptions) {
+            const none = document.createElement("div");
+            none.className = "text-danger fw-semibold mb-2";
+            none.textContent = "Chưa tìm được thợ hoặc khung giờ phù hợp.";
+            cell.append(none);
+        }
+
+        const list = document.createElement("ul");
+        list.className = "list-unstyled mb-0";
+        for (const option of plan.stylists || []) {
+            const item = document.createElement("li");
+            item.className = "mb-2";
+            const title = document.createElement("strong");
+            title.textContent = option.stylistName;
+            item.append(title);
+
+            if (option.availableAtOriginalTime) {
+                const fit = document.createElement("span");
+                fit.className = "badge text-bg-success ms-2";
+                fit.textContent = "Rảnh đúng giờ";
+                item.append(fit);
+            } else if (option.suggestedStartTimes?.length) {
+                const times = document.createElement("div");
+                times.textContent = `Có thể nhận lúc: ${option.suggestedStartTimes.join(", ")}`;
+                item.append(times);
+                appendReasons(item, option.reasonsUnavailableAtOriginalTime);
+            } else {
+                appendReasons(item, option.reasonsUnavailableAtOriginalTime);
+            }
+
+            list.append(item);
+        }
+        cell.append(list);
+        return cell;
+    }
+
+    function appendReasons(parent, reasons) {
+        if (!reasons?.length) return;
+        const reason = document.createElement("small");
+        reason.className = "d-block text-muted";
+        reason.textContent = `Không phù hợp giờ ban đầu: ${reasons.join(" ")}`;
+        parent.append(reason);
+    }
+
     function setBusy(isBusy) {
         submit.disabled = isBusy || !stylist.value || !date.value;
         loading.classList.toggle("d-none", !isBusy);
@@ -45,7 +91,8 @@ window.ScheduleCoordinationPage = (() => {
                 textCell(appointment.startTime.slice(0, 5)),
                 textCell(`${appointment.durationMinutes} phút`),
                 textCell(statusLabels[appointment.status] || appointment.status),
-                textCell([appointment.customerPhone, appointment.customerEmail].filter(Boolean).join(" · "))
+                textCell([appointment.customerPhone, appointment.customerEmail].filter(Boolean).join(" · ")),
+                renderPlan(appointment.plan)
             );
             rows.append(row);
         }

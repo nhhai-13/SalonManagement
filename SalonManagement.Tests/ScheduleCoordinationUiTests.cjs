@@ -92,3 +92,40 @@ test("shows the empty state when the selected stylist and date have no appointme
     assert.equal(elements["schedule-count"].textContent, "0 lịch cần xử lý");
     assert.equal(elements["schedule-empty"].classList.contains("d-none"), false);
 });
+
+test("renders suggested alternative times and the reason the original time is unavailable", async () => {
+    const appointment = {
+        id: 12,
+        customerName: "Khách thử",
+        services: ["Cắt tóc nam"],
+        startTime: "09:00",
+        durationMinutes: 60,
+        status: "Confirmed",
+        customerPhone: "0900000000",
+        plan: {
+            hasOptions: true,
+            stylists: [{
+                stylistId: 8,
+                stylistName: "Thợ thay thế",
+                availableAtOriginalTime: false,
+                reasonsUnavailableAtOriginalTime: ["Bị trùng lịch với lịch hẹn #55."],
+                suggestedStartTimes: ["10:00", "10:15"]
+            }]
+        }
+    };
+    const { page, elements } = createPage({
+        ok: true,
+        status: 200,
+        json: async () => ({ totalCount: 1, appointments: [appointment] })
+    });
+
+    await page.initialize();
+    elements["stylist-id"].value = "4";
+    elements["day-off"].value = "2026-10-11";
+    await elements["schedule-coordination-filter"].listeners.submit({ preventDefault() {} });
+
+    const row = elements["schedule-appointments"].children[0];
+    const option = row.children[6].children[0].children[0];
+    assert.equal(option.children[1].textContent, "Có thể nhận lúc: 10:00, 10:15");
+    assert.match(option.children[2].textContent, /Bị trùng lịch/);
+});

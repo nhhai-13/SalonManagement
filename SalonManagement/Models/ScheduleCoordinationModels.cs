@@ -19,7 +19,19 @@ public sealed record ScheduleCoordinationAppointment(
     string[] Services,
     string StartTime,
     int DurationMinutes,
-    string Status);
+    string Status,
+    ScheduleCoordinationPlan Plan);
+
+public sealed record ScheduleCoordinationPlan(
+    IReadOnlyList<ScheduleCoordinationStylistOption> Stylists,
+    bool HasOptions);
+
+public sealed record ScheduleCoordinationStylistOption(
+    int StylistId,
+    string StylistName,
+    bool AvailableAtOriginalTime,
+    IReadOnlyList<string> ReasonsUnavailableAtOriginalTime,
+    IReadOnlyList<string> SuggestedStartTimes);
 
 public sealed record ScheduleCoordinationAppointmentsResponse(
     int StylistId,

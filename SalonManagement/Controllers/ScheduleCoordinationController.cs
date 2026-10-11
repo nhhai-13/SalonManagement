@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
+using SalonManagement.Services;
 
 namespace SalonManagement.Controllers;
 
@@ -57,9 +58,32 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
             .Include(appointment => appointment.Customer)
             .Include(appointment => appointment.AppointmentServices)
                 .ThenInclude(item => item.Service)
+                    .ThenInclude(service => service.ServiceGroup)
             .OrderBy(appointment => appointment.StartTime)
             .ThenBy(appointment => appointment.AppointmentId)
             .ToListAsync();
+
+        var activeStylists = await dbContext.Stylists
+            .AsNoTracking()
+            .Where(stylist => stylist.IsActive && stylist.StylistId != stylistId)
+            .Include(stylist => stylist.WorkSchedules)
+            .ToListAsync();
+
+        var dayAppointments = await dbContext.Appointments
+            .AsNoTracking()
+            .Where(appointment => appointment.AppointmentDate >= dayStart &&
+                appointment.AppointmentDate < nextDay)
+            .ToListAsync();
+
+        var storedBusinessHours = await dbContext.BusinessHours
+            .AsNoTracking()
+            .SingleOrDefaultAsync(hours => hours.DayOfWeek == date.Value.DayOfWeek);
+        var businessHours = new BusinessHourResponse(
+            date.Value.DayOfWeek,
+            storedBusinessHours?.IsClosed ?? false,
+            storedBusinessHours?.OpensAt ?? new TimeOnly(8, 0),
+            storedBusinessHours?.ClosesAt ?? new TimeOnly(17, 0),
+            storedBusinessHours?.TimeZoneId ?? BusinessHour.SalonTimeZone);
 
         var appointments = appointmentEntities.Select(appointment => new ScheduleCoordinationAppointment(
                 appointment.AppointmentId,
@@ -71,13 +95,20 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
                     .Select(item => item.Service.ServiceName)
                     .ToArray(),
                 appointment.StartTime.ToString(@"hh\:mm"),
-                Math.Max(0, (int)(appointment.EndTime - appointment.StartTime).TotalMinutes),
-                appointment.Status)).ToArray();
+                ScheduleCoordinationPlanner.GetDuration(appointment),
+                appointment.Status,
+                ScheduleCoordinationPlanner.BuildPlan(
+                    appointment,
+                    stylistId.Value,
+                    date.Value,
+                    activeStylists,
+                    dayAppointments,
+                    businessHours))).ToArray();
 
         return Ok(new ScheduleCoordinationAppointmentsResponse(
             stylistId.Value,
             date.Value,
-            appointments.Count,
+            appointments.Length,
             appointments));
     }
 }
