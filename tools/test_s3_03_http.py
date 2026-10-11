@@ -71,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix="s3-03-http-", dir=ROOT) as temporary:
         owner_tokens = login(owner, "owner@salon.local", "Owner123!", "admin")
         assert request(anonymous, "/api/owner/session", token=owner_tokens["accessToken"])[0] == 200
         assert request(anonymous, "/api/owner/session", token=desk_tokens["accessToken"])[0] == 403
-        for opener, path in [(desk, "/CheckIn"), (stylist, "/StylistNotifications"), (owner, "/StylistLinks"), (owner, "/admin")]:
+        for opener, path in [(desk, "/CheckIn"), (stylist, "/StylistNotifications"), (owner, "/StylistLinks"), (owner, "/owner")]:
             assert request(opener, path)[0] == 200, path
         assert request(stylist, "/CheckIn")[0] == 403
         assert request(desk, "/StylistLinks")[0] == 403
