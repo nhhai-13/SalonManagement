@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix="s3-06-http-", dir=ROOT) as temporary:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     base = f"http://127.0.0.1:{port}"
-    env = dict(os.environ, DatabaseProvider="Sqlite", ConnectionStrings__DefaultConnection=f"Server={SERVER};Database={database};Trusted_Connection=True;TrustServerCertificate=True",
+    env = dict(os.environ, DatabaseProvider="SqlServer", ConnectionStrings__DefaultConnection=f"Server={SERVER};Database={database};Trusted_Connection=True;TrustServerCertificate=True",
                ASPNETCORE_ENVIRONMENT="Development", Logging__LogLevel__Default="Error")
     server = subprocess.Popen(["dotnet", str(ROOT / "SalonManagement/bin/Debug/net8.0/SalonManagement.dll"), "--urls", base],
                               cwd=ROOT / "SalonManagement", env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
