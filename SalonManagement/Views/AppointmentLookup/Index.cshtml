@@ -58,6 +58,22 @@
                     addText(body, 'div', (appointment.services || []).join(', '), 'mt-2');
                     addText(body, 'div', `Thợ: ${appointment.stylistName}`);
                     addText(body, 'div', `${appointment.date} · ${appointment.startTime}–${appointment.endTime} · ${appointment.durationMinutes} phút`);
+                    if (appointment.status !== 'Đã huỷ') {
+                        const cancel = document.createElement('button');
+                        cancel.type = 'button'; cancel.className = 'btn btn-outline-danger btn-sm mt-3'; cancel.textContent = 'Huỷ lịch';
+                        cancel.addEventListener('click', async () => {
+                            if (!confirm('Bạn có chắc muốn huỷ lịch hẹn này?')) return;
+                            cancel.disabled = true;
+                            try {
+                                const response = await fetch('/appointments/lookup/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: appointment.reference }) });
+                                const data = await response.json();
+                                if (!response.ok) throw new Error(data.error || 'Không thể huỷ lịch hẹn.');
+                                showMessage('Huỷ lịch hẹn thành công. Khung giờ đã được trả lại.', false);
+                                form.requestSubmit();
+                            } catch (error) { showMessage(error.message || 'Không thể huỷ lịch hẹn.', true); cancel.disabled = false; }
+                        });
+                        body.append(cancel);
+                    }
                     item.append(body);
                     list.append(item);
                 });

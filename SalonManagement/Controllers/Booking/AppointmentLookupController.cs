@@ -31,4 +31,13 @@ public sealed class AppointmentLookupController(ApplicationDbContext db, TimePro
         }
         return Ok(new { error = result.Error, appointments = result.Items.Select(item => new { item.Reference, date = item.Date.ToString("dd/MM/yyyy"), startTime = item.StartTime.ToString(@"hh\:mm"), endTime = item.EndTime.ToString(@"hh\:mm"), item.Services, item.StylistName, item.DurationMinutes, item.Status }) });
     }
+
+    [HttpPost("cancel")]
+    public async Task<IActionResult> Cancel([FromBody] CancelAppointmentRequest request)
+    {
+        var result = await new AppointmentCancellationService(db, timeProvider).CancelAsync(request.Reference);
+        return result.Succeeded ? Ok(new { status = "Cancelled" }) : BadRequest(new { error = result.Error, code = result.ErrorCode });
+    }
 }
+
+public sealed record CancelAppointmentRequest(string? Reference);
