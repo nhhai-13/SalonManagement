@@ -11,6 +11,10 @@ public partial class PreserveRescheduleHistory : Migration
                    AND COL_LENGTH(N'[dbo].[AppointmentChangeLogs]', N'ChangedAtUtc') IS NOT NULL
                 BEGIN
                     EXEC sp_rename N'[dbo].[AppointmentChangeLogs]', N'RescheduleChangeLogs';
+                    IF OBJECT_ID(N'[dbo].[PK_AppointmentChangeLogs]', N'PK') IS NOT NULL
+                        EXEC sp_rename N'[dbo].[PK_AppointmentChangeLogs]', N'PK_RescheduleChangeLogs', N'OBJECT';
+                    IF OBJECT_ID(N'[dbo].[FK_AppointmentChangeLogs_Appointments_AppointmentId]', N'F') IS NOT NULL
+                        EXEC sp_rename N'[dbo].[FK_AppointmentChangeLogs_Appointments_AppointmentId]', N'FK_RescheduleChangeLogs_Appointments_AppointmentId', N'OBJECT';
                 END
                 """);
     }
