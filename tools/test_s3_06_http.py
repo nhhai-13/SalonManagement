@@ -119,6 +119,7 @@ with tempfile.TemporaryDirectory(prefix="s3-06-http-", dir=ROOT) as temporary:
         c.execute("UPDATE Appointments SET Status='NoShow',CheckedInAt=NULL,StartTime='00:00:00',EndTime='23:59:00' WHERE AppointmentId IN (?,?,?)", tuple(ids))
         c.execute("INSERT INTO WorkSchedules (StylistId,WorkDate,StartTime,EndTime,Status,CreatedAt) VALUES (?,?,?,?,?,?)", (1, future.strftime("%Y-%m-%d 00:00:00"), "00:00:00", "23:59:00", "Working", now.isoformat(" ")))
         c.execute("UPDATE Services SET DurationMinutes=1 WHERE ServiceId=1")
+        c.execute("UPDATE BusinessHours SET IsClosed=0,OpensAt='00:00:00',ClosesAt='23:59:00'")
         c.execute("IF NOT EXISTS (SELECT 1 FROM StylistServices WHERE StylistId=1 AND ServiceId=1) INSERT INTO StylistServices (StylistId,ServiceId) VALUES (1,1)"); con.commit()
         status, page = request(desk, "/NoShows/Create")
         form = {"FullName": "HTTP Test", "Phone": "0999998888", "StylistId": 1, "ServiceId": 1, "StartsAt": future.strftime("%Y-%m-%dT%H:%M"), "__RequestVerificationToken": csrf(page)}
@@ -126,7 +127,8 @@ with tempfile.TemporaryDirectory(prefix="s3-06-http-", dir=ROOT) as temporary:
         assert request(desk, "/NoShows/Create", form, form=True)[0] == 200
         assert c.execute("SELECT COUNT(*) FROM Appointments").fetchone()[0] == before
         form["AcknowledgeNoShow"] = "true"
-        assert request(desk, "/NoShows/Create", form, form=True)[0] == 302
+        booking_status, booking_body = request(desk, "/NoShows/Create", form, form=True)
+        assert booking_status == 302, (booking_status, re.sub("<[^>]+>", "", booking_body)[-2500:])
         assert c.execute("SELECT COUNT(*) FROM Appointments").fetchone()[0] == before + 1
         assert request(desk, "/NoShows/Create", form, form=True)[0] == 200
         assert c.execute("SELECT COUNT(*) FROM Appointments").fetchone()[0] == before + 1
