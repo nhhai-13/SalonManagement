@@ -72,6 +72,7 @@ public override async Task<int> SaveChangesAsync(
     CancellationToken cancellationToken = default)
 {
     ChangeTracker.DetectChanges();
+    await AssignMissingBookingReferencesAsync(cancellationToken);
     if (ChangeTracker.Entries<AuditLog>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
         throw new InvalidOperationException("Nhật ký hệ thống chỉ đọc, không được sửa hoặc xoá.");
     var auditEntries = CreateAuditEntries();
@@ -108,6 +109,7 @@ public override async Task<int> SaveChangesAsync(
 private List<AuditEntry> CreateAuditEntries()
 {
     ChangeTracker.DetectChanges();
+    await AssignMissingBookingReferencesAsync(cancellationToken);
 
     var entries = new List<AuditEntry>();
 
