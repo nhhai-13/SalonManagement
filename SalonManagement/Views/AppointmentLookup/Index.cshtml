@@ -58,6 +58,7 @@
                     addText(body, 'div', (appointment.services || []).join(', '), 'mt-2');
                     addText(body, 'div', `Thợ: ${appointment.stylistName}`);
                     addText(body, 'div', `${appointment.date} · ${appointment.startTime}–${appointment.endTime} · ${appointment.durationMinutes} phút`);
+                    if (appointment.status === 'Đã huỷ') addText(body, 'div', `Đã huỷ lúc ${appointment.cancelledAt || 'không rõ'} bởi ${appointment.cancelledBy || 'Khách hàng'}`, 'text-muted mt-2');
                     if (appointment.status !== 'Đã huỷ') {
                         const cancel = document.createElement('button');
                         cancel.type = 'button'; cancel.className = 'btn btn-outline-danger btn-sm mt-3'; cancel.textContent = 'Huỷ lịch';

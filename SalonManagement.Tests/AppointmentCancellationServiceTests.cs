@@ -20,7 +20,10 @@ public sealed class AppointmentCancellationServiceTests
         var result = await new AppointmentCancellationService(db, new FakeTimeProvider(now)).CancelAsync("cancel01");
 
         Assert.IsTrue(result.Succeeded);
-        Assert.AreEqual("Cancelled", (await db.Appointments.SingleAsync()).Status);
+        var cancelled = await db.Appointments.SingleAsync();
+        Assert.AreEqual("Cancelled", cancelled.Status);
+        Assert.AreEqual("Khách hàng", cancelled.CancelledBy);
+        Assert.IsNotNull(cancelled.CancelledAt);
     }
 
     [TestMethod]
@@ -35,6 +38,22 @@ public sealed class AppointmentCancellationServiceTests
         Assert.IsFalse(result.Succeeded);
         Assert.AreEqual("too_late", result.ErrorCode);
         Assert.AreEqual("Confirmed", (await db.Appointments.SingleAsync()).Status);
+    }
+
+    [TestMethod]
+    public async Task Cancel_twice_is_rejected_without_overwriting_cancellation_details()
+    {
+        await using var db = CreateDb();
+        var now = new DateTimeOffset(2031, 2, 3, 8, 0, 0, TimeSpan.FromHours(7));
+        await SeedAsync(db, now.LocalDateTime.AddMinutes(121), "CANCEL03");
+        var service = new AppointmentCancellationService(db, new FakeTimeProvider(now));
+        Assert.IsTrue((await service.CancelAsync("CANCEL03")).Succeeded);
+        var firstCancelledAt = (await db.Appointments.SingleAsync()).CancelledAt;
+
+        var repeat = await service.CancelAsync("CANCEL03");
+
+        Assert.AreEqual("already_cancelled", repeat.ErrorCode);
+        Assert.AreEqual(firstCancelledAt, (await db.Appointments.SingleAsync()).CancelledAt);
     }
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());

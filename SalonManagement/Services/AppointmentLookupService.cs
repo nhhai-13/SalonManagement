@@ -4,7 +4,7 @@ using SalonManagement.Models;
 
 namespace SalonManagement.Services;
 
-public sealed record AppointmentLookupItem(string Reference, DateTime Date, TimeSpan StartTime, TimeSpan EndTime, IReadOnlyList<string> Services, string StylistName, int DurationMinutes, string Status);
+public sealed record AppointmentLookupItem(string Reference, DateTime Date, TimeSpan StartTime, TimeSpan EndTime, IReadOnlyList<string> Services, string StylistName, int DurationMinutes, string Status, DateTime? CancelledAt, string? CancelledBy);
 public sealed record AppointmentLookupResult(IReadOnlyList<AppointmentLookupItem> Items, string? Error);
 
 public sealed class AppointmentLookupService(ApplicationDbContext db)
@@ -33,7 +33,7 @@ public sealed class AppointmentLookupService(ApplicationDbContext db)
     private static AppointmentLookupItem ToItem(Appointment appointment)
     {
         var duration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
-        return new(appointment.BookingReference, appointment.AppointmentDate, appointment.StartTime, appointment.EndTime, appointment.AppointmentServices.Select(item => item.Service.ServiceName).ToList(), appointment.Stylist?.FullName ?? "Chưa phân công", duration, StatusLabel(appointment.Status));
+        return new(appointment.BookingReference, appointment.AppointmentDate, appointment.StartTime, appointment.EndTime, appointment.AppointmentServices.Select(item => item.Service.ServiceName).ToList(), appointment.Stylist?.FullName ?? "Chưa phân công", duration, StatusLabel(appointment.Status), appointment.CancelledAt, appointment.CancelledBy);
     }
     private static string StatusLabel(string status) => status switch { "Pending" => "Chờ xác nhận", "Confirmed" => "Đã xác nhận", "InProgress" => "Đang thực hiện", "Completed" => "Đã hoàn thành", "Cancelled" => "Đã huỷ", "NoShow" => "Không đến", _ => status };
 }

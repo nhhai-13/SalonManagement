@@ -26,7 +26,10 @@ public sealed class AppointmentCancellationService(ApplicationDbContext db, Time
             return AppointmentCancellationResult.Rejected("too_late", "Lịch hẹn còn dưới 120 phút. Vui lòng gọi điện cho tiệm để được hỗ trợ.");
 
         appointment.Status = "Cancelled";
-        appointment.UpdatedAt = SalonClock.GetLocalNow(timeProvider);
+        var cancelledAt = SalonClock.GetLocalNow(timeProvider);
+        appointment.CancelledAt = cancelledAt;
+        appointment.CancelledBy = "Khách hàng";
+        appointment.UpdatedAt = cancelledAt;
         await db.SaveChangesAsync();
         return AppointmentCancellationResult.Success();
     }

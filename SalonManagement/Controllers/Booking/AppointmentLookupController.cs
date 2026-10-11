@@ -29,7 +29,7 @@ public sealed class AppointmentLookupController(ApplicationDbContext db, TimePro
                 return StatusCode(StatusCodes.Status429TooManyRequests, new { error = $"Bạn tạm thời bị chặn tra cứu. Vui lòng thử lại sau {block.RetryAt!.Value.LocalDateTime:HH:mm}." });
             }
         }
-        return Ok(new { error = result.Error, appointments = result.Items.Select(item => new { item.Reference, date = item.Date.ToString("dd/MM/yyyy"), startTime = item.StartTime.ToString(@"hh\:mm"), endTime = item.EndTime.ToString(@"hh\:mm"), item.Services, item.StylistName, item.DurationMinutes, item.Status }) });
+        return Ok(new { error = result.Error, appointments = result.Items.Select(item => new { item.Reference, date = item.Date.ToString("dd/MM/yyyy"), startTime = item.StartTime.ToString(@"hh\:mm"), endTime = item.EndTime.ToString(@"hh\:mm"), item.Services, item.StylistName, item.DurationMinutes, item.Status, cancelledAt = item.CancelledAt?.ToString("dd/MM/yyyy HH:mm"), item.CancelledBy }) });
     }
 
     [HttpPost("cancel")]

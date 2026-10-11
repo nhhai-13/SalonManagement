@@ -34,6 +34,10 @@
 
         public DateTime? RejectedAt { get; set; }
 
+        public DateTime? CancelledAt { get; set; }
+
+        public string? CancelledBy { get; set; }
+
         public Customer Customer { get; set; } = null!;
 
         public Stylist Stylist { get; set; } = null!;
