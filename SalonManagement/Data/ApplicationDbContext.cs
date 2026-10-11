@@ -27,6 +27,8 @@ namespace SalonManagement.Data
 
         public DbSet<AppointmentService> AppointmentServices => Set<AppointmentService>();
 
+        public DbSet<ScheduleContactFollowUp> ScheduleContactFollowUps => Set<ScheduleContactFollowUp>();
+
         public DbSet<Invoice> Invoices => Set<Invoice>();
 
         public DbSet<Payment> Payments => Set<Payment>();
@@ -152,6 +154,21 @@ namespace SalonManagement.Data
                         item.ServiceId
                     })
                     .IsUnique();
+            });
+
+            builder.Entity<ScheduleContactFollowUp>(entity =>
+            {
+                entity.HasKey(item => item.ScheduleContactFollowUpId);
+                entity.Property(item => item.Category).HasMaxLength(30).IsRequired();
+                entity.Property(item => item.Reason).HasMaxLength(500).IsRequired();
+                entity.Property(item => item.ContactStatus).HasMaxLength(30).IsRequired();
+                entity.Property(item => item.ContactNote).HasMaxLength(1000);
+                entity.HasOne(item => item.Appointment)
+                    .WithOne(appointment => appointment.ScheduleContactFollowUp)
+                    .HasForeignKey<ScheduleContactFollowUp>(item => item.AppointmentId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(item => item.AppointmentId).IsUnique();
+                entity.HasIndex(item => new { item.OriginalAppointmentDate, item.ContactStatus, item.Category });
             });
 
             builder.Entity<Invoice>(entity =>

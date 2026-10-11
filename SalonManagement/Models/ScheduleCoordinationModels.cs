@@ -64,3 +64,30 @@ public sealed record ScheduleTransferItemResult(
     string? StylistName,
     string? StartTime,
     string? AppointmentStatus);
+
+public sealed record ScheduleFollowUpSyncRequest(int StylistId, DateOnly Date);
+
+public sealed record ScheduleFollowUpSyncResponse(int AddedOrUpdated, int TotalWithoutOptions);
+
+public sealed record ScheduleFollowUpItem(
+    int Id,
+    int AppointmentId,
+    string Category,
+    string CategoryLabel,
+    string CustomerName,
+    string CustomerPhone,
+    string[] Services,
+    DateOnly OriginalDate,
+    string OriginalStartTime,
+    string Reason,
+    string ContactStatus,
+    string? ContactNote,
+    DateTime? ContactedAt);
+
+public sealed record ScheduleFollowUpListResponse(
+    int TotalCount,
+    IReadOnlyList<ScheduleFollowUpItem> Items);
+
+public sealed record ScheduleFollowUpUpdateRequest(
+    [Required, MaxLength(30)] string ContactStatus,
+    [MaxLength(1000)] string? ContactNote);

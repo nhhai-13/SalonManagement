@@ -38,6 +38,9 @@ public class AdminController : Controller
     [HttpGet("reception/schedule-coordination")]
     public IActionResult ReceptionScheduleCoordination() => View("ScheduleCoordination");
 
+    [HttpGet("reception/schedule-coordination/follow-ups")]
+    public IActionResult ReceptionScheduleFollowUps() => View("ScheduleFollowUps");
+
     [HttpGet("stylist/register")]
     public IActionResult StylistRegister()
     {

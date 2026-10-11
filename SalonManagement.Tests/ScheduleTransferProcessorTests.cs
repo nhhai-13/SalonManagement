@@ -15,6 +15,15 @@ public sealed class ScheduleTransferProcessorTests
     {
         await using var db = await CreateDbAsync();
         var source = await AddAppointmentAsync(db, 1, new TimeSpan(9, 0, 0));
+        db.ScheduleContactFollowUps.Add(new ScheduleContactFollowUp
+        {
+            AppointmentId = source.AppointmentId,
+            Category = ScheduleContactCategories.NoAlternative,
+            Reason = "Không có phương án",
+            OriginalAppointmentDate = source.AppointmentDate,
+            OriginalStartTime = source.StartTime
+        });
+        await db.SaveChangesAsync();
         var selection = Selection(source.AppointmentId, startMinute: 600);
 
         var response = await new ScheduleTransferProcessor(db).TransferAsync(new([selection]));
@@ -28,6 +37,7 @@ public sealed class ScheduleTransferProcessorTests
         Assert.Equal(new TimeSpan(10, 0, 0), saved.StartTime);
         Assert.Equal(new TimeSpan(11, 0, 0), saved.EndTime);
         Assert.Equal("Confirmed", saved.Status);
+        Assert.Empty(await db.ScheduleContactFollowUps.ToListAsync());
     }
 
     [Fact]
@@ -75,6 +85,9 @@ public sealed class ScheduleTransferProcessorTests
         Assert.Contains("vừa bị chiếm", response.Results[1].Message);
         Assert.Equal(2, (await db.Appointments.AsNoTracking().SingleAsync(item => item.AppointmentId == first.AppointmentId)).StylistId);
         Assert.Equal(1, (await db.Appointments.AsNoTracking().SingleAsync(item => item.AppointmentId == second.AppointmentId)).StylistId);
+        var followUp = await db.ScheduleContactFollowUps.SingleAsync(item => item.AppointmentId == second.AppointmentId);
+        Assert.Equal(ScheduleContactCategories.TransferFailed, followUp.Category);
+        Assert.Contains("vừa bị chiếm", followUp.Reason);
     }
 
     [Fact]

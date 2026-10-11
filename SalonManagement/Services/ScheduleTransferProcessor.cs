@@ -30,6 +30,7 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
         var results = new List<ScheduleTransferItemResult>();
         var reservations = new List<ProposedReservation>();
         var seenAppointmentIds = new HashSet<int>();
+        var succeededAppointmentIds = new HashSet<int>();
 
         foreach (var selection in request.Items)
         {
@@ -43,6 +44,17 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
 
             var result = await ProcessItemAsync(selection, persist, reservations, cancellationToken);
             results.Add(result);
+            if (persist)
+            {
+                if (result.Outcome is "Succeeded" or "AlreadyApplied")
+                {
+                    succeededAppointmentIds.Add(result.AppointmentId);
+                }
+                if (result.Outcome != "Failed" || !succeededAppointmentIds.Contains(result.AppointmentId))
+                {
+                    await UpdateFollowUpAfterTransferAsync(result, cancellationToken);
+                }
+            }
         }
 
         var successOutcomes = persist
@@ -288,6 +300,57 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
 
     private static ScheduleTransferItemResult Failure(int appointmentId, string message) =>
         new(appointmentId, "Failed", message, null, null, null, null);
+
+    private async Task UpdateFollowUpAfterTransferAsync(
+        ScheduleTransferItemResult result,
+        CancellationToken cancellationToken)
+    {
+        if (result.Outcome is "Succeeded" or "AlreadyApplied")
+        {
+            var resolved = await dbContext.ScheduleContactFollowUps
+                .SingleOrDefaultAsync(item => item.AppointmentId == result.AppointmentId, cancellationToken);
+            if (resolved is not null)
+            {
+                dbContext.ScheduleContactFollowUps.Remove(resolved);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            return;
+        }
+
+        if (result.Outcome != "Failed" || result.AppointmentId <= 0)
+        {
+            return;
+        }
+
+        var appointment = await dbContext.Appointments.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.AppointmentId == result.AppointmentId &&
+                ScheduleCoordinationStatuses.NeedsReview.Contains(item.Status), cancellationToken);
+        if (appointment is null)
+        {
+            return;
+        }
+
+        var followUp = await dbContext.ScheduleContactFollowUps
+            .SingleOrDefaultAsync(item => item.AppointmentId == result.AppointmentId, cancellationToken);
+        if (followUp is null)
+        {
+            followUp = new ScheduleContactFollowUp
+            {
+                AppointmentId = appointment.AppointmentId,
+                OriginalAppointmentDate = appointment.AppointmentDate,
+                OriginalStartTime = appointment.StartTime,
+                ContactStatus = ScheduleContactStatuses.Pending,
+                CreatedAt = DateTime.Now
+            };
+            dbContext.ScheduleContactFollowUps.Add(followUp);
+        }
+
+        followUp.Category = ScheduleContactCategories.TransferFailed;
+        followUp.Reason = result.Message.Length <= 500 ? result.Message : result.Message[..500];
+        followUp.UpdatedAt = DateTime.Now;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
 
     private static string FormatTime(TimeSpan time) => time.ToString(@"hh\:mm");
 

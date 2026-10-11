@@ -508,6 +508,61 @@ namespace SalonManagement.Data.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.ScheduleContactFollowUp", b =>
+                {
+                    b.Property<int>("ScheduleContactFollowUpId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ScheduleContactFollowUpId"));
+
+                    b.Property<int>("AppointmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("ContactedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ContactNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ContactStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("OriginalAppointmentDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan>("OriginalStartTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ScheduleContactFollowUpId");
+
+                    b.HasIndex("AppointmentId")
+                        .IsUnique();
+
+                    b.HasIndex("OriginalAppointmentDate", "ContactStatus", "Category");
+
+                    b.ToTable("ScheduleContactFollowUps");
+                });
+
             modelBuilder.Entity("SalonManagement.Models.Service", b =>
                 {
                     b.Property<int>("ServiceId")
@@ -784,6 +839,17 @@ namespace SalonManagement.Data.Migrations
                     b.Navigation("ServiceGroup");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.ScheduleContactFollowUp", b =>
+                {
+                    b.HasOne("SalonManagement.Models.Appointment", "Appointment")
+                        .WithOne("ScheduleContactFollowUp")
+                        .HasForeignKey("SalonManagement.Models.ScheduleContactFollowUp", "AppointmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Appointment");
+                });
+
             modelBuilder.Entity("SalonManagement.Models.WorkSchedule", b =>
                 {
                     b.HasOne("SalonManagement.Models.Stylist", "Stylist")
@@ -805,6 +871,8 @@ namespace SalonManagement.Data.Migrations
                     b.Navigation("AppointmentServices");
 
                     b.Navigation("Invoice");
+
+                    b.Navigation("ScheduleContactFollowUp");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Customer", b =>

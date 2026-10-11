@@ -30,5 +30,7 @@
             = new List<AppointmentService>();
 
         public Invoice? Invoice { get; set; }
+
+        public ScheduleContactFollowUp? ScheduleContactFollowUp { get; set; }
     }
 }

@@ -647,6 +647,41 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID(N'[ScheduleContactFollowUps]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [ScheduleContactFollowUps] (
+        [ScheduleContactFollowUpId] int NOT NULL IDENTITY,
+        [AppointmentId] int NOT NULL,
+        [Category] nvarchar(30) NOT NULL,
+        [Reason] nvarchar(500) NOT NULL,
+        [OriginalAppointmentDate] datetime2 NOT NULL,
+        [OriginalStartTime] time NOT NULL,
+        [ContactStatus] nvarchar(30) NOT NULL,
+        [ContactNote] nvarchar(1000) NULL,
+        [ContactedAt] datetime2 NULL,
+        [CreatedAt] datetime2 NOT NULL,
+        [UpdatedAt] datetime2 NULL,
+        CONSTRAINT [PK_ScheduleContactFollowUps] PRIMARY KEY ([ScheduleContactFollowUpId]),
+        CONSTRAINT [FK_ScheduleContactFollowUps_Appointments_AppointmentId]
+            FOREIGN KEY ([AppointmentId]) REFERENCES [Appointments] ([AppointmentId]) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX [IX_ScheduleContactFollowUps_AppointmentId]
+        ON [ScheduleContactFollowUps] ([AppointmentId]);
+    CREATE INDEX [IX_ScheduleContactFollowUps_OriginalAppointmentDate_ContactStatus_Category]
+        ON [ScheduleContactFollowUps] ([OriginalAppointmentDate], [ContactStatus], [Category]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261011000000_AddScheduleContactFollowUps'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261011000000_AddScheduleContactFollowUps', N'8.0.30');
+END;
+GO
+
 COMMIT;
 GO
 

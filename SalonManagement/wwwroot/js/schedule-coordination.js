@@ -354,6 +354,16 @@ window.ScheduleCoordinationPage = (() => {
             const payload = await response.json().catch(() => ({}));
             if (response.status === 401) return SalonAuth.redirectToLogin("Vui lòng đăng nhập lại để xem lịch.");
             if (!response.ok) throw new Error(payload.message || "Không thể tải lịch hẹn. Vui lòng thử lại.");
+            const syncResponse = await SalonAuth.authenticatedFetch("/api/schedule-coordination/follow-ups/sync", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ stylistId: Number(stylist.value), date: date.value })
+            });
+            if (syncResponse.status === 401) return SalonAuth.redirectToLogin("Vui lòng đăng nhập lại để cập nhật danh sách cần gọi khách.");
+            if (!syncResponse.ok) {
+                const syncPayload = await syncResponse.json().catch(() => ({}));
+                throw new Error(syncPayload.message || "Không thể cập nhật danh sách khách cần liên hệ.");
+            }
             renderAppointments(payload);
         } catch (loadError) {
             error.textContent = loadError.message || "Không thể tải lịch hẹn. Vui lòng thử lại.";
