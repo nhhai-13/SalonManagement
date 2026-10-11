@@ -1,4 +1,4 @@
-﻿namespace SalonManagement.Models
+namespace SalonManagement.Models
 {
     public class Appointment
     {
@@ -17,6 +17,11 @@
         public string Status { get; set; } = "Pending";
 
         public string BookingReference { get; set; } = string.Empty;
+        public DateTimeOffset? CheckedInAt { get; set; }
+        public int LateMinutes { get; set; }
+        public DateTimeOffset? NoShowAt { get; set; }
+        public string? StatusBeforeNoShow { get; set; }
+        public Guid Version { get; set; } = Guid.NewGuid();
 
         public string? Notes { get; set; }
 

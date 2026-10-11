@@ -5,6 +5,8 @@ namespace SalonManagement.Models;
 public class ApplicationUser : IdentityUser
 {
     public string FullName { get; set; } = string.Empty;
+    public int? StylistId { get; set; }
+    public Stylist? Stylist { get; set; }
     public bool IsActive { get; set; } = true;
     public bool MustChangePassword { get; set; }
     public string? EmailVerificationCodeHash { get; set; }

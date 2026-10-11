@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using SalonManagement.Models;
 namespace SalonManagement.Data
 {
-    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+    public partial class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
 
@@ -209,6 +209,7 @@ private class AuditEntry
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            ConfigureAttendanceModels(builder);
 
             builder.Entity<RefreshToken>(entity =>
             {

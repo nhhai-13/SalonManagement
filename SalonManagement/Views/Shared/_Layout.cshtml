@@ -163,7 +163,10 @@ else
                 }
 
             }
-        </nav>
+                    <ul class="list-unstyled sl-nav-section">
+                @await Html.PartialAsync("_S303Nav")
+                @await Html.PartialAsync("_S306Nav")
+            </ul></nav>
 
         @if (User.Identity?.IsAuthenticated == true)
         {
