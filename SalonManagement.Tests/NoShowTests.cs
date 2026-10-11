@@ -25,7 +25,7 @@ public class NoShowTests
             Customer = new Customer { FullName = "Khách", Phone = "0901234567" }, Stylist = new Stylist { FullName = "Thợ" } };
         db.Add(a); await db.SaveChangesAsync(); return a;
     }
-    [Theory] [InlineData(30, false)] [InlineData(31, true)]
+    [Theory] [InlineData(29, false)] [InlineData(30, false)] [InlineData(31, true)]
     public async Task NoShowWindow(int minutes, bool allowed)
     {
         await using var db = Db(); var a = await Seed(db);
@@ -48,6 +48,41 @@ public class NoShowTests
             await Assert.ThrowsAsync<InvalidOperationException>(() => svc.Apply(a.AppointmentId, "undo-no-show", "desk"));
             Assert.Equal(1, await svc.NoShowCount(a.Customer.Phone)); Assert.Single(db.AppointmentAudits);
         }
+    }
+    [Fact]
+    public async Task NoShowRejectsExactlyThirtyMinutesWithoutAuditOrHistory()
+    {
+        await using var db = Db(); var a = await Seed(db);
+        var svc = new NoShowService(db, new Clock { Now = Start.AddMinutes(30) });
+        await Assert.ThrowsAsync<InvalidOperationException>(() => svc.Apply(a.AppointmentId, "no-show", "desk"));
+        Assert.Equal(AppointmentStatuses.Confirmed, a.Status);
+        Assert.Null(a.NoShowAt);
+        Assert.Empty(db.AppointmentAudits);
+        Assert.Equal(0, await svc.NoShowCount(a.Customer.Phone));
+    }
+    [Theory]
+    [InlineData("Arrived")] [InlineData("Completed")] [InlineData("Cancelled")]
+    public async Task NoShowRejectsIneligibleStatuses(string status)
+    {
+        await using var db = Db(); var a = await Seed(db); a.Status = status;
+        await db.SaveChangesAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new NoShowService(db,
+            new Clock { Now = Start.AddMinutes(31) }).Apply(a.AppointmentId, "no-show", "desk"));
+        Assert.Equal(status, a.Status);
+        Assert.Empty(db.AppointmentAudits);
+    }
+    [Fact]
+    public async Task UndoOneSecondAfterDeadlineIsRejected()
+    {
+        await using var db = Db(); var a = await Seed(db);
+        var clock = new Clock { Now = Start.AddMinutes(31) };
+        var svc = new NoShowService(db, clock);
+        await svc.Apply(a.AppointmentId, "no-show", "desk");
+        clock.Now = clock.Now.AddMinutes(15).AddSeconds(1);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => svc.Apply(a.AppointmentId, "undo-no-show", "desk"));
+        Assert.Equal(AppointmentStatuses.NoShow, a.Status);
+        Assert.Equal(1, await svc.NoShowCount(a.Customer.Phone));
+        Assert.Single(db.AppointmentAudits);
     }
     [Fact]
     public async Task UndoRejectsRebookedSlot()
