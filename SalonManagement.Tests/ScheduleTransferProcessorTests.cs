@@ -177,7 +177,7 @@ public sealed class ScheduleTransferProcessorTests
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        var db = new ApplicationDbContext(options);
+        var db = new ApplicationDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         db.Stylists.AddRange(
             new Stylist { StylistId = 1, FullName = "Thợ nghỉ", Specialty = "Cắt tóc nam", IsActive = true },
             new Stylist

@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpContextAccessor();
 // =====================================
 // LOGGING
 // =====================================
@@ -32,14 +33,8 @@ var connectionString =
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    if (builder.Configuration["DatabaseProvider"] == "Sqlite")
-    {
-        options.UseSqlite(connectionString);
-    }
-    else
-    {
-        options.UseSqlServer(connectionString);
-    }
+    options.UseSqlServer(connectionString, sqlServerOptions =>
+        sqlServerOptions.EnableRetryOnFailure());
 });
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -50,7 +45,7 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 {
-    options.SignIn.RequireConfirmedAccount = false;
+    options.SignIn.RequireConfirmedAccount = true;
 
     options.Password.RequiredLength = 8;
     options.Password.RequireDigit = true;
@@ -81,7 +76,7 @@ builder.Services.Configure<DataProtectionTokenProviderOptions>(
 // DATA PROTECTION
 // =====================================
 
-if (builder.Environment.IsDevelopment())
+if (builder.Environment.IsDevelopment() || builder.Environment.IsStaging())
 {
     builder.Services.AddDataProtection()
         .PersistKeysToFileSystem(
@@ -90,7 +85,7 @@ if (builder.Environment.IsDevelopment())
                     builder.Environment.ContentRootPath,
                     ".keys")))
         .SetApplicationName(
-            "SalonManagement.Development");
+            $"SalonManagement.{builder.Environment.EnvironmentName}");
 }
 
 // =====================================
@@ -99,11 +94,13 @@ if (builder.Environment.IsDevelopment())
 
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme =
-        JwtBearerDefaults.AuthenticationScheme;
-
-    options.DefaultChallengeScheme =
-        JwtBearerDefaults.AuthenticationScheme;
+    // The application issues JWTs (and mirrors the access token into an
+    // HttpOnly cookie for page navigations). AddDefaultIdentity registers its
+    // application cookie as the default scheme, so explicitly select bearer
+    // authentication for every protected MVC/API endpoint.
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(options =>
 {
@@ -130,25 +127,24 @@ builder.Services.AddAuthentication(options =>
         };
     options.Events = new JwtBearerEvents
     {
+        // Browser page navigations cannot attach an Authorization header.
+        // Accept the same JWT from the secure HttpOnly cookie issued at login.
+        OnMessageReceived = context =>
+        {
+            if (string.IsNullOrWhiteSpace(context.Token) &&
+                !context.Request.Headers.ContainsKey("Authorization") &&
+                context.Request.Cookies.TryGetValue("salon.accessToken", out var cookieToken))
+            {
+                context.Token = cookieToken;
+            }
+
+            return Task.CompletedTask;
+        },
         OnTokenValidated = async context =>
         {
-            var userId =
-                context.Principal?.FindFirstValue(
-                    JwtRegisteredClaimNames.Sub);
-
-            var userManager =
-                context.HttpContext.RequestServices
-                    .GetRequiredService<
-                        UserManager<ApplicationUser>>();
-
-            var user = userId is null
-                ? null
-                : await userManager.FindByIdAsync(userId);
-
-            if (user is null || !user.IsActive)
-            {
-                context.Fail("Account is inactive.");
-            }
+            var validator = context.HttpContext.RequestServices.GetRequiredService<SessionPrincipalValidator>();
+            if (context.Principal == null || !await validator.ValidateAsync(context.Principal))
+                context.Fail("Session has been revoked or account is inactive.");
         },
         OnChallenge = async context =>
         {
@@ -179,6 +175,8 @@ builder.Services.AddAuthentication(options =>
 // =====================================
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddAttendanceModules();
+builder.Services.AddScoped<StylistAvailabilityService>();
 
 builder.Services.AddScoped<
     ITokenService,
@@ -197,12 +195,16 @@ builder.Services.Configure<ScheduleNotificationOptions>(
 builder.Services.AddSingleton<IScheduleChangeEmailSender, SmtpScheduleChangeEmailSender>();
 builder.Services.AddScoped<ScheduleNotificationDispatcher>();
 builder.Services.AddHostedService<ScheduleNotificationBackgroundService>();
+builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
 
 builder.Services.AddSingleton<
     IPasswordResetRateLimiter,
     PasswordResetRateLimiter>();
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddScoped<IBookingService, BookingService>();
+
+builder.Services.AddScoped<SessionPrincipalValidator>();
+builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
 
 // =====================================
 // BUILD APPLICATION
@@ -211,68 +213,16 @@ builder.Services.AddControllersWithViews();
 var app = builder.Build();
 
 // =====================================
-// SQLITE DATABASE INITIALIZATION
+// DATABASE MIGRATION
 // =====================================
 
-if (builder.Configuration["DatabaseProvider"] == "Sqlite")
+await using (var scope = app.Services.CreateAsyncScope())
 {
-    await using var scope =
-        app.Services.CreateAsyncScope();
-
     var dbContext =
         scope.ServiceProvider
             .GetRequiredService<ApplicationDbContext>();
 
-    await dbContext.Database.EnsureCreatedAsync();
-    await dbContext.Database.ExecuteSqlRawAsync("""
-        CREATE TABLE IF NOT EXISTS "ScheduleContactFollowUps" (
-            "ScheduleContactFollowUpId" INTEGER NOT NULL CONSTRAINT "PK_ScheduleContactFollowUps" PRIMARY KEY AUTOINCREMENT,
-            "AppointmentId" INTEGER NOT NULL,
-            "Category" TEXT NOT NULL,
-            "Reason" TEXT NOT NULL,
-            "OriginalAppointmentDate" TEXT NOT NULL,
-            "OriginalStartTime" TEXT NOT NULL,
-            "ContactStatus" TEXT NOT NULL,
-            "ContactNote" TEXT NULL,
-            "ContactedAt" TEXT NULL,
-            "CreatedAt" TEXT NOT NULL,
-            "UpdatedAt" TEXT NULL,
-            CONSTRAINT "FK_ScheduleContactFollowUps_Appointments_AppointmentId"
-                FOREIGN KEY ("AppointmentId") REFERENCES "Appointments" ("AppointmentId") ON DELETE CASCADE
-        );
-        CREATE UNIQUE INDEX IF NOT EXISTS "IX_ScheduleContactFollowUps_AppointmentId"
-            ON "ScheduleContactFollowUps" ("AppointmentId");
-        CREATE INDEX IF NOT EXISTS "IX_ScheduleContactFollowUps_OriginalAppointmentDate_ContactStatus_Category"
-            ON "ScheduleContactFollowUps" ("OriginalAppointmentDate", "ContactStatus", "Category");
-
-        CREATE TABLE IF NOT EXISTS "ScheduleChangeNotifications" (
-            "ScheduleChangeNotificationId" INTEGER NOT NULL CONSTRAINT "PK_ScheduleChangeNotifications" PRIMARY KEY AUTOINCREMENT,
-            "AppointmentId" INTEGER NOT NULL,
-            "Version" INTEGER NOT NULL,
-            "RecipientEmail" TEXT NOT NULL,
-            "CustomerName" TEXT NOT NULL,
-            "ServiceNames" TEXT NOT NULL,
-            "AppointmentDate" TEXT NOT NULL,
-            "OldStylistName" TEXT NOT NULL,
-            "NewStylistName" TEXT NOT NULL,
-            "OldStartTime" TEXT NOT NULL,
-            "NewStartTime" TEXT NOT NULL,
-            "TransferredAt" TEXT NOT NULL,
-            "Status" TEXT NOT NULL,
-            "AttemptCount" INTEGER NOT NULL,
-            "LastAttemptAt" TEXT NULL,
-            "NextAttemptAt" TEXT NULL,
-            "SentAt" TEXT NULL,
-            "LastError" TEXT NULL,
-            "CreatedAt" TEXT NOT NULL,
-            CONSTRAINT "FK_ScheduleChangeNotifications_Appointments_AppointmentId"
-                FOREIGN KEY ("AppointmentId") REFERENCES "Appointments" ("AppointmentId") ON DELETE CASCADE
-        );
-        CREATE UNIQUE INDEX IF NOT EXISTS "IX_ScheduleChangeNotifications_AppointmentId_Version"
-            ON "ScheduleChangeNotifications" ("AppointmentId", "Version");
-        CREATE INDEX IF NOT EXISTS "IX_ScheduleChangeNotifications_Status_NextAttemptAt"
-            ON "ScheduleChangeNotifications" ("Status", "NextAttemptAt");
-        """);
+    await dbContext.Database.MigrateAsync();
 }
 
 // =====================================
@@ -379,6 +329,11 @@ using (var scope = app.Services.CreateScope())
     await SeedData.SeedAsync(
         dbContext,
         userManager);
+    if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
+    {
+        var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;
+        await StylistBookingDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
+    }
 }
 
 // =====================================
@@ -386,3 +341,4 @@ using (var scope = app.Services.CreateScope())
 // =====================================
 
 app.Run();
+

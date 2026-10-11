@@ -50,7 +50,7 @@ window.BusinessHoursPage = (() => {
             document.getElementById("hours-form").addEventListener("submit", async event => {
                 event.preventDefault();
                 const rows = [...document.querySelectorAll(".hours-row")];
-                if (!rows.every(validate)) return;
+                if (rows.map(validate).some(valid => !valid)) return;
                 const days = rows.map(item => ({
                     dayOfWeek: Number(item.dataset.day),
                     isClosed: item.querySelector(".closed").checked,
@@ -60,6 +60,13 @@ window.BusinessHoursPage = (() => {
                 const response = await SalonAuth.authenticatedFetch("/api/business-hours", {
                     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days })
                 });
+                if (!response.ok) {
+                    const problem = await response.json().catch(() => ({}));
+                    Object.entries(problem.errors || {}).forEach(([key, messages]) => {
+                        const match = /^Days\[(\d)\]$/.exec(key);
+                        if (match) rows.find(row => row.dataset.day === match[1])?.querySelector('.error')?.replaceChildren(document.createTextNode(messages.join(' ')));
+                    });
+                }
                 const result = document.getElementById("hours-result");
                 result.className = `alert ${response.ok ? "alert-success" : "alert-danger"}`;
                 result.textContent = response.ok ? "Đã lưu giờ hoạt động." : "Không thể lưu. Vui lòng kiểm tra lại các khung giờ.";
@@ -67,3 +74,4 @@ window.BusinessHoursPage = (() => {
         }
     };
 })();
+

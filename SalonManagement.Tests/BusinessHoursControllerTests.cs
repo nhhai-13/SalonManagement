@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Controllers;
 using SalonManagement.Data;
@@ -64,6 +65,6 @@ public class BusinessHoursControllerTests
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, new HttpContextAccessor());
     }
 }

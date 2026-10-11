@@ -179,7 +179,7 @@ public sealed class ScheduleCoordinationControllerTests
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
     }
 
     private sealed record SeedData(Stylist Stylist, Stylist OtherStylist, Customer Customer, Service Service);

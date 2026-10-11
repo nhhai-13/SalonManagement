@@ -151,7 +151,7 @@ public sealed class ScheduleChangeNotificationTests
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer("Server=(local);Database=MigrationScriptCheck;Trusted_Connection=True;TrustServerCertificate=True")
             .Options;
-        using var db = new ApplicationDbContext(options);
+        using var db = new ApplicationDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
 
         var script = db.GetService<IMigrator>().GenerateScript(
             "20261011000000_AddScheduleContactFollowUps",
@@ -260,7 +260,7 @@ public sealed class ScheduleChangeNotificationTests
         var options = configuredOptions ?? new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        var db = new ApplicationDbContext(options);
+        var db = new ApplicationDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
         if (db.Database.IsRelational()) await db.Database.EnsureCreatedAsync();
         db.Stylists.AddRange(
             new Stylist { StylistId = 1, FullName = "Thợ cũ", Specialty = "Cắt tóc nam", IsActive = true },
