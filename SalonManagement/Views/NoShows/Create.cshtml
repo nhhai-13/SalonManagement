@@ -1,7 +1,9 @@
 @model SalonManagement.Models.DeskBookingRequest
 @{ ViewData["Title"] = "Đặt lịch tại quầy"; List<SalonManagement.Models.Stylist> stylists = ViewBag.Stylists; List<SalonManagement.Models.Service> services = ViewBag.Services; }
-<h1>Đặt lịch tại quầy</h1>
-<form asp-action="Create" method="post" class="card card-body" style="max-width:680px">
+<div class="attendance-page">
+@await Html.PartialAsync("_AttendanceStyles")
+<div class="attendance-heading"><div><span class="attendance-kicker">LUMINOL · LỄ TÂN</span><h1>Đặt lịch tại quầy</h1></div></div>
+<form asp-action="Create" method="post" class="card card-body attendance-booking">
 <div asp-validation-summary="All" class="text-danger" role="alert"></div>
 <label asp-for="FullName">Tên khách</label><input asp-for="FullName" class="form-control mb-2" required maxlength="150" />
 <label asp-for="Phone">Số điện thoại</label><input asp-for="Phone" class="form-control mb-2" type="tel" pattern="0[0-9]{9}" required />
@@ -13,6 +15,7 @@
 
 <button class="btn btn-primary">Đặt lịch</button><a asp-action="Index" class="mt-2">Về lịch ngày</a>
 </form>
+</div>
 @section Scripts {
 <script>
 const phone = document.getElementById('Phone');
