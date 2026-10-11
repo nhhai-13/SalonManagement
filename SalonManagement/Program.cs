@@ -176,6 +176,7 @@ builder.Services.AddAuthentication(options =>
 // =====================================
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddAttendanceModules();
 builder.Services.AddScoped<StylistAvailabilityService>();
 
 builder.Services.AddScoped<
