@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -18,6 +18,10 @@ namespace SalonManagement.Data.Migrations
                 nullable: false,
                 defaultValue: "");
 
+            if (ActiveProvider.Contains("SqlServer"))
+                migrationBuilder.Sql("UPDATE Appointments SET BookingReference = CONVERT(varchar(8), CONVERT(binary(4), AppointmentId), 2) WHERE BookingReference = '';");
+            else if (ActiveProvider.Contains("Sqlite"))
+                migrationBuilder.Sql("UPDATE Appointments SET BookingReference = printf('%08X', AppointmentId) WHERE BookingReference = '';");
             migrationBuilder.CreateIndex(
                 name: "IX_Appointments_BookingReference",
                 table: "Appointments",
