@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace SalonManagement.Models;
 
 /// <summary>
@@ -38,3 +40,27 @@ public sealed record ScheduleCoordinationAppointmentsResponse(
     DateOnly Date,
     int TotalCount,
     IReadOnlyList<ScheduleCoordinationAppointment> Appointments);
+
+public sealed record ScheduleTransferBatchRequest(
+    [Required, MinLength(1), MaxLength(100)] IReadOnlyList<ScheduleTransferSelection> Items);
+
+public sealed record ScheduleTransferSelection(
+    int AppointmentId,
+    int StylistId,
+    int StartMinuteOfDay,
+    bool CustomerConfirmed);
+
+public sealed record ScheduleTransferBatchResponse(
+    int TotalSelected,
+    int SuccessCount,
+    int FailureCount,
+    IReadOnlyList<ScheduleTransferItemResult> Results);
+
+public sealed record ScheduleTransferItemResult(
+    int AppointmentId,
+    string Outcome,
+    string Message,
+    int? StylistId,
+    string? StylistName,
+    string? StartTime,
+    string? AppointmentStatus);

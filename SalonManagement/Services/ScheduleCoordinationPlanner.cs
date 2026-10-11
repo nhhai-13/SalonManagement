@@ -73,7 +73,7 @@ public static class ScheduleCoordinationPlanner
         IReadOnlyCollection<Appointment> dayAppointments,
         BusinessHourResponse businessHours)
     {
-        var reasons = GetSkillReasons(stylist, appointment);
+        var reasons = GetSkillRejectionReasons(stylist, appointment).ToList();
         if (durationMinutes <= 0)
         {
             reasons.Add("Không xác định được thời lượng phục vụ của lịch hẹn.");
@@ -114,7 +114,7 @@ public static class ScheduleCoordinationPlanner
 
         var availableAtOriginalTime = reasons.Count == 0;
         var suggestedTimes = new List<string>();
-        if (durationMinutes > 0 && GetSkillReasons(stylist, appointment).Count == 0 && !businessHours.IsClosed)
+        if (durationMinutes > 0 && GetSkillRejectionReasons(stylist, appointment).Count == 0 && !businessHours.IsClosed)
         {
             foreach (var shift in shifts)
             {
@@ -162,7 +162,7 @@ public static class ScheduleCoordinationPlanner
             suggestedTimes);
     }
 
-    private static List<string> GetSkillReasons(Stylist stylist, Appointment appointment)
+    public static IReadOnlyList<string> GetSkillRejectionReasons(Stylist stylist, Appointment appointment)
     {
         var requiredServices = appointment.AppointmentServices.ToArray();
         if (requiredServices.Length == 0)

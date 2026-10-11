@@ -111,4 +111,24 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
             appointments.Length,
             appointments));
     }
+
+    [HttpPost("transfers/preview")]
+    public async Task<ActionResult<ScheduleTransferBatchResponse>> PreviewTransfers(
+        [FromBody] ScheduleTransferBatchRequest request,
+        CancellationToken cancellationToken)
+    {
+        var response = await new ScheduleTransferProcessor(dbContext)
+            .PreviewAsync(request, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpPost("transfers")]
+    public async Task<ActionResult<ScheduleTransferBatchResponse>> TransferAppointments(
+        [FromBody] ScheduleTransferBatchRequest request,
+        CancellationToken cancellationToken)
+    {
+        var response = await new ScheduleTransferProcessor(dbContext)
+            .TransferAsync(request, cancellationToken);
+        return Ok(response);
+    }
 }

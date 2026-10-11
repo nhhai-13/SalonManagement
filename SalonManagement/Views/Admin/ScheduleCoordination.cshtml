@@ -45,17 +45,46 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th scope="col">Chọn</th>
                         <th scope="col">Khách hàng</th>
                         <th scope="col">Dịch vụ</th>
                         <th scope="col">Bắt đầu</th>
                         <th scope="col">Thời lượng</th>
                         <th scope="col">Trạng thái</th>
                         <th scope="col">Liên hệ</th>
-                        <th scope="col">Gợi ý thợ và giờ</th>
+                        <th scope="col">Gợi ý</th>
+                        <th scope="col">Chọn thợ và giờ mới</th>
+                        <th scope="col">Khách đã đồng ý</th>
+                        <th scope="col">Kết quả</th>
                     </tr>
                 </thead>
                 <tbody id="schedule-appointments"></tbody>
             </table>
+        </div>
+    </section>
+
+    <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+        <span id="transfer-selected-count" class="text-muted" aria-live="polite">Chưa chọn lịch</span>
+        <button class="btn btn-outline-primary" id="preview-transfers" type="button" disabled>Kiểm tra phương án đã chọn</button>
+    </div>
+
+    <section id="transfer-preview" class="card border-primary mt-3 d-none" aria-labelledby="transfer-preview-title">
+        <div class="card-body">
+            <h2 id="transfer-preview-title" class="h5">Xác nhận chuyển lịch</h2>
+            <p id="transfer-preview-summary" class="mb-2"></p>
+            <ul id="transfer-preview-list" class="mb-3"></ul>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" id="confirm-transfers" type="button" disabled>Xác nhận chuyển các lịch hợp lệ</button>
+                <button class="btn btn-outline-secondary" id="cancel-transfer-preview" type="button">Quay lại chỉnh phương án</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="transfer-results" class="card mt-3 d-none" aria-labelledby="transfer-results-title">
+        <div class="card-body">
+            <h2 id="transfer-results-title" class="h5">Kết quả chuyển lịch</h2>
+            <p id="transfer-results-summary" class="mb-2"></p>
+            <ul id="transfer-results-list" class="mb-0"></ul>
         </div>
     </section>
 </main>

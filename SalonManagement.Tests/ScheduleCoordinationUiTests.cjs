@@ -32,21 +32,37 @@ class FakeElement {
     reportValidity() { return true; }
 }
 
-function createPage(appointmentResponse) {
+function createPage(appointmentResponse, transferResponses = {}) {
     const ids = [
         "schedule-coordination-filter", "stylist-id", "day-off", "load-appointments",
         "schedule-error", "schedule-loading", "schedule-empty", "schedule-results",
-        "schedule-appointments", "schedule-count", "schedule-coordination-page", "logout"
+        "schedule-appointments", "schedule-count", "schedule-coordination-page", "logout",
+        "transfer-selected-count", "preview-transfers", "transfer-preview",
+        "transfer-preview-summary", "transfer-preview-list", "confirm-transfers",
+        "cancel-transfer-preview", "transfer-results", "transfer-results-summary",
+        "transfer-results-list"
     ];
     const elements = Object.fromEntries(ids.map(id => [id, new FakeElement()]));
+    const requests = [];
     const document = {
         getElementById: id => elements[id],
         createElement: () => new FakeElement()
     };
     const auth = {
-        authenticatedFetch: async url => url.endsWith("/stylists")
-            ? { ok: true, status: 200, json: async () => [{ id: 4, name: "Thợ kiểm thử" }] }
-            : appointmentResponse,
+        authenticatedFetch: async (url, options) => {
+            if (url.endsWith("/stylists")) {
+                return { ok: true, status: 200, json: async () => [{ id: 4, name: "Thợ kiểm thử" }] };
+            }
+            if (url.endsWith("/transfers/preview")) {
+                requests.push({ url, options });
+                return transferResponses.preview;
+            }
+            if (url.endsWith("/transfers")) {
+                requests.push({ url, options });
+                return transferResponses.transfer;
+            }
+            return appointmentResponse;
+        },
         redirectToLogin() {}
     };
     const window = {};
@@ -57,7 +73,7 @@ function createPage(appointmentResponse) {
         URLSearchParams,
         Option: function (text, value) { return { text, value }; }
     });
-    return { page: window.ScheduleCoordinationPage, elements };
+    return { page: window.ScheduleCoordinationPage, elements, requests };
 }
 
 test("shows a friendly error when the appointment list cannot be loaded", async () => {
@@ -125,7 +141,70 @@ test("renders suggested alternative times and the reason the original time is un
     await elements["schedule-coordination-filter"].listeners.submit({ preventDefault() {} });
 
     const row = elements["schedule-appointments"].children[0];
-    const option = row.children[6].children[0].children[0];
+    const option = row.children[7].children[0].children[0];
     assert.equal(option.children[1].textContent, "Có thể nhận lúc: 10:00, 10:15");
     assert.match(option.children[2].textContent, /Bị trùng lịch/);
+});
+
+test("previews a selected batch and renders per-appointment transfer results", async () => {
+    const appointment = {
+        id: 15,
+        customerName: "Khách chuyển lịch",
+        services: ["Cắt tóc nam"],
+        startTime: "09:00",
+        durationMinutes: 60,
+        status: "Confirmed",
+        plan: {
+            hasOptions: true,
+            stylists: [{
+                stylistId: 8,
+                stylistName: "Thợ thay thế",
+                availableAtOriginalTime: true,
+                reasonsUnavailableAtOriginalTime: [],
+                suggestedStartTimes: []
+            }]
+        }
+    };
+    const { page, elements, requests } = createPage({
+        ok: true,
+        status: 200,
+        json: async () => ({ totalCount: 1, appointments: [appointment] })
+    }, {
+        preview: { ok: true, status: 200, json: async () => ({
+            successCount: 1,
+            failureCount: 0,
+            results: [{ appointmentId: 15, outcome: "Ready", message: "Phương án hợp lệ." }]
+        }) },
+        transfer: { ok: true, status: 200, json: async () => ({
+            successCount: 1,
+            failureCount: 0,
+            results: [{ appointmentId: 15, outcome: "Succeeded", message: "Đã chuyển lịch thành công.",
+                stylistId: 8, stylistName: "Thợ thay thế", startTime: "10:00", appointmentStatus: "Confirmed" }]
+        }) }
+    });
+
+    await page.initialize();
+    elements["stylist-id"].value = "4";
+    elements["day-off"].value = "2026-10-11";
+    await elements["schedule-coordination-filter"].listeners.submit({ preventDefault() {} });
+    const row = elements["schedule-appointments"].children[0];
+    row.children[0].children[0].checked = true;
+    row.children[8].children[0].value = row.children[8].children[0].options[1].value;
+    row.children[9].children[0].checked = true;
+    await elements["preview-transfers"].listeners.click();
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, "/api/schedule-coordination/transfers/preview");
+    assert.equal(JSON.parse(requests[0].options.body).items[0].customerConfirmed, true);
+    assert.equal(elements["transfer-preview"].classList.contains("d-none"), false);
+    assert.equal(elements["confirm-transfers"].disabled, false);
+
+    await elements["confirm-transfers"].listeners.click();
+
+    assert.equal(requests.length, 2);
+    assert.equal(requests[1].url, "/api/schedule-coordination/transfers");
+    assert.match(elements["transfer-results-summary"].textContent, /1 lịch thành công/);
+    assert.match(row.children[10].textContent, /Thợ: Thợ thay thế, giờ: 10:00, trạng thái: Confirmed/);
+    assert.match(row.children[10].textContent, /Đã chuyển lịch thành công/);
+    assert.equal(row.children[0].children[0].disabled, true);
 });
