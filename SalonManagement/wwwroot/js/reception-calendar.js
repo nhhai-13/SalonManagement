@@ -74,7 +74,7 @@ window.ReceptionCalendar = (() => {
         if (gridContainer) gridContainer.classList.add("opacity-50");
 
         try {
-            const res = await authFetch(`/api/reception/daily-schedule?date=${encodeURIComponent(date)}`);
+            const res = await authFetch(`/api/reception/reschedule-calendar?date=${encodeURIComponent(date)}`);
             if (!res.ok) {
                 console.error("Lỗi tải lịch ngày:", res.status);
                 return;

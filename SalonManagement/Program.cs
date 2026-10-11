@@ -196,9 +196,7 @@ builder.Services.AddSingleton<
     PasswordResetRateLimiter>();
 
 builder.Services.AddScoped<IBookingService, BookingService>();
-builder.Services.AddSingleton<IAppointmentRescheduleEmailQueue, AppointmentRescheduleEmailQueue>();
-builder.Services.AddHostedService<AppointmentRescheduleEmailWorker>();
-builder.Services.AddScoped<IAppointmentRescheduleService, AppointmentRescheduleService>();
+
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
 builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
@@ -207,6 +205,9 @@ builder.Services.AddControllersWithViews(options => options.Filters.Add<RequireP
 // BUILD APPLICATION
 // =====================================
 
+builder.Services.AddSingleton<IAppointmentRescheduleEmailQueue, AppointmentRescheduleEmailQueue>();
+builder.Services.AddHostedService<AppointmentRescheduleEmailWorker>();
+builder.Services.AddScoped<IAppointmentRescheduleService, AppointmentRescheduleService>();
 var app = builder.Build();
 
 // =====================================

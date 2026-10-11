@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -12,7 +12,7 @@ namespace SalonManagement.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "AppointmentChangeLogs",
+                name: "RescheduleChangeLogs",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -35,9 +35,9 @@ namespace SalonManagement.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AppointmentChangeLogs", x => x.Id);
+                    table.PrimaryKey("PK_RescheduleChangeLogs", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_AppointmentChangeLogs_Appointments_AppointmentId",
+                        name: "FK_RescheduleChangeLogs_Appointments_AppointmentId",
                         column: x => x.AppointmentId,
                         principalTable: "Appointments",
                         principalColumn: "AppointmentId",
@@ -45,13 +45,13 @@ namespace SalonManagement.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AppointmentChangeLogs_AppointmentId",
-                table: "AppointmentChangeLogs",
+                name: "IX_RescheduleChangeLogs_AppointmentId",
+                table: "RescheduleChangeLogs",
                 column: "AppointmentId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AppointmentChangeLogs_ChangedAtUtc",
-                table: "AppointmentChangeLogs",
+                name: "IX_RescheduleChangeLogs_ChangedAtUtc",
+                table: "RescheduleChangeLogs",
                 column: "ChangedAtUtc");
         }
 
@@ -59,7 +59,7 @@ namespace SalonManagement.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "AppointmentChangeLogs");
+                name: "RescheduleChangeLogs");
         }
     }
 }

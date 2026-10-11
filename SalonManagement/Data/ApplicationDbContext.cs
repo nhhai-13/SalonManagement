@@ -43,7 +43,7 @@ public ApplicationDbContext(
         
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
-        public DbSet<AppointmentChangeLog> AppointmentChangeLogs => Set<AppointmentChangeLog>();
+        public DbSet<RescheduleChangeLog> RescheduleChangeLogs => Set<RescheduleChangeLog>();
 public override int SaveChanges()
 {
     return SaveChangesAsync().GetAwaiter().GetResult();
@@ -367,7 +367,7 @@ private class AuditEntry
                     .HasForeignKey(payment => payment.InvoiceId);
             });
 
-            builder.Entity<AppointmentChangeLog>(entity =>
+            builder.Entity<RescheduleChangeLog>(entity =>
             {
                 entity.HasKey(log => log.Id);
                 entity.Property(log => log.ModifiedByUserId).HasMaxLength(450);

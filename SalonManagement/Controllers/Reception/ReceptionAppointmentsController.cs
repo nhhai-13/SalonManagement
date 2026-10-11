@@ -22,7 +22,7 @@ public class ReceptionAppointmentsController : ControllerBase
     /// <summary>
     /// Lấy toàn bộ lịch hẹn và ca làm việc theo ngày cho màn hình lịch ngày của lễ tân.
     /// </summary>
-    [HttpGet("daily-schedule")]
+    [HttpGet("reschedule-calendar")]
     public async Task<IActionResult> GetDailySchedule([FromQuery] string? date, CancellationToken cancellationToken)
     {
         var targetDate = DateTime.Today;

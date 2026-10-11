@@ -359,7 +359,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                 // [AC4 - Audit Trail]: Ghi nhận nhật ký thay đổi lịch hẹn trong cùng transaction
                 if (hasChanged)
                 {
-                    var changeLog = new AppointmentChangeLog
+                    var changeLog = new RescheduleChangeLog
                     {
                         AppointmentId = appointmentId,
                         ModifiedByUserId = string.IsNullOrWhiteSpace(currentUserId) ? "SYSTEM" : currentUserId,
@@ -378,7 +378,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                         ChangedAtUtc = DateTime.UtcNow
                     };
 
-                    _db.AppointmentChangeLogs.Add(changeLog);
+                    _db.RescheduleChangeLogs.Add(changeLog);
                 }
 
                 // Cập nhật thông tin lịch hẹn
@@ -468,7 +468,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
 
     public async Task<List<AppointmentChangeLogDto>> GetRescheduleHistoryAsync(int appointmentId, CancellationToken cancellationToken = default)
     {
-        var logs = await _db.AppointmentChangeLogs.AsNoTracking()
+        var logs = await _db.RescheduleChangeLogs.AsNoTracking()
             .Where(l => l.AppointmentId == appointmentId)
             .OrderByDescending(l => l.ChangedAtUtc)
             .ToListAsync(cancellationToken);

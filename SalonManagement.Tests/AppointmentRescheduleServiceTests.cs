@@ -555,7 +555,7 @@ public class AppointmentRescheduleServiceTests
         Assert.True(result.Success);
 
         // Kiểm tra log được lưu trong DB
-        var logs = await db.AppointmentChangeLogs.Where(l => l.AppointmentId == 90).ToListAsync();
+        var logs = await db.RescheduleChangeLogs.Where(l => l.AppointmentId == 90).ToListAsync();
         Assert.Single(logs);
 
         var log = logs[0];
@@ -586,7 +586,7 @@ public class AppointmentRescheduleServiceTests
         await using var db = CreateInMemoryDbContext();
 
         var baseTime = DateTime.UtcNow;
-        var log1 = new AppointmentChangeLog
+        var log1 = new RescheduleChangeLog
         {
             AppointmentId = 95,
             ModifiedByUserId = "u1",
@@ -600,7 +600,7 @@ public class AppointmentRescheduleServiceTests
             ChangedAtUtc = baseTime.AddMinutes(-30)
         };
 
-        var log2 = new AppointmentChangeLog
+        var log2 = new RescheduleChangeLog
         {
             AppointmentId = 95,
             ModifiedByUserId = "u2",
@@ -614,7 +614,7 @@ public class AppointmentRescheduleServiceTests
             ChangedAtUtc = baseTime
         };
 
-        db.AppointmentChangeLogs.AddRange(log1, log2);
+        db.RescheduleChangeLogs.AddRange(log1, log2);
         await db.SaveChangesAsync();
 
         var service = new AppointmentRescheduleService(db);

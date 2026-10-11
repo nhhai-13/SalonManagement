@@ -2,7 +2,7 @@ using System;
 
 namespace SalonManagement.Models
 {
-    public class AppointmentChangeLog
+    public class RescheduleChangeLog
     {
         public int Id { get; set; }
 
