@@ -63,7 +63,22 @@ public sealed record ScheduleTransferItemResult(
     int? StylistId,
     string? StylistName,
     string? StartTime,
-    string? AppointmentStatus);
+    string? AppointmentStatus,
+    int? EmailNotificationId = null,
+    string? EmailStatus = null,
+    int EmailAttemptCount = 0,
+    DateTime? EmailSentAt = null);
+
+public sealed record ScheduleChangeNotificationStatus(
+    int Id,
+    int AppointmentId,
+    int Version,
+    string Status,
+    int AttemptCount,
+    DateTime TransferredAt,
+    DateTime? SentAt,
+    DateTime? NextAttemptAt,
+    string? LastError);
 
 public sealed record ScheduleFollowUpSyncRequest(int StylistId, DateOnly Date);
 

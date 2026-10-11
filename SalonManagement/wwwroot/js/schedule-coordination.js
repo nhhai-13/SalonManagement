@@ -274,6 +274,17 @@ window.ScheduleCoordinationPage = (() => {
             if (control) {
                 control.outcomeCell.textContent = `${appliedPlan}${result.message}`;
                 if (result.outcome === "Succeeded" || result.outcome === "AlreadyApplied") {
+                    const emailState = document.createElement("small");
+                    emailState.className = "d-block mt-1 text-muted";
+                    emailState.textContent = `Email: ${emailStatusLabel(result.emailStatus, result.emailAttemptCount)}`;
+                    control.outcomeCell.append(emailState);
+                    const lineEmailState = document.createElement("small");
+                    lineEmailState.className = "d-block mt-1";
+                    lineEmailState.textContent = emailState.textContent;
+                    line.append(lineEmailState);
+                    if (result.emailNotificationId) {
+                        refreshNotificationStatus(result.emailNotificationId, emailState, lineEmailState);
+                    }
                     control.checkbox.checked = false;
                     control.checkbox.disabled = true;
                     control.choice.disabled = true;
@@ -283,6 +294,35 @@ window.ScheduleCoordinationPage = (() => {
         }
         resultsPanel.classList.remove("d-none");
         updateSelectionState();
+    }
+
+    function emailStatusLabel(status, attempts = 0, sentAt = null) {
+        if (status === "NotRequired") return "khách không có email, không phát sinh thư";
+        if (status === "Sent") return `đã gửi${sentAt ? ` lúc ${new Date(sentAt).toLocaleTimeString("vi-VN")}` : ""}`;
+        if (status === "Sending") return `đang gửi (lần ${attempts})`;
+        if (status === "Pending") return `đang chờ gửi/thử lại (lần ${attempts})`;
+        if (status === "Failed") return `gửi thất bại sau ${attempts} lần thử`;
+        if (status === "NotQueued") return "chưa tạo được yêu cầu email";
+        return "chưa có yêu cầu gửi email";
+    }
+
+    async function refreshNotificationStatus(notificationId, emailState, lineEmailState) {
+        const deadline = Date.now() + 5 * 60 * 1000;
+        while (Date.now() < deadline && document.getElementById("schedule-coordination-page")) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            try {
+                const response = await SalonAuth.authenticatedFetch(`/api/schedule-coordination/notifications/${notificationId}`);
+                if (response.status === 401) return SalonAuth.redirectToLogin("Vui lòng đăng nhập lại để xem trạng thái email.");
+                if (!response.ok) return;
+                const status = await response.json();
+                const label = `Email: ${emailStatusLabel(status.status, status.attemptCount, status.sentAt)}`;
+                emailState.textContent = label;
+                lineEmailState.textContent = label;
+                if (status.status === "Sent" || status.status === "Failed") return;
+            } catch {
+                // The saved outbox row remains available for a later refresh.
+            }
+        }
     }
 
     async function previewTransfers() {

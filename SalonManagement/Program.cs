@@ -190,6 +190,14 @@ builder.Services.AddScoped<
     IEmailService,
     EmailService>();
 
+builder.Services.Configure<ScheduleEmailOptions>(
+    builder.Configuration.GetSection("ScheduleChangeEmail:Smtp"));
+builder.Services.Configure<ScheduleNotificationOptions>(
+    builder.Configuration.GetSection("ScheduleChangeEmail:Delivery"));
+builder.Services.AddSingleton<IScheduleChangeEmailSender, SmtpScheduleChangeEmailSender>();
+builder.Services.AddScoped<ScheduleNotificationDispatcher>();
+builder.Services.AddHostedService<ScheduleNotificationBackgroundService>();
+
 builder.Services.AddSingleton<
     IPasswordResetRateLimiter,
     PasswordResetRateLimiter>();
@@ -216,6 +224,55 @@ if (builder.Configuration["DatabaseProvider"] == "Sqlite")
             .GetRequiredService<ApplicationDbContext>();
 
     await dbContext.Database.EnsureCreatedAsync();
+    await dbContext.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS "ScheduleContactFollowUps" (
+            "ScheduleContactFollowUpId" INTEGER NOT NULL CONSTRAINT "PK_ScheduleContactFollowUps" PRIMARY KEY AUTOINCREMENT,
+            "AppointmentId" INTEGER NOT NULL,
+            "Category" TEXT NOT NULL,
+            "Reason" TEXT NOT NULL,
+            "OriginalAppointmentDate" TEXT NOT NULL,
+            "OriginalStartTime" TEXT NOT NULL,
+            "ContactStatus" TEXT NOT NULL,
+            "ContactNote" TEXT NULL,
+            "ContactedAt" TEXT NULL,
+            "CreatedAt" TEXT NOT NULL,
+            "UpdatedAt" TEXT NULL,
+            CONSTRAINT "FK_ScheduleContactFollowUps_Appointments_AppointmentId"
+                FOREIGN KEY ("AppointmentId") REFERENCES "Appointments" ("AppointmentId") ON DELETE CASCADE
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_ScheduleContactFollowUps_AppointmentId"
+            ON "ScheduleContactFollowUps" ("AppointmentId");
+        CREATE INDEX IF NOT EXISTS "IX_ScheduleContactFollowUps_OriginalAppointmentDate_ContactStatus_Category"
+            ON "ScheduleContactFollowUps" ("OriginalAppointmentDate", "ContactStatus", "Category");
+
+        CREATE TABLE IF NOT EXISTS "ScheduleChangeNotifications" (
+            "ScheduleChangeNotificationId" INTEGER NOT NULL CONSTRAINT "PK_ScheduleChangeNotifications" PRIMARY KEY AUTOINCREMENT,
+            "AppointmentId" INTEGER NOT NULL,
+            "Version" INTEGER NOT NULL,
+            "RecipientEmail" TEXT NOT NULL,
+            "CustomerName" TEXT NOT NULL,
+            "ServiceNames" TEXT NOT NULL,
+            "AppointmentDate" TEXT NOT NULL,
+            "OldStylistName" TEXT NOT NULL,
+            "NewStylistName" TEXT NOT NULL,
+            "OldStartTime" TEXT NOT NULL,
+            "NewStartTime" TEXT NOT NULL,
+            "TransferredAt" TEXT NOT NULL,
+            "Status" TEXT NOT NULL,
+            "AttemptCount" INTEGER NOT NULL,
+            "LastAttemptAt" TEXT NULL,
+            "NextAttemptAt" TEXT NULL,
+            "SentAt" TEXT NULL,
+            "LastError" TEXT NULL,
+            "CreatedAt" TEXT NOT NULL,
+            CONSTRAINT "FK_ScheduleChangeNotifications_Appointments_AppointmentId"
+                FOREIGN KEY ("AppointmentId") REFERENCES "Appointments" ("AppointmentId") ON DELETE CASCADE
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_ScheduleChangeNotifications_AppointmentId_Version"
+            ON "ScheduleChangeNotifications" ("AppointmentId", "Version");
+        CREATE INDEX IF NOT EXISTS "IX_ScheduleChangeNotifications_Status_NextAttemptAt"
+            ON "ScheduleChangeNotifications" ("Status", "NextAttemptAt");
+        """);
 }
 
 // =====================================

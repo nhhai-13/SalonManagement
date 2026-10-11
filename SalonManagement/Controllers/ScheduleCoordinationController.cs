@@ -46,15 +46,13 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
 
         var dayStart = date.Value.ToDateTime(TimeOnly.MinValue);
         var nextDay = dayStart.AddDays(1);
-        var reviewStatuses = ScheduleCoordinationStatuses.NeedsReview;
-
         var appointmentEntities = await dbContext.Appointments
             .AsNoTracking()
             .Where(appointment =>
                 appointment.StylistId == stylistId &&
                 appointment.AppointmentDate >= dayStart &&
                 appointment.AppointmentDate < nextDay &&
-                reviewStatuses.Contains(appointment.Status))
+                (appointment.Status == "Pending" || appointment.Status == "Confirmed" || appointment.Status == "Arrived"))
             .Include(appointment => appointment.Customer)
             .Include(appointment => appointment.AppointmentServices)
                 .ThenInclude(item => item.Service)
@@ -147,7 +145,7 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
         var sources = await dbContext.Appointments
             .Where(item => item.StylistId == request.StylistId &&
                 item.AppointmentDate >= dayStart && item.AppointmentDate < nextDay &&
-                ScheduleCoordinationStatuses.NeedsReview.Contains(item.Status))
+                (item.Status == "Pending" || item.Status == "Confirmed" || item.Status == "Arrived"))
             .Include(item => item.Customer)
             .Include(item => item.AppointmentServices)
                 .ThenInclude(service => service.Service)
@@ -227,7 +225,8 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
             .Include(item => item.Appointment).ThenInclude(item => item.Customer)
             .Include(item => item.Appointment).ThenInclude(item => item.AppointmentServices)
                 .ThenInclude(item => item.Service);
-        query = query.Where(item => ScheduleCoordinationStatuses.NeedsReview.Contains(item.Appointment.Status));
+        query = query.Where(item => item.Appointment.Status == "Pending" ||
+            item.Appointment.Status == "Confirmed" || item.Appointment.Status == "Arrived");
         if (date.HasValue)
         {
             var dayStart = date.Value.ToDateTime(TimeOnly.MinValue);
@@ -301,6 +300,29 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
         followUp.UpdatedAt = DateTime.Now;
         await dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new { message = "Đã cập nhật kết quả liên hệ." });
+    }
+
+    [HttpGet("notifications/{id:int}")]
+    public async Task<ActionResult<ScheduleChangeNotificationStatus>> GetScheduleChangeNotification(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var item = await dbContext.ScheduleChangeNotifications.AsNoTracking()
+            .Where(notification => notification.ScheduleChangeNotificationId == id)
+            .Select(notification => new ScheduleChangeNotificationStatus(
+                notification.ScheduleChangeNotificationId,
+                notification.AppointmentId,
+                notification.Version,
+                notification.Status,
+                notification.AttemptCount,
+                notification.TransferredAt,
+                notification.SentAt,
+                notification.NextAttemptAt,
+                notification.LastError))
+            .SingleOrDefaultAsync(cancellationToken);
+        return item is null
+            ? NotFound(new { message = "Không tìm thấy email thông báo lịch hẹn." })
+            : Ok(item);
     }
 
     private static string BuildNoAlternativeReason(ScheduleCoordinationPlan plan)

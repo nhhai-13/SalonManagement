@@ -10,8 +10,6 @@ namespace SalonManagement.Services;
 public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
 {
     private static readonly string[] TransferableStatuses = ["Pending", "Confirmed", "Arrived"];
-    private static readonly string[] NonBlockingStatuses = ["Completed", "Cancelled", "Canceled", "NoShow", "No Show"];
-
     public async Task<ScheduleTransferBatchResponse> PreviewAsync(
         ScheduleTransferBatchRequest request,
         CancellationToken cancellationToken = default) =>
@@ -50,10 +48,42 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
                 {
                     succeededAppointmentIds.Add(result.AppointmentId);
                 }
-                if (result.Outcome != "Failed" || !succeededAppointmentIds.Contains(result.AppointmentId))
+                if (result.Outcome == "Failed" && !succeededAppointmentIds.Contains(result.AppointmentId))
                 {
                     await UpdateFollowUpAfterTransferAsync(result, cancellationToken);
                 }
+            }
+        }
+
+        if (persist)
+        {
+            for (var index = 0; index < results.Count; index++)
+            {
+                if (results[index].Outcome is not ("Succeeded" or "AlreadyApplied")) continue;
+                var appointmentId = results[index].AppointmentId;
+                var hasEmail = await dbContext.Appointments.AsNoTracking()
+                    .Where(item => item.AppointmentId == appointmentId)
+                    .Select(item => item.Customer.Email)
+                    .SingleOrDefaultAsync(cancellationToken);
+                if (string.IsNullOrWhiteSpace(hasEmail))
+                {
+                    results[index] = results[index] with { EmailStatus = "NotRequired" };
+                    continue;
+                }
+
+                var notification = await dbContext.ScheduleChangeNotifications.AsNoTracking()
+                    .Where(item => item.AppointmentId == appointmentId)
+                    .OrderByDescending(item => item.Version)
+                    .FirstOrDefaultAsync(cancellationToken);
+                results[index] = notification is null
+                    ? results[index] with { EmailStatus = "NotQueued" }
+                    : results[index] with
+                    {
+                        EmailNotificationId = notification.ScheduleChangeNotificationId,
+                        EmailStatus = notification.Status,
+                        EmailAttemptCount = notification.AttemptCount,
+                        EmailSentAt = notification.SentAt
+                    };
             }
         }
 
@@ -76,6 +106,7 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
     {
         IDbContextTransaction? transaction = null;
         EntityEntry<Appointment>? updateEntry = null;
+        ScheduleChangeNotification? notificationEntry = null;
         try
         {
             if (selection.AppointmentId <= 0)
@@ -104,6 +135,7 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
             var appointment = await dbContext.Appointments
                 .AsNoTracking()
                 .Include(item => item.Stylist)
+                .Include(item => item.Customer)
                 .Include(item => item.AppointmentServices)
                     .ThenInclude(item => item.Service)
                         .ThenInclude(service => service.ServiceGroup)
@@ -130,6 +162,13 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
                 appointment.StartTime == start && appointment.EndTime == end &&
                 string.Equals(appointment.Status, "Confirmed", StringComparison.OrdinalIgnoreCase))
             {
+                var alreadyAppliedFollowUp = await dbContext.ScheduleContactFollowUps
+                    .SingleOrDefaultAsync(item => item.AppointmentId == appointment.AppointmentId, cancellationToken);
+                if (alreadyAppliedFollowUp is not null)
+                {
+                    dbContext.ScheduleContactFollowUps.Remove(alreadyAppliedFollowUp);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                }
                 if (transaction is not null)
                 {
                     await transaction.CommitAsync(cancellationToken);
@@ -194,19 +233,19 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
                 return Failure(selection.AppointmentId, "Giờ đã chọn nằm ngoài giờ mở cửa của salon.");
             }
 
-            var databaseConflict = await dbContext.Appointments
+            var stylistAppointments = await dbContext.Appointments
                 .AsNoTracking()
                 .Where(item => item.StylistId == stylist.StylistId &&
                     item.AppointmentId != appointment.AppointmentId &&
-                    item.AppointmentDate >= dayStart && item.AppointmentDate < nextDay &&
-                    !NonBlockingStatuses.Contains(item.Status) &&
-                    item.StartTime < end && item.EndTime > start)
-                .Select(item => (int?)item.AppointmentId)
-                .FirstOrDefaultAsync(cancellationToken);
-            if (databaseConflict.HasValue)
+                    item.AppointmentDate >= dayStart && item.AppointmentDate < nextDay)
+                .Select(item => new { item.AppointmentId, item.StartTime, item.EndTime, item.Status })
+                .ToListAsync(cancellationToken);
+            var databaseConflict = stylistAppointments.FirstOrDefault(item =>
+                !IsNonBlockingStatus(item.Status) && item.StartTime < end && item.EndTime > start);
+            if (databaseConflict is not null)
             {
                 return Failure(selection.AppointmentId,
-                    $"Khung giờ vừa bị chiếm bởi lịch hẹn #{databaseConflict.Value}; hãy chọn phương án khác.");
+                    $"Khung giờ vừa bị chiếm bởi lịch hẹn #{databaseConflict.AppointmentId}; hãy chọn phương án khác.");
             }
 
             var batchConflict = reservations.FirstOrDefault(reservation =>
@@ -253,6 +292,44 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
             appointmentEntry.Property(item => item.EndTime).IsModified = true;
             appointmentEntry.Property(item => item.Status).IsModified = true;
             appointmentEntry.Property(item => item.UpdatedAt).IsModified = true;
+
+            if (!string.IsNullOrWhiteSpace(appointment.Customer.Email))
+            {
+                var previousVersion = await dbContext.ScheduleChangeNotifications
+                    .Where(item => item.AppointmentId == appointment.AppointmentId)
+                    .Select(item => (int?)item.Version)
+                    .MaxAsync(cancellationToken) ?? 0;
+                var serviceNames = string.Join(", ", appointment.AppointmentServices
+                    .OrderBy(item => item.AppointmentServiceId)
+                    .Select(item => item.Service.ServiceName));
+                var transferredAt = DateTime.Now;
+                notificationEntry = new ScheduleChangeNotification
+                {
+                    AppointmentId = appointment.AppointmentId,
+                    Version = previousVersion + 1,
+                    RecipientEmail = appointment.Customer.Email.Trim(),
+                    CustomerName = appointment.Customer.FullName,
+                    ServiceNames = serviceNames.Length <= 1000 ? serviceNames : serviceNames[..1000],
+                    AppointmentDate = appointment.AppointmentDate,
+                    OldStylistName = appointment.Stylist.FullName,
+                    NewStylistName = stylist.FullName,
+                    OldStartTime = appointment.StartTime,
+                    NewStartTime = start,
+                    TransferredAt = transferredAt,
+                    Status = ScheduleChangeNotificationStatuses.Pending,
+                    AttemptCount = 0,
+                    NextAttemptAt = transferredAt
+                };
+                dbContext.ScheduleChangeNotifications.Add(notificationEntry);
+            }
+
+            var existingFollowUp = await dbContext.ScheduleContactFollowUps
+                .SingleOrDefaultAsync(item => item.AppointmentId == appointment.AppointmentId, cancellationToken);
+            if (existingFollowUp is not null)
+            {
+                dbContext.ScheduleContactFollowUps.Remove(existingFollowUp);
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
             if (transaction is not null)
             {
@@ -260,7 +337,11 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
             }
 
             return new ScheduleTransferItemResult(selection.AppointmentId, "Succeeded",
-                "Đã chuyển lịch thành công.", stylist.StylistId, stylist.FullName, FormatTime(start), "Confirmed");
+                "Đã chuyển lịch thành công.", stylist.StylistId, stylist.FullName, FormatTime(start), "Confirmed",
+                notificationEntry?.ScheduleChangeNotificationId,
+                notificationEntry is null ? "NotRequired" : ScheduleChangeNotificationStatuses.Pending,
+                notificationEntry?.AttemptCount ?? 0,
+                notificationEntry?.SentAt);
         }
         catch (OperationCanceledException)
         {
@@ -271,6 +352,10 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
             if (updateEntry is not null)
             {
                 updateEntry.State = EntityState.Detached;
+            }
+            if (notificationEntry is not null)
+            {
+                dbContext.Entry(notificationEntry).State = EntityState.Detached;
             }
 
             if (transaction is not null)
@@ -305,19 +390,6 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
         ScheduleTransferItemResult result,
         CancellationToken cancellationToken)
     {
-        if (result.Outcome is "Succeeded" or "AlreadyApplied")
-        {
-            var resolved = await dbContext.ScheduleContactFollowUps
-                .SingleOrDefaultAsync(item => item.AppointmentId == result.AppointmentId, cancellationToken);
-            if (resolved is not null)
-            {
-                dbContext.ScheduleContactFollowUps.Remove(resolved);
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
-
-            return;
-        }
-
         if (result.Outcome != "Failed" || result.AppointmentId <= 0)
         {
             return;
@@ -325,7 +397,8 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
 
         var appointment = await dbContext.Appointments.AsNoTracking()
             .SingleOrDefaultAsync(item => item.AppointmentId == result.AppointmentId &&
-                ScheduleCoordinationStatuses.NeedsReview.Contains(item.Status), cancellationToken);
+                (item.Status == "Pending" || item.Status == "Confirmed" || item.Status == "Arrived"),
+                cancellationToken);
         if (appointment is null)
         {
             return;
@@ -353,6 +426,9 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
     }
 
     private static string FormatTime(TimeSpan time) => time.ToString(@"hh\:mm");
+
+    private static bool IsNonBlockingStatus(string status) =>
+        status is "Completed" or "Cancelled" or "Canceled" or "NoShow" or "No Show";
 
     private sealed record ProposedReservation(
         int AppointmentId,

@@ -179,7 +179,8 @@ test("previews a selected batch and renders per-appointment transfer results", a
             successCount: 1,
             failureCount: 0,
             results: [{ appointmentId: 15, outcome: "Succeeded", message: "Đã chuyển lịch thành công.",
-                stylistId: 8, stylistName: "Thợ thay thế", startTime: "10:00", appointmentStatus: "Confirmed" }]
+                stylistId: 8, stylistName: "Thợ thay thế", startTime: "10:00", appointmentStatus: "Confirmed",
+                emailStatus: "Pending", emailAttemptCount: 0 }]
         }) }
     });
 
@@ -206,5 +207,6 @@ test("previews a selected batch and renders per-appointment transfer results", a
     assert.match(elements["transfer-results-summary"].textContent, /1 lịch thành công/);
     assert.match(row.children[10].textContent, /Thợ: Thợ thay thế, giờ: 10:00, trạng thái: Confirmed/);
     assert.match(row.children[10].textContent, /Đã chuyển lịch thành công/);
+    assert.match(row.children[10].children[0].textContent, /Email: đang chờ gửi/);
     assert.equal(row.children[0].children[0].disabled, true);
 });

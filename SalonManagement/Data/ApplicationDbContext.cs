@@ -29,6 +29,8 @@ namespace SalonManagement.Data
 
         public DbSet<ScheduleContactFollowUp> ScheduleContactFollowUps => Set<ScheduleContactFollowUp>();
 
+        public DbSet<ScheduleChangeNotification> ScheduleChangeNotifications => Set<ScheduleChangeNotification>();
+
         public DbSet<Invoice> Invoices => Set<Invoice>();
 
         public DbSet<Payment> Payments => Set<Payment>();
@@ -169,6 +171,24 @@ namespace SalonManagement.Data
                     .OnDelete(DeleteBehavior.Cascade);
                 entity.HasIndex(item => item.AppointmentId).IsUnique();
                 entity.HasIndex(item => new { item.OriginalAppointmentDate, item.ContactStatus, item.Category });
+            });
+
+            builder.Entity<ScheduleChangeNotification>(entity =>
+            {
+                entity.HasKey(item => item.ScheduleChangeNotificationId);
+                entity.Property(item => item.RecipientEmail).HasMaxLength(256).IsRequired();
+                entity.Property(item => item.CustomerName).HasMaxLength(150).IsRequired();
+                entity.Property(item => item.ServiceNames).HasMaxLength(1000).IsRequired();
+                entity.Property(item => item.OldStylistName).HasMaxLength(150).IsRequired();
+                entity.Property(item => item.NewStylistName).HasMaxLength(150).IsRequired();
+                entity.Property(item => item.Status).HasMaxLength(30).IsRequired();
+                entity.Property(item => item.LastError).HasMaxLength(1000);
+                entity.HasOne(item => item.Appointment)
+                    .WithMany(appointment => appointment.ScheduleChangeNotifications)
+                    .HasForeignKey(item => item.AppointmentId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(item => new { item.AppointmentId, item.Version }).IsUnique();
+                entity.HasIndex(item => new { item.Status, item.NextAttemptAt });
             });
 
             builder.Entity<Invoice>(entity =>
