@@ -106,7 +106,7 @@ public override async Task<int> SaveChangesAsync(
 private List<AuditEntry> CreateAuditEntries()
 {
     ChangeTracker.DetectChanges();
-    await AssignMissingBookingReferencesAsync(cancellationToken);
+
 
     var entries = new List<AuditEntry>();
 
