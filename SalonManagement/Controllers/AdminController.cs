@@ -41,6 +41,16 @@ public class AdminController : Controller
     [HttpGet("reception/schedule-coordination/follow-ups")]
     public IActionResult ReceptionScheduleFollowUps() => View("ScheduleFollowUps");
 
+    [HttpGet("reception/bookings/new")]
+    public IActionResult ReceptionBookingCustomer() => View("BookingCustomer");
+
+    [HttpGet("reception/customers/{customerId:int}")]
+    public IActionResult ReceptionCustomerProfile(int customerId)
+    {
+        ViewData["CustomerId"] = customerId;
+        return View("CustomerProfile");
+    }
+
     [HttpGet("stylist/register")]
     public IActionResult StylistRegister()
     {

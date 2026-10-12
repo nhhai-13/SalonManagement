@@ -1,0 +1,78 @@
+@{
+    ViewData["Title"] = "Hồ sơ khách hàng";
+}
+
+<main id="customer-profile-page" class="py-4 d-none" data-customer-id="@ViewData["CustomerId"]" aria-labelledby="customer-profile-title">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <span class="text-uppercase text-muted small fw-semibold">Hồ sơ khách hàng</span>
+            <h1 id="customer-profile-title" class="h2 mb-1">Thông tin khách</h1>
+            <p class="text-muted mb-0">Xem lịch sử đến và cập nhật thông tin liên hệ, ghi chú nội bộ.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-primary" href="/reception/bookings/new">Đặt lịch tại quầy</a>
+            <button id="customer-profile-logout" class="btn btn-outline-danger" type="button">Đăng xuất</button>
+        </div>
+    </div>
+
+    <div id="customer-profile-error" class="alert alert-danger d-none" role="alert"></div>
+    <div id="customer-profile-loading" class="alert alert-info" role="status">Đang tải hồ sơ khách...</div>
+
+    <section id="customer-profile-content" class="d-none">
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <article class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h2 class="h5">Lịch sử đến</h2>
+                        <div class="d-flex gap-4">
+                            <div><div class="text-muted small">Đã đến</div><strong id="customer-profile-visits" class="fs-3">0</strong></div>
+                            <div><div class="text-muted small">Không đến</div><strong id="customer-profile-no-shows" class="fs-3">0</strong></div>
+                        </div>
+                        <p class="text-muted small mb-0 mt-2">Chỉ tính lịch hoàn tất hoặc được ghi nhận không đến; lịch hủy và chưa hoàn tất không tính.</p>
+                    </div>
+                </article>
+            </div>
+            <div class="col-md-6">
+                <article class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h2 class="h5">Số điện thoại nhận diện</h2>
+                        <p id="customer-profile-phone" class="fs-5 mb-1"></p>
+                        <p class="text-muted small mb-0">Số điện thoại được khóa tại màn hình này để tránh thay đổi nhận diện ngoài quy trình đổi số.</p>
+                    </div>
+                </article>
+            </div>
+        </div>
+
+        <section class="card shadow-sm" aria-labelledby="customer-profile-edit-title">
+            <div class="card-body">
+                <h2 id="customer-profile-edit-title" class="h5 mb-3">Thông tin và ghi chú riêng của tiệm</h2>
+                <form id="customer-profile-form" class="row g-3" novalidate>
+                    <div class="col-md-6">
+                        <label class="form-label" for="customer-profile-name">Họ tên</label>
+                        <input class="form-control" id="customer-profile-name" maxlength="150" autocomplete="name" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="customer-profile-email">Email</label>
+                        <input class="form-control" id="customer-profile-email" type="email" maxlength="256" autocomplete="email" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="customer-profile-notes">Ghi chú riêng của tiệm</label>
+                        <textarea class="form-control" id="customer-profile-notes" rows="4" maxlength="2000" aria-describedby="customer-profile-notes-help"></textarea>
+                        <div id="customer-profile-notes-help" class="form-text">Chỉ Admin, Chủ tiệm và Lễ tân xem được ghi chú này.</div>
+                    </div>
+                    <div class="col-12 d-flex flex-wrap align-items-center gap-3">
+                        <button id="customer-profile-save" class="btn btn-primary" type="submit">Lưu thay đổi</button>
+                        <span id="customer-profile-updated-at" class="text-muted small"></span>
+                    </div>
+                </form>
+                <div id="customer-profile-result" class="alert d-none mt-3 mb-0" role="status" aria-live="polite"></div>
+            </div>
+        </section>
+    </section>
+</main>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script src="~/js/customer-profile.js" asp-append-version="true"></script>
+    <script>ReceptionCustomerProfilePage.initialize();</script>
+}

@@ -64,7 +64,7 @@ html { scroll-behavior: smooth; }
 .booking-card { display: grid; grid-template-columns: .9fr 1.35fr; gap: 55px; padding: 35px 42px; border-radius: 6px; color: #fff; background: #483127; box-shadow: 0 15px 50px rgba(65,43,31,.2); }
 .booking-copy h2 { margin: 7px 0; font: 600 27px "Playfair Display", serif; }
 .booking-copy p { margin: 0; color: rgba(255,255,255,.65); font-size: 12px; line-height: 1.6; }
-.booking-form { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 12px; }
+.booking-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 12px; }
 .booking-form label > span:first-child { display: block; margin-bottom: 7px; color: rgba(255,255,255,.72); font-size: 10px; font-weight: 600; text-transform: uppercase; }
 .booking-input { display: flex; height: 50px; align-items: center; gap: 10px; padding: 0 15px; border-radius: 3px; color: #8b776b; background: #fff; }
 .booking-input input, .booking-input select { min-width: 0; width: 100%; border: 0; outline: 0; color: #3d332e; background: transparent; font: 13px "DM Sans", sans-serif; }

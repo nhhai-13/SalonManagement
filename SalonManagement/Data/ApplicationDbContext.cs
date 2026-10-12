@@ -15,6 +15,8 @@ namespace SalonManagement.Data
 
         public DbSet<Customer> Customers => Set<Customer>();
 
+        public DbSet<CustomerProfileChangeLog> CustomerProfileChangeLogs => Set<CustomerProfileChangeLog>();
+
         public DbSet<Stylist> Stylists => Set<Stylist>();
 
         public DbSet<Service> Services => Set<Service>();
@@ -66,9 +68,29 @@ namespace SalonManagement.Data
                 entity.HasKey(customer => customer.CustomerId);
                 entity.Property(customer => customer.FullName).HasMaxLength(150);
                 entity.Property(customer => customer.Phone).HasMaxLength(20);
+                entity.Property(customer => customer.NormalizedPhone).HasMaxLength(20).HasDefaultValue("");
                 entity.Property(customer => customer.Email).HasMaxLength(256);
                 entity.Property(customer => customer.Gender).HasMaxLength(20);
                 entity.HasIndex(customer => customer.Phone);
+                entity.HasIndex(customer => customer.NormalizedPhone);
+            });
+
+            builder.Entity<CustomerProfileChangeLog>(entity =>
+            {
+                entity.HasKey(change => change.CustomerProfileChangeLogId);
+                entity.Property(change => change.ChangedByUserId).HasMaxLength(450).IsRequired();
+                entity.Property(change => change.ChangedByEmail).HasMaxLength(256).IsRequired();
+                entity.Property(change => change.PreviousFullName).HasMaxLength(150).IsRequired();
+                entity.Property(change => change.PreviousEmail).HasMaxLength(256);
+                entity.Property(change => change.PreviousNotes).HasMaxLength(2000);
+                entity.Property(change => change.UpdatedFullName).HasMaxLength(150).IsRequired();
+                entity.Property(change => change.UpdatedEmail).HasMaxLength(256);
+                entity.Property(change => change.UpdatedNotes).HasMaxLength(2000);
+                entity.HasIndex(change => new { change.CustomerId, change.ChangedAtUtc });
+                entity.HasOne<Customer>()
+                    .WithMany()
+                    .HasForeignKey(change => change.CustomerId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<Stylist>(entity =>

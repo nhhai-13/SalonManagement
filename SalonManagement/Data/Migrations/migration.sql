@@ -204,9 +204,6 @@ BEGIN
 END;
 GO
 
-COMMIT;
-GO
-
 BEGIN TRANSACTION;
 GO
 
@@ -722,6 +719,71 @@ IF NOT EXISTS (
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
     VALUES (N'20261011010000_AddScheduleChangeNotificationOutbox', N'8.0.30');
+END;
+GO
+
+IF COL_LENGTH(N'Customers', N'NormalizedPhone') IS NULL
+BEGIN
+    ALTER TABLE [Customers] ADD [NormalizedPhone] nvarchar(20) NOT NULL CONSTRAINT [DF_Customers_NormalizedPhone] DEFAULT N'';
+END;
+GO
+
+UPDATE Customers
+SET NormalizedPhone = CASE
+    WHEN LEFT(digits.PhoneDigits, 2) = '84' AND LEN(digits.PhoneDigits) >= 11
+        THEN '0' + SUBSTRING(digits.PhoneDigits, 3, 20)
+    ELSE digits.PhoneDigits
+END
+FROM Customers
+CROSS APPLY (SELECT REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(Phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', ''), '/', ''), CHAR(9), '') AS PhoneDigits) digits;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_Customers_NormalizedPhone' AND object_id = OBJECT_ID(N'[Customers]'))
+    CREATE INDEX [IX_Customers_NormalizedPhone] ON [Customers] ([NormalizedPhone]);
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261011020000_AddCustomerProfiles'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261011020000_AddCustomerProfiles', N'8.0.30');
+END;
+GO
+
+IF OBJECT_ID(N'[CustomerProfileChangeLogs]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [CustomerProfileChangeLogs] (
+        [CustomerProfileChangeLogId] int IDENTITY(1,1) NOT NULL,
+        [CustomerId] int NOT NULL,
+        [ChangedByUserId] nvarchar(450) NOT NULL,
+        [ChangedByEmail] nvarchar(256) NOT NULL,
+        [PreviousFullName] nvarchar(150) NOT NULL,
+        [PreviousEmail] nvarchar(256) NULL,
+        [PreviousNotes] nvarchar(2000) NULL,
+        [UpdatedFullName] nvarchar(150) NOT NULL,
+        [UpdatedEmail] nvarchar(256) NULL,
+        [UpdatedNotes] nvarchar(2000) NULL,
+        [ChangedAtUtc] datetime2 NOT NULL,
+        CONSTRAINT [PK_CustomerProfileChangeLogs] PRIMARY KEY ([CustomerProfileChangeLogId]),
+        CONSTRAINT [FK_CustomerProfileChangeLogs_Customers_CustomerId]
+            FOREIGN KEY ([CustomerId]) REFERENCES [Customers] ([CustomerId]) ON DELETE NO ACTION
+    );
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_CustomerProfileChangeLogs_CustomerId_ChangedAtUtc' AND object_id = OBJECT_ID(N'[CustomerProfileChangeLogs]'))
+    CREATE INDEX [IX_CustomerProfileChangeLogs_CustomerId_ChangedAtUtc] ON [CustomerProfileChangeLogs] ([CustomerId], [ChangedAtUtc]);
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261012010000_AddCustomerProfileChangeLog'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261012010000_AddCustomerProfileChangeLog', N'8.0.30');
 END;
 GO
 

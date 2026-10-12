@@ -92,7 +92,6 @@ if (builder.Environment.IsDevelopment())
         .SetApplicationName(
             "SalonManagement.Development");
 }
-
 // =====================================
 // JWT AUTHENTICATION
 // =====================================
@@ -184,6 +183,10 @@ builder.Services.AddScoped<
     ITokenService,
     TokenService>();
 
+builder.Services.AddScoped<CustomerProfileService>();
+builder.Services.AddScoped<CustomerProfileManagementService>();
+builder.Services.AddScoped<BookingService>();
+
 builder.Services.AddMemoryCache();
 
 builder.Services.AddScoped<
@@ -224,6 +227,39 @@ if (builder.Configuration["DatabaseProvider"] == "Sqlite")
             .GetRequiredService<ApplicationDbContext>();
 
     await dbContext.Database.EnsureCreatedAsync();
+    await EnsureSqliteColumnAsync(dbContext, "Customers", "NormalizedPhone", "TEXT NOT NULL DEFAULT ''");
+    await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS \"IX_Customers_NormalizedPhone\" ON \"Customers\" (\"NormalizedPhone\")");
+    await dbContext.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS "CustomerProfileChangeLogs" (
+            "CustomerProfileChangeLogId" INTEGER NOT NULL CONSTRAINT "PK_CustomerProfileChangeLogs" PRIMARY KEY AUTOINCREMENT,
+            "CustomerId" INTEGER NOT NULL,
+            "ChangedByUserId" TEXT NOT NULL,
+            "ChangedByEmail" TEXT NOT NULL,
+            "PreviousFullName" TEXT NOT NULL,
+            "PreviousEmail" TEXT NULL,
+            "PreviousNotes" TEXT NULL,
+            "UpdatedFullName" TEXT NOT NULL,
+            "UpdatedEmail" TEXT NULL,
+            "UpdatedNotes" TEXT NULL,
+            "ChangedAtUtc" TEXT NOT NULL,
+            CONSTRAINT "FK_CustomerProfileChangeLogs_Customers_CustomerId"
+                FOREIGN KEY ("CustomerId") REFERENCES "Customers" ("CustomerId") ON DELETE RESTRICT
+        );
+        CREATE INDEX IF NOT EXISTS "IX_CustomerProfileChangeLogs_CustomerId_ChangedAtUtc"
+            ON "CustomerProfileChangeLogs" ("CustomerId", "ChangedAtUtc");
+        """);
+    await dbContext.Database.ExecuteSqlRawAsync("""
+        UPDATE Customers SET NormalizedPhone =
+            CASE WHEN substr(PhoneDigits, 1, 2) = '84' AND length(PhoneDigits) >= 11
+                THEN '0' || substr(PhoneDigits, 3)
+                ELSE PhoneDigits END
+        FROM (
+            SELECT CustomerId,
+                replace(replace(replace(replace(replace(replace(replace(replace(Phone, '+', ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', ''), '/', ''), char(9), '') AS PhoneDigits
+            FROM Customers WHERE NormalizedPhone = ''
+        ) AS digits
+        WHERE Customers.CustomerId = digits.CustomerId
+        """);
     await dbContext.Database.ExecuteSqlRawAsync("""
         CREATE TABLE IF NOT EXISTS "ScheduleContactFollowUps" (
             "ScheduleContactFollowUpId" INTEGER NOT NULL CONSTRAINT "PK_ScheduleContactFollowUps" PRIMARY KEY AUTOINCREMENT,
@@ -379,6 +415,13 @@ using (var scope = app.Services.CreateScope())
     await SeedData.SeedAsync(
         dbContext,
         userManager);
+
+    if (app.Environment.IsDevelopment())
+    {
+        var salonTimeZone = TimeZoneInfo.FindSystemTimeZoneById(BusinessHour.SalonTimeZone);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, salonTimeZone));
+        await DevelopmentBookingScheduleSeeder.SeedAsync(dbContext, today);
+    }
 }
 
 // =====================================
@@ -386,3 +429,29 @@ using (var scope = app.Services.CreateScope())
 // =====================================
 
 app.Run();
+
+static async Task EnsureSqliteColumnAsync(
+    ApplicationDbContext dbContext,
+    string table,
+    string column,
+    string definition)
+{
+    if (table != "Customers" || column != "NormalizedPhone" || definition != "TEXT NOT NULL DEFAULT ''")
+        throw new ArgumentOutOfRangeException(nameof(column), "Unexpected SQLite schema alteration.");
+
+    var connection = dbContext.Database.GetDbConnection();
+    await using var command = connection.CreateCommand();
+    command.CommandText = $"PRAGMA table_info(\"{table}\")";
+    if (connection.State != System.Data.ConnectionState.Open)
+        await connection.OpenAsync();
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+            return;
+    }
+    await reader.DisposeAsync();
+    await using var alterCommand = connection.CreateCommand();
+    alterCommand.CommandText = "ALTER TABLE \"Customers\" ADD COLUMN \"NormalizedPhone\" TEXT NOT NULL DEFAULT ''";
+    await alterCommand.ExecuteNonQueryAsync();
+}

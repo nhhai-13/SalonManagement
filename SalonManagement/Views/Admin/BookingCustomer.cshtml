@@ -1,0 +1,58 @@
+@{
+    ViewData["Title"] = "Nhận diện khách tại quầy";
+}
+
+<main id="reception-booking-customer-page" class="py-4 d-none" aria-labelledby="booking-customer-title">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <span class="text-uppercase text-muted small fw-semibold">Lễ tân</span>
+            <h1 id="booking-customer-title" class="h2 mb-1">Đặt lịch tại quầy</h1>
+            <p class="text-muted mb-0">Hồ sơ khách được tạo hoặc khớp theo số điện thoại khi lưu lịch.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-primary" href="/reception/schedule-coordination">Điều phối lịch</a>
+            <button id="booking-customer-logout" class="btn btn-outline-danger" type="button">Đăng xuất</button>
+        </div>
+    </div>
+
+    <section class="card shadow-sm">
+        <div class="card-body">
+            <form id="reception-booking-customer-form" class="row g-3" novalidate>
+                <div class="col-md-6">
+                    <label class="form-label" for="reception-customer-name">Họ tên khách</label>
+                    <input class="form-control" id="reception-customer-name" maxlength="150" autocomplete="name" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="reception-customer-phone">Số điện thoại</label>
+                    <input class="form-control" id="reception-customer-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="reception-booking-service">Dịch vụ</label>
+                    <select class="form-select" id="reception-booking-service" required><option value="">Đang tải dịch vụ...</option></select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="reception-booking-stylist">Chuyên viên</label>
+                    <select class="form-select" id="reception-booking-stylist" required><option value="">Đang tải chuyên viên...</option></select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="reception-booking-date">Ngày hẹn</label>
+                    <input class="form-control" id="reception-booking-date" type="date" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="reception-booking-time">Giờ bắt đầu</label>
+                    <input class="form-control" id="reception-booking-time" type="time" step="300" required />
+                </div>
+                <div class="col-12">
+                    <button id="reception-customer-submit" class="btn btn-primary" type="submit">Tạo lịch hẹn</button>
+                </div>
+            </form>
+            <div id="reception-customer-result" class="alert d-none mt-3 mb-0" role="status" aria-live="polite"></div>
+        </div>
+    </section>
+</main>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script src="~/js/reception-booking-customer.js" asp-append-version="true"></script>
+    <script>ReceptionBookingCustomerPage.initialize();</script>
+}
