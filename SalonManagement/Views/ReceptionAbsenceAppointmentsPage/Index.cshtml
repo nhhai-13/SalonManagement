@@ -1,0 +1,74 @@
+@{
+    ViewData["Title"] = "Xử lý lịch thợ nghỉ";
+}
+
+<div id="absence-appointments-page" class="container py-4 d-none">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+        <div>
+            <span class="text-uppercase text-muted small fw-semibold">Lễ tân</span>
+            <h1 class="h2 mb-1">Lịch cần xử lý khi thợ nghỉ</h1>
+            <p class="text-muted mb-0">Chọn thợ và ngày nghỉ để xem các lịch chưa hoàn tất cần chuyển xử lý.</p>
+        </div>
+        <a class="btn btn-outline-secondary" href="/reception">Quay lại không gian lễ tân</a>
+    </div>
+
+    <section class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <form id="absence-appointments-form" class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label" for="absent-stylist">Thợ nghỉ</label>
+                    <select class="form-select" id="absent-stylist" required><option value="">Đang tải danh sách thợ…</option></select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="absence-date">Ngày cần xử lý</label>
+                    <input class="form-control" id="absence-date" type="date" required value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-2 d-grid"><button class="btn btn-primary" type="submit">Xem lịch</button></div>
+            </form>
+            <div id="absence-appointments-error" class="alert alert-danger mt-3 d-none" role="alert"></div>
+        </div>
+    </section>
+
+    <section class="card shadow-sm border-0 mt-4 d-none" id="absence-appointments-results">
+        <div class="card-header bg-warning-subtle d-flex flex-wrap align-items-center justify-content-between gap-2 py-3">
+            <h2 class="h5 mb-0">Lịch chưa hoàn tất của <span id="absence-appointments-stylist"></span></h2>
+            <div class="d-flex align-items-center gap-2"><span id="absence-appointments-count" class="badge text-bg-warning">0 lịch cần chuyển</span><button id="batch-reschedule-confirm" class="btn btn-sm btn-primary" type="button" disabled>Xác nhận chuyển đã chọn</button></div>
+        </div>
+        <div class="card-body p-0">
+            <div class="p-4 text-muted d-none" id="absence-appointments-empty">Thợ này không có lịch chưa hoàn tất trong ngày đã chọn.</div>
+            <div class="table-responsive d-none" id="absence-appointments-table-wrap">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light"><tr><th><input id="batch-reschedule-select-all" type="checkbox" aria-label="Chọn tất cả lịch có phương án"></th><th>Khách hàng</th><th>Dịch vụ</th><th>Thời gian cũ</th><th>Trạng thái</th><th>Đề xuất thay thế</th></tr></thead>
+                    <tbody id="absence-appointments-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="card shadow-sm border-0 mt-4 d-none" id="batch-reschedule-results">
+        <div class="card-header bg-primary-subtle"><h2 class="h5 mb-0">Kết quả chuyển lịch</h2></div>
+        <div class="card-body"><div id="batch-reschedule-success" class="d-none"></div><div id="batch-reschedule-failed" class="d-none mt-3"></div></div>
+    </section>
+
+    <section class="card shadow-sm border-danger border-2 mt-4 d-none" id="call-customer-results">
+        <div class="card-header bg-danger-subtle d-flex align-items-center justify-content-between gap-2 py-3">
+            <div><span class="text-uppercase small fw-semibold text-danger-emphasis">Cần liên hệ</span><h2 class="h5 mb-0">Cần gọi khách</h2></div>
+            <span id="call-customer-count" class="badge text-bg-danger">0 lịch</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                <thead class="table-light"><tr><th>Khách hàng</th><th>Số điện thoại</th><th>Dịch vụ</th><th>Thời gian</th><th>Lý do</th></tr></thead>
+                <tbody id="call-customer-list"></tbody>
+            </table></div>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script src="~/js/reception-absence-appointments.js" asp-append-version="true"></script>
+    <script>
+        SalonAuth.requireSession({ endpoint: "/api/portal/reception/session", contentId: "absence-appointments-page" })
+            .then(() => ReceptionAbsenceAppointments.initialize());
+    </script>
+}

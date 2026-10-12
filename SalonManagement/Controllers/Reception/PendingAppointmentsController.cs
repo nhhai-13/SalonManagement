@@ -28,7 +28,8 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
             .Select(appointment => new PendingAppointmentResponse(
                 appointment.AppointmentId,
                 appointment.BookingReference,
-                appointment.Customer.FullName,
+                appointment.CustomerId,
+                appointment.CustomerNameOverride ?? appointment.Customer.FullName,
                 appointment.Customer.Phone,
                 appointment.Customer.Email,
                 appointment.Stylist.FullName,
@@ -40,6 +41,8 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
                 appointment.StartTime,
                 appointment.EndTime,
                 appointment.Status,
+                appointment.BookingSource,
+                appointment.NameConflictResolution,
                 appointment.CreatedAt,
                 appointment.ConfirmedByUserId,
                 appointment.ConfirmedAt,
@@ -55,6 +58,8 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         var appointment = await db.Appointments.SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
         if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
         if (appointment.Status != "PendingConfirmation") return Conflict(new { error = "Lịch hẹn này đã được xử lý." });
+        if (appointment.NameConflictResolution == "PendingReceptionReview")
+            return Conflict(new { error = "Vui lòng chọn cách xử lý tên khác hồ sơ trước khi xác nhận lịch." });
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
@@ -92,13 +97,44 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         await db.SaveChangesAsync();
         return Ok(new { appointment.AppointmentId, appointment.Status, appointment.RejectionReason, appointment.RejectedByUserId, appointment.RejectedAt });
     }
+
+    [HttpPost("{appointmentId:int}/name-conflict")]
+    public async Task<IActionResult> ResolveNameConflict(int appointmentId, [FromBody] ResolveNameConflictRequest request)
+    {
+        if (request.Resolution is not ("KeepProfile" or "UpdateProfile" or "UseForThisAppointment"))
+            return BadRequest(new { error = "Lựa chọn xử lý tên không hợp lệ." });
+        var appointment = await db.Appointments.Include(item => item.Customer).SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
+        if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
+        if (appointment.Status != "PendingConfirmation" || appointment.NameConflictResolution != "PendingReceptionReview")
+            return Conflict(new { error = "Lịch hẹn này không còn chờ xử lý tên." });
+
+        var enteredName = appointment.CustomerNameOverride;
+        if (string.IsNullOrWhiteSpace(enteredName)) return Conflict(new { error = "Không tìm thấy tên mới cần xử lý." });
+        if (request.Resolution == "UpdateProfile")
+        {
+            appointment.Customer.FullName = enteredName;
+            appointment.Customer.NormalizedSearchName = CustomerProfileService.NormalizeSearchName(enteredName);
+            appointment.Customer.UpdatedAt = SalonClock.GetLocalNow(timeProvider);
+            appointment.CustomerNameOverride = null;
+        }
+        else if (request.Resolution == "KeepProfile")
+        {
+            appointment.CustomerNameOverride = null;
+        }
+        appointment.NameConflictResolution = request.Resolution;
+        appointment.UpdatedAt = SalonClock.GetLocalNow(timeProvider);
+        await db.SaveChangesAsync();
+        return Ok(new { appointment.AppointmentId, appointment.NameConflictResolution, appointment.CustomerNameOverride, customerName = appointment.Customer.FullName });
+    }
 }
 
 public sealed record RejectPendingAppointmentRequest(string? Reason);
+public sealed record ResolveNameConflictRequest(string? Resolution);
 
 public sealed record PendingAppointmentResponse(
     int AppointmentId,
     string Reference,
+    int CustomerId,
     string CustomerName,
     string CustomerPhone,
     string? CustomerEmail,
@@ -108,6 +144,8 @@ public sealed record PendingAppointmentResponse(
     TimeSpan StartTime,
     TimeSpan EndTime,
     string Status,
+    string? BookingSource,
+    string? NameConflictResolution,
     DateTime CreatedAt,
     string? ConfirmedByUserId = null,
     DateTime? ConfirmedAt = null,

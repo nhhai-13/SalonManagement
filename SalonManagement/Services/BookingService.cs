@@ -267,6 +267,6 @@ public class BookingService : IBookingService
     {
         var digits = new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
         if (digits.StartsWith("84") && digits.Length == 11) digits = "0" + digits[2..];
-        return digits.Length == 10 ? digits : null;
+        return digits.Length == 10 && digits[0] == '0' ? digits : null;
     }
 }

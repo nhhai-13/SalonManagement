@@ -1,0 +1,27 @@
+@using SalonManagement.Models
+@{ ViewData["Title"] = "Tạo lịch tại quầy"; var services = (IReadOnlyList<Service>)ViewBag.Services; var stylists = (IReadOnlyList<Stylist>)ViewBag.Stylists; }
+<div class="container py-4" style="max-width:700px">
+    <h1 class="h3">Tạo lịch tại quầy</h1>
+    <div id="message" class="alert d-none"></div>
+    <div id="customer-history" class="alert alert-info d-none"></div>
+    <section id="name-conflict" class="card border-warning mb-3 d-none" aria-live="polite">
+        <div class="card-body"><h2 class="h5 text-warning-emphasis">Tên khác với hồ sơ khách</h2><p class="mb-2">Hồ sơ: <strong id="profile-name"></strong><br />Tên vừa nhập: <strong id="entered-name"></strong></p><p class="small text-muted">Chọn cách dùng tên cho lịch hẹn này. Thông tin bạn đã nhập được giữ nguyên.</p><div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-outline-secondary btn-sm" data-name-resolution="KeepProfile">Giữ tên hồ sơ</button><button type="button" class="btn btn-primary btn-sm" data-name-resolution="UpdateProfile">Cập nhật tên hồ sơ</button><button type="button" class="btn btn-outline-primary btn-sm" data-name-resolution="UseForThisAppointment">Chỉ dùng cho lịch này</button></div></div>
+    </section>
+    <form id="counter-form" class="row g-3">
+        <div class="col-md-6"><label class="form-label">Tên khách</label><input id="name" class="form-control" required /></div>
+        <div class="col-md-6"><label class="form-label">Số điện thoại</label><input id="phone" class="form-control" required /></div>
+        <div class="col-md-6"><label class="form-label">Email</label><input id="email" type="email" class="form-control" /></div>
+        <div class="col-md-6"><label class="form-label">Dịch vụ</label><select id="services" class="form-select" multiple required>@foreach(var service in services){<option value="@service.ServiceId">@service.ServiceName</option>}</select></div>
+        <div class="col-md-6"><label class="form-label">Thợ</label><select id="stylist" class="form-select" required><option value="">Chọn thợ</option>@foreach(var stylist in stylists){<option value="@stylist.StylistId">@stylist.FullName</option>}</select></div>
+        <div class="col-md-6"><label class="form-label">Ngày</label><input id="date" type="date" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" required /></div>
+        <div class="col-md-6"><label class="form-label">Giờ bắt đầu</label><input id="time" type="time" step="900" class="form-control" required /></div>
+        <div class="col-12"><button class="btn btn-primary">Tạo lịch</button></div>
+    </form>
+</div>
+@section Scripts {<script>
+const phoneEl=document.getElementById('phone'),nameEl=document.getElementById('name'),emailEl=document.getElementById('email'),servicesEl=document.getElementById('services'),stylistEl=document.getElementById('stylist'),historyEl=document.getElementById('customer-history'),conflictEl=document.getElementById('name-conflict'),messageEl=document.getElementById('message');
+if(!document.getElementById('time').value)document.getElementById('time').value=new Date().toTimeString().slice(0,5);
+phoneEl.addEventListener('change',async()=>{const r=await fetch(`/reception/counter-appointments/customer?phone=${encodeURIComponent(phoneEl.value)}`),x=await r.json();if(r.ok&&x.found){nameEl.value=x.fullName;emailEl.value=x.email||'';historyEl.replaceChildren();historyEl.append('Khách quen: ');const strong=document.createElement('strong');strong.textContent=x.fullName;historyEl.append(strong,'. ');const link=document.createElement('a');link.href=x.profileUrl;link.textContent='Mở hồ sơ';historyEl.append(link);const summary=document.createElement('div');summary.textContent=`Số lần đến: ${x.visitCount}; không đến: ${x.noShowCount}${x.shopNotes?`; ghi chú tiệm: ${x.shopNotes}`:''}`;historyEl.append(document.createElement('br'),summary);const history=document.createElement('div');history.textContent='Dịch vụ gần nhất: '+x.history.map(h=>`${h.date} – ${h.services.join(', ')}`).join('; ');historyEl.append(history);historyEl.classList.remove('d-none')}else historyEl.classList.add('d-none')});
+async function createAppointment(nameConflictResolution=null){const d=document.getElementById('date').value,t=document.getElementById('time').value,body={fullName:nameEl.value,phone:phoneEl.value,email:emailEl.value||null,serviceIds:[...servicesEl.selectedOptions].map(x=>+x.value),stylistId:+stylistEl.value,date:d,startTime:t+':00',nameConflictResolution};const r=await fetch('/reception/counter-appointments/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),x=await r.json();if(r.status===409&&x.code==='name_conflict'){document.getElementById('profile-name').textContent=x.profileName;document.getElementById('entered-name').textContent=x.enteredName;conflictEl.classList.remove('d-none');return}messageEl.textContent=x.error||x.message;messageEl.className='alert '+(r.ok?'alert-success':'alert-danger');if(r.ok)setTimeout(()=>location.href=x.redirect,500)}
+document.getElementById('counter-form').addEventListener('submit',async event=>{event.preventDefault();conflictEl.classList.add('d-none');await createAppointment()});document.querySelectorAll('[data-name-resolution]').forEach(button=>button.addEventListener('click',()=>createAppointment(button.dataset.nameResolution)));
+</script>}

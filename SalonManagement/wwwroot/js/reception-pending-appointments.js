@@ -27,12 +27,12 @@ window.ReceptionPendingAppointments = (() => {
             wrap.classList.toggle("d-none", appointments.length === 0);
             list.innerHTML = appointments.map(appointment => `
                 <tr class="table-warning">
-                    <td><strong>${escapeHtml(appointment.customerName)}</strong><br><small class="text-muted">${escapeHtml(appointment.customerPhone)}${appointment.customerEmail ? ` · ${escapeHtml(appointment.customerEmail)}` : ""}<br>Mã: ${escapeHtml(appointment.reference)}</small></td>
+                    <td><strong>${escapeHtml(appointment.customerName)}</strong>${appointment.nameConflictResolution === "PendingReceptionReview" ? '<br><span class="badge text-bg-warning mt-1">Tên khác hồ sơ – chờ chọn</span>' : ''}<br><small class="text-muted">${escapeHtml(appointment.customerPhone)}${appointment.customerEmail ? ` · ${escapeHtml(appointment.customerEmail)}` : ""}<br>Mã: ${escapeHtml(appointment.reference)} · ${appointment.bookingSource === "Online" ? "Online" : "Tại quầy"}</small><br><a class="small" href="/reception/customers/${appointment.customerId}">Mở hồ sơ khách</a></td>
                     <td>${appointment.services.map(escapeHtml).join("<br>")}</td>
                     <td>${escapeHtml(appointment.stylistName)}</td>
                     <td><strong>${date(appointment.appointmentDate)}</strong><br><small>${time(appointment.startTime)}–${time(appointment.endTime)}</small></td>
                     <td><span class="badge text-bg-warning">Chờ xác nhận</span>${appointment.isOverdue ? '<br><span class="badge text-bg-danger mt-1">Quá hạn xử lý</span>' : ''}</td>
-                    <td><div class="d-flex flex-column gap-1"><button class="btn btn-sm btn-success" type="button" data-confirm-appointment="${appointment.appointmentId}">Xác nhận</button><div class="input-group input-group-sm"><select class="form-select" aria-label="Lý do từ chối" data-rejection-reason><option value="">Chọn lý do…</option><option>Không còn thợ phù hợp</option><option>Khung giờ không còn trống</option><option>Không liên hệ được khách</option><option>Yêu cầu của khách không phù hợp</option></select><button class="btn btn-outline-danger" type="button" data-reject-appointment="${appointment.appointmentId}">Từ chối</button></div></div></td>
+                    <td><div class="d-flex flex-column gap-1">${appointment.nameConflictResolution === "PendingReceptionReview" ? `<div class="border border-warning rounded p-2"><small class="d-block mb-1">Chọn cách xử lý tên:</small><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" type="button" data-resolve-name-conflict="${appointment.appointmentId}" data-name-resolution="KeepProfile">Giữ hồ sơ</button><button class="btn btn-outline-primary" type="button" data-resolve-name-conflict="${appointment.appointmentId}" data-name-resolution="UpdateProfile">Cập nhật hồ sơ</button><button class="btn btn-outline-primary" type="button" data-resolve-name-conflict="${appointment.appointmentId}" data-name-resolution="UseForThisAppointment">Chỉ dùng lịch này</button></div></div>` : ''}<button class="btn btn-sm btn-success" type="button" data-confirm-appointment="${appointment.appointmentId}" ${appointment.nameConflictResolution === "PendingReceptionReview" ? "disabled" : ""}>Xác nhận</button><div class="input-group input-group-sm"><select class="form-select" aria-label="Lý do từ chối" data-rejection-reason><option value="">Chọn lý do…</option><option>Không còn thợ phù hợp</option><option>Khung giờ không còn trống</option><option>Không liên hệ được khách</option><option>Yêu cầu của khách không phù hợp</option></select><button class="btn btn-outline-danger" type="button" data-reject-appointment="${appointment.appointmentId}">Từ chối</button></div></div></td>
                 </tr>`).join("");
             list.querySelectorAll("[data-confirm-appointment]").forEach(button => button.addEventListener("click", async () => {
                 button.disabled = true;
@@ -45,6 +45,21 @@ window.ReceptionPendingAppointments = (() => {
                     await load();
                 } catch (problem) {
                     error.textContent = problem.message || "Không thể xác nhận lịch hẹn. Vui lòng thử lại.";
+                    error.classList.remove("d-none");
+                    button.disabled = false;
+                }
+            }));
+            list.querySelectorAll("[data-resolve-name-conflict]").forEach(button => button.addEventListener("click", async () => {
+                button.disabled = true;
+                try {
+                    const response = await SalonAuth.authenticatedFetch(`/api/reception/pending-appointments/${button.dataset.resolveNameConflict}/name-conflict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resolution: button.dataset.nameResolution }) });
+                    if (!response.ok) {
+                        const body = await response.json().catch(() => ({}));
+                        throw new Error(body.error || "Không thể lưu lựa chọn tên.");
+                    }
+                    await load();
+                } catch (problem) {
+                    error.textContent = problem.message || "Không thể lưu lựa chọn tên. Vui lòng thử lại.";
                     error.classList.remove("d-none");
                     button.disabled = false;
                 }

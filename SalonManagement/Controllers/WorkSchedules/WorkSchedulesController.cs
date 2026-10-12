@@ -27,12 +27,14 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
 
         var schedules = selectedStylistId is null
             ? []
-            : await db.WorkSchedules.AsNoTracking()
+            : (await db.WorkSchedules.AsNoTracking()
                 .Where(schedule => schedule.StylistId == selectedStylistId &&
                                    schedule.WorkDate >= start && schedule.WorkDate < start.AddDays(7))
                 .OrderBy(schedule => schedule.WorkDate)
+                .ToListAsync())
+                .OrderBy(schedule => schedule.WorkDate)
                 .ThenBy(schedule => schedule.StartTime)
-                .ToListAsync();
+                .ToList();
 
         var configuredHours = await db.BusinessHours.AsNoTracking()
             .ToDictionaryAsync(hours => hours.DayOfWeek);
@@ -178,8 +180,11 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
             .Where(schedule => schedule.StylistId == model.StylistId &&
                                schedule.WorkDate >= sourceStart && schedule.WorkDate < sourceStart.AddDays(7))
             .OrderBy(schedule => schedule.WorkDate)
-            .ThenBy(schedule => schedule.StartTime)
             .ToListAsync();
+        sourceShifts = sourceShifts
+            .OrderBy(schedule => schedule.WorkDate)
+            .ThenBy(schedule => schedule.StartTime)
+            .ToList();
 
         if (sourceShifts.Count == 0)
         {
@@ -291,14 +296,17 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
     }
 
     private async Task<WorkSchedule?> FindConflictingShiftAsync(
-        int stylistId, DateTime workDate, TimeSpan startTime, TimeSpan endTime, int? excludedScheduleId = null) =>
-        await db.WorkSchedules.AsNoTracking()
+        int stylistId, DateTime workDate, TimeSpan startTime, TimeSpan endTime, int? excludedScheduleId = null)
+    {
+        var conflicts = await db.WorkSchedules.AsNoTracking()
             .Where(schedule => schedule.StylistId == stylistId &&
                                schedule.WorkDate == workDate &&
                                (!excludedScheduleId.HasValue || schedule.WorkScheduleId != excludedScheduleId) &&
                                schedule.StartTime < endTime && startTime < schedule.EndTime)
-            .OrderBy(schedule => schedule.StartTime)
-            .FirstOrDefaultAsync();
+            .ToListAsync();
+
+        return conflicts.OrderBy(schedule => schedule.StartTime).FirstOrDefault();
+    }
 
     private static string ConflictMessage(WorkSchedule schedule) =>
         $"Ca làm bị chồng lấn với ca {schedule.StartTime:hh\\:mm}–{schedule.EndTime:hh\\:mm} ngày {schedule.WorkDate:dd/MM/yyyy}.";

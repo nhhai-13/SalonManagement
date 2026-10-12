@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fullName: fullName.value.trim(), phone: phone.value.trim(), email: email.value.trim(),
                 notes: notes.value.trim() || null, website: null
             });
-            bookingResult.textContent = `Đặt lịch thành công. Mã tra cứu: ${data.reference}. Thợ: ${data.stylistName}.`;
+            bookingResult.textContent = `Đặt lịch thành công. Mã tra cứu: ${data.reference}. Thợ: ${data.stylistName}.` + (data.noShowWarning ? ` Lưu ý: hồ sơ này từng có ${data.noShowCount} lần không đến.` : '');
         } catch (e) {
             bookingResult.textContent = e.message;
             placeBooking.disabled = false;

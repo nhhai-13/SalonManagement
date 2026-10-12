@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations;
 namespace SalonManagement.Services;
 
 public sealed record BookingRequest(DateTime Date, TimeSpan StartTime, IReadOnlyCollection<int> ServiceIds, string FullName, string Phone, string? Email = null, string? Notes = null);
-public sealed record BookingConfirmation(string Reference, string StylistName, IReadOnlyList<string> Services, DateTime Date, TimeSpan StartTime, TimeSpan EndTime);
+public sealed record BookingConfirmation(string Reference, string StylistName, IReadOnlyList<string> Services, DateTime Date, TimeSpan StartTime, TimeSpan EndTime, int NoShowCount);
 public sealed record BookingCreationResult(BookingConfirmation? Confirmation, string? ErrorCode, string? Message, IReadOnlyDictionary<string, string>? FieldErrors = null)
 {
     public static BookingCreationResult Rejected(string code, string message) => new(null, code, message);
@@ -58,14 +58,17 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
 
             var activeCount = await db.Appointments.Include(item => item.Customer).CountAsync(item => item.Customer.Phone == phone && item.Status != "Cancelled" && item.Status != "Completed" && item.Status != "NoShow" && item.Status != "Rejected");
             if (activeCount >= 3) return BookingCreationResult.Rejected("appointment_limit", "Bạn đã có 3 lịch hẹn chưa hoàn tất. Vui lòng huỷ bớt lịch cũ hoặc liên hệ tiệm.");
-            var customer = await db.Customers.FirstOrDefaultAsync(item => item.Phone == phone) ?? new Customer { FullName = name, Phone = phone!, Email = request.Email?.Trim() };
-            if (customer.CustomerId == 0) db.Customers.Add(customer); else { customer.FullName = name; customer.Email = string.IsNullOrWhiteSpace(request.Email) ? customer.Email : request.Email.Trim(); }
+            var profiles = new CustomerProfileService(db);
+            var existingCustomer = await profiles.FindByPhoneAsync(phone);
+            var noShowCount = existingCustomer is null ? 0 : await db.Appointments.CountAsync(item => item.CustomerId == existingCustomer.CustomerId && item.Status == "NoShow");
+            var hasNameConflict = existingCustomer is not null && !CustomerProfileService.NamesEquivalent(existingCustomer.FullName, name);
+            var customer = await profiles.FindOrCreateAsync(name, phone!, request.Email, updateExistingName: false, overwriteExistingEmail: false);
             var reference = await CreateReferenceAsync();
             // Bookings submitted from the public site must be reviewed by reception.
             // Staff-created appointments continue to use their existing workflow/statuses.
-            db.Appointments.Add(new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "PendingConfirmation", BookingReference = reference, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() });
+            db.Appointments.Add(new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "PendingConfirmation", BookingReference = reference, BookingSource = "Online", CustomerNameOverride = hasNameConflict ? name : null, NameConflictResolution = hasNameConflict ? "PendingReceptionReview" : null, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() });
             try { await db.SaveChangesAsync(); } catch (DbUpdateException) { return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác."); }
-            return new(new(reference, stylist.FullName, services.Select(item => item.ServiceName).ToList(), request.Date.Date, request.StartTime, endTime), null, null);
+            return new(new(reference, stylist.FullName, services.Select(item => item.ServiceName).ToList(), request.Date.Date, request.StartTime, endTime, noShowCount), null, null);
         }
         finally { ConfirmationLock.Release(); }
     }

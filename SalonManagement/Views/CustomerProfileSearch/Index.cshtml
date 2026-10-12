@@ -1,0 +1,10 @@
+@model SalonManagement.Models.CustomerProfileSearchPageViewModel
+@{ ViewData["Title"] = "Tìm hồ sơ khách"; }
+<div class="container py-4" style="max-width:960px">
+    <a class="btn btn-outline-secondary btn-sm mb-3" href="/reception/portal">Quay lại Lễ tân</a>
+    <h1 class="h3">Tìm hồ sơ khách hàng</h1>
+    <p class="text-muted">Tìm theo tên (có hoặc không dấu) hoặc 4 số cuối điện thoại.</p>
+    <form class="row g-2 mb-4" method="get"><div class="col-sm-8"><label class="visually-hidden" for="customer-search-query">Từ khóa</label><input id="customer-search-query" name="q" class="form-control" value="@Model.Query" placeholder="Ví dụ: Minh hoặc 5678" autofocus /></div><div class="col-sm-4"><button class="btn btn-primary w-100">Tìm hồ sơ</button></div></form>
+    @if (Model.Message is not null) { <div class="alert @(Model.Results.Count == 0 ? "alert-info" : "alert-warning")">@Model.Message</div> }
+    @if (Model.Results.Count > 0) { <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Họ tên</th><th>Số điện thoại</th><th>Đã đến</th><th>Không đến</th><th></th></tr></thead><tbody>@foreach (var customer in Model.Results) { <tr><td>@customer.FullName</td><td>@customer.Phone</td><td>@customer.VisitCount</td><td>@customer.NoShowCount</td><td><a class="btn btn-outline-primary btn-sm" href="/reception/customers/@customer.CustomerId">Mở hồ sơ</a></td></tr> }</tbody></table></div> }
+</div>

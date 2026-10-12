@@ -11,7 +11,7 @@ namespace SalonManagement.Controllers.Reception;
 [Authorize(Roles = UserRoles.Receptionist)]
 [ApiController]
 [Route("api/reception/appointments")]
-public sealed class AppointmentReschedulingController(AppointmentReschedulingService service, ApplicationDbContext db) : ControllerBase
+public sealed class AppointmentReschedulingController(AppointmentReschedulingService service, BatchAppointmentReschedulingService batchService, ApplicationDbContext db) : ControllerBase
 {
     [HttpPut("{appointmentId:int}/reschedule")]
     public async Task<IActionResult> Reschedule(int appointmentId, [FromBody] RescheduleAppointmentRequest request)
@@ -30,6 +30,17 @@ public sealed class AppointmentReschedulingController(AppointmentReschedulingSer
         return Ok(new { appointment.AppointmentId, appointment.StylistId, appointment.StartTime, appointment.EndTime, appointment.UpdatedAt });
     }
 
+    [HttpPost("batch-reschedule")]
+    public async Task<ActionResult<BatchRescheduleResult>> BatchReschedule([FromBody] BatchRescheduleRequest request)
+    {
+        if (request.Items is null || request.Items.Count == 0)
+            return BadRequest(new { error = "Vui lòng chọn ít nhất một lịch hẹn để chuyển." });
+        var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(actorId)) return Unauthorized();
+        var actorName = User.FindFirst("email")?.Value ?? User.Identity?.Name ?? actorId;
+        return Ok(await batchService.RescheduleAsync(request.Items, new AppointmentChangeActor(actorId, actorName)));
+    }
+
     [HttpGet("{appointmentId:int}/change-history")]
     public async Task<IActionResult> ChangeHistory(int appointmentId)
     {
@@ -41,3 +52,5 @@ public sealed class AppointmentReschedulingController(AppointmentReschedulingSer
         return Ok(items);
     }
 }
+
+public sealed record BatchRescheduleRequest(IReadOnlyList<BatchRescheduleItem>? Items);

@@ -117,7 +117,7 @@ public class BookingController : Controller
         }
         var confirmation = result.Confirmation;
         _emailVerification?.Consume(input.Email);
-        return Ok(new { confirmation.Reference, confirmation.StylistName, confirmation.Services, date = confirmation.Date.ToString("dd/MM/yyyy"), startTime = confirmation.StartTime.ToString(@"hh\:mm"), endTime = confirmation.EndTime.ToString(@"hh\:mm") });
+        return Ok(new { confirmation.Reference, confirmation.StylistName, confirmation.Services, date = confirmation.Date.ToString("dd/MM/yyyy"), startTime = confirmation.StartTime.ToString(@"hh\:mm"), endTime = confirmation.EndTime.ToString(@"hh\:mm"), noShowWarning = confirmation.NoShowCount > 0, confirmation.NoShowCount });
     }
 
     [HttpPost("send-email-code")]

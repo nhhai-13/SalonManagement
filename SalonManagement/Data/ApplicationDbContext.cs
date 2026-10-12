@@ -51,6 +51,7 @@ public ApplicationDbContext(
         public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
 
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<StaffNotification> StaffNotifications => Set<StaffNotification>();
 public override int SaveChanges()
 {
     return SaveChangesAsync().GetAwaiter().GetResult();
@@ -125,6 +126,7 @@ private List<AuditEntry> CreateAuditEntries()
         if (entityType != nameof(ApplicationUser) &&
             entry.Entity is not Microsoft.AspNetCore.Identity.IdentityUserRole<string> &&
             entityType != nameof(Service) &&
+            entityType != nameof(Customer) &&
             entityType != nameof(WorkSchedule) &&
             entityType != nameof(Appointment) &&
             entityType != nameof(Invoice))
@@ -194,6 +196,7 @@ private static string? GetEntityId(object entity)
         ApplicationUser user => user.Id,
         Microsoft.AspNetCore.Identity.IdentityUserRole<string> role => role.UserId,
         Service service => service.ServiceId.ToString(),
+        Customer customer => customer.CustomerId.ToString(),
         WorkSchedule schedule => schedule.WorkScheduleId.ToString(),
         Appointment appointment => appointment.AppointmentId.ToString(),
         Invoice invoice => invoice.InvoiceId.ToString(),
@@ -260,10 +263,12 @@ private class AuditEntry
             {
                 entity.HasKey(customer => customer.CustomerId);
                 entity.Property(customer => customer.FullName).HasMaxLength(150);
+                entity.Property(customer => customer.NormalizedSearchName).HasMaxLength(150);
                 entity.Property(customer => customer.Phone).HasMaxLength(20);
                 entity.Property(customer => customer.Email).HasMaxLength(256);
                 entity.Property(customer => customer.Gender).HasMaxLength(20);
-                entity.HasIndex(customer => customer.Phone);
+                entity.HasIndex(customer => customer.Phone).IsUnique();
+                entity.HasIndex(customer => customer.NormalizedSearchName);
             });
 
             builder.Entity<Stylist>(entity =>
@@ -340,6 +345,8 @@ private class AuditEntry
             {
                 entity.HasKey(appointment => appointment.AppointmentId);
                 entity.Property(appointment => appointment.Status).HasMaxLength(30);
+                entity.Property(appointment => appointment.CustomerNameOverride).HasMaxLength(150);
+                entity.Property(appointment => appointment.NameConflictResolution).HasMaxLength(30);
 
                 entity.HasOne(appointment => appointment.Customer)
                     .WithMany(customer => customer.Appointments)
@@ -358,6 +365,15 @@ private class AuditEntry
                         appointment.AppointmentDate,
                         appointment.StartTime
                     });
+            });
+
+            builder.Entity<StaffNotification>(entity =>
+            {
+                entity.HasKey(notification => notification.StaffNotificationId);
+                entity.Property(notification => notification.RecipientEmail).HasMaxLength(256).IsRequired();
+                entity.Property(notification => notification.Type).HasMaxLength(50).IsRequired();
+                entity.Property(notification => notification.Message).HasMaxLength(500).IsRequired();
+                entity.HasIndex(notification => new { notification.RecipientEmail, notification.ReadAt, notification.CreatedAt });
             });
 
             builder.Entity<AppointmentChangeLog>(entity =>

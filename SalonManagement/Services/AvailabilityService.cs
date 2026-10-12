@@ -31,10 +31,19 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
         var closesAt = (hours?.ClosesAt ?? new TimeOnly(17, 0)).ToTimeSpan();
         var daysOff = await db.StylistDaysOff.AsNoTracking().Where(item => item.OffDate == date.Date).Select(item => item.StylistId).ToListAsync();
         var breaks = await db.StylistBreaks.AsNoTracking().Where(item => item.BreakDate == date.Date).ToListAsync();
-        var eligible = candidates.Where(s => !daysOff.Contains(s.StylistId) && requiredIds.All(id => s.Services.Any(skill => skill.ServiceId == id))).ToList();
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking()
+            .Where(item => item.OffDate == DateOnly.FromDateTime(date))
+            .ToListAsync();
+        var eligible = candidates.Where(s =>
+            !daysOff.Contains(s.StylistId)
+            && !timeOffs.Any(item => item.StylistId == s.StylistId && item.IsFullDay)
+            && requiredIds.All(id => s.Services.Any(skill => skill.ServiceId == id))).ToList();
         var appointments = await db.Appointments.AsNoTracking().Where(a => a.AppointmentDate == date.Date && a.Status != "Cancelled" && a.Status != "NoShow" && a.Status != "Rejected").ToListAsync();
         var slots = eligible.SelectMany(stylist => stylist.WorkSchedules.SelectMany(shift => SlotsForShift(shift, duration, opensAt, closesAt)
-                .Where(slot => !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime) && !breaks.Where(b => b.StylistId == stylist.StylistId).Any(b => b.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < b.EndTime))))
+                .Where(slot => !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime)
+                    && !breaks.Where(b => b.StylistId == stylist.StylistId).Any(b => b.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < b.EndTime)
+                    && !timeOffs.Where(item => item.StylistId == stylist.StylistId && !item.IsFullDay && item.StartTime.HasValue && item.EndTime.HasValue)
+                        .Any(item => item.StartTime!.Value.ToTimeSpan() < slot + TimeSpan.FromMinutes(duration) && slot < item.EndTime!.Value.ToTimeSpan()))))
             .Distinct().OrderBy(time => time).ToList();
 
         var now = SalonClock.GetLocalNow(timeProvider);

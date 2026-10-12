@@ -198,6 +198,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<StylistAvailabilityService>();
+builder.Services.AddScoped<AppointmentReplacementSuggestionService>();
 
 builder.Services.AddScoped<
     ITokenService,
@@ -217,7 +218,11 @@ builder.Services.AddSingleton<
 
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<AppointmentBookingService>();
+builder.Services.AddScoped<CustomerProfileService>();
+builder.Services.AddScoped<CustomerProfileSearchService>();
 builder.Services.AddScoped<AppointmentReschedulingService>();
+builder.Services.AddScoped<BatchAppointmentReschedulingService>();
+builder.Services.AddScoped<AppointmentLifecycleService>();
 builder.Services.AddScoped<AppointmentChangeEmailProcessor>();
 builder.Services.AddHostedService<AppointmentChangeEmailBackgroundService>();
 builder.Services.AddScoped<BookingEmailVerificationService>();
@@ -245,10 +250,42 @@ await using (var scope = app.Services.CreateAsyncScope())
     if (usesSqlite)
     {
         await dbContext.Database.EnsureCreatedAsync();
+        // EnsureCreated does not evolve an existing SQLite file. Keep local/demo
+        // data intact while adding columns introduced after the first launch.
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "ConfirmedByUserId", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "ConfirmedAt", "DATETIME");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "RejectionReason", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "RejectedByUserId", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "RejectedAt", "DATETIME");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "CancelledAt", "DATETIME");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "CancelledBy", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "ActualStartedAt", "DATETIME");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "ActualCompletedAt", "DATETIME");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "ArrivedAt", "DATETIME");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "IsLate", "INTEGER NOT NULL DEFAULT 0");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "LateMinutes", "INTEGER");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "NoShowAt", "DATETIME");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "NoShowByUserId", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "BookingSource", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "CustomerNameOverride", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "NameConflictResolution", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Customers", "NormalizedSearchName", "TEXT NOT NULL DEFAULT ''");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS StaffNotifications (StaffNotificationId INTEGER PRIMARY KEY AUTOINCREMENT, RecipientEmail TEXT NOT NULL, AppointmentId INTEGER NOT NULL, Type TEXT NOT NULL, Message TEXT NOT NULL, CreatedAt DATETIME NOT NULL, ReadAt DATETIME NULL)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_StaffNotifications_RecipientEmail_ReadAt_CreatedAt ON StaffNotifications (RecipientEmail, ReadAt, CreatedAt)");
     }
     else
     {
         await dbContext.Database.MigrateAsync();
+    }
+
+    var customerProfiles = scope.ServiceProvider.GetRequiredService<CustomerProfileService>();
+    await customerProfiles.ConsolidateLegacyProfilesAsync();
+    await customerProfiles.RebuildSearchNamesAsync();
+    if (usesSqlite)
+    {
+        await dbContext.Database.ExecuteSqlRawAsync("DROP INDEX IF EXISTS IX_Customers_Phone");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_Customers_Phone ON Customers (Phone)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_Customers_NormalizedSearchName ON Customers (NormalizedSearchName)");
     }
 }
 
@@ -369,4 +406,24 @@ using (var scope = app.Services.CreateScope())
 // =====================================
 
 app.Run();
+
+static async Task EnsureSqliteColumnAsync(ApplicationDbContext dbContext, string table, string column, string type)
+{
+    await dbContext.Database.OpenConnectionAsync();
+    try
+    {
+        await using var check = dbContext.Database.GetDbConnection().CreateCommand();
+        check.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
+        var exists = Convert.ToInt32(await check.ExecuteScalarAsync()) > 0;
+        if (!exists)
+        {
+            var addColumnSql = string.Concat("ALTER TABLE \"", table, "\" ADD COLUMN \"", column, "\" ", type, " NULL");
+            await dbContext.Database.ExecuteSqlRawAsync(addColumnSql);
+        }
+    }
+    finally
+    {
+        await dbContext.Database.CloseConnectionAsync();
+    }
+}
 

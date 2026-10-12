@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using SalonManagement.Controllers;
@@ -306,6 +307,28 @@ public sealed class WorkSchedulesControllerTests
         var result = await CreateController(db).Index(first.StylistId, new DateTime(2026, 10, 7));
         var model = Assert.IsType<ViewResult>(result).Model as WeeklyWorkScheduleViewModel;
         Assert.NotNull(model); Assert.Equal(new DateTime(2026, 10, 5), model.WeekStart); Assert.Single(model.Schedules); Assert.Equal(first.StylistId, model.Schedules[0].StylistId);
+    }
+
+    [Fact]
+    public async Task Index_UsesClientSideTimeSortingWithSqlite()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options, new HttpContextAccessor());
+        await db.Database.EnsureCreatedAsync();
+        var stylist = await AddStylistAsync(db, "SQLite");
+        var monday = new DateTime(2026, 10, 5);
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = monday, StartTime = TimeSpan.FromHours(13), EndTime = TimeSpan.FromHours(17) },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = monday, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) });
+        await db.SaveChangesAsync();
+
+        var result = await CreateController(db).Index(stylist.StylistId, monday);
+        var model = Assert.IsType<ViewResult>(result).Model as WeeklyWorkScheduleViewModel;
+
+        Assert.NotNull(model);
+        Assert.Equal([TimeSpan.FromHours(8), TimeSpan.FromHours(13)], model.Schedules.Select(schedule => schedule.StartTime));
     }
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());

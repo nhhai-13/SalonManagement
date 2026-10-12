@@ -18,11 +18,29 @@
 
         public string BookingReference { get; set; } = string.Empty;
 
+        public string? BookingSource { get; set; }
+
+        public string? CustomerNameOverride { get; set; }
+
+        public string? NameConflictResolution { get; set; }
+
         public string? Notes { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         public DateTime? UpdatedAt { get; set; }
+        public DateTime? ActualStartedAt { get; set; }
+        public DateTime? ActualCompletedAt { get; set; }
+
+        public DateTime? ArrivedAt { get; set; }
+
+        public bool IsLate { get; set; }
+
+        public int? LateMinutes { get; set; }
+
+        public DateTime? NoShowAt { get; set; }
+
+        public string? NoShowByUserId { get; set; }
 
         public string? ConfirmedByUserId { get; set; }
 

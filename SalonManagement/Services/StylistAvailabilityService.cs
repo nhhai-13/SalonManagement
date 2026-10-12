@@ -65,13 +65,17 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     }
 
     // Read-only assignment decision. The eventual appointment writer must revalidate under its transaction.
-    public async Task<StylistAssignment?> AssignAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date, TimeOnly start)
+    public async Task<StylistAssignment?> AssignAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date, TimeOnly start, int? excludedStylistId = null)
     {
         var startText = start.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerMinute != 0) return null;
         var candidates = (await GetStylistSlotsAsync(serviceIds, stylistId, date)).Where(s => s.Start == startText).ToList();
         if (candidates.Count == 0) return null;
-        var candidateIds = candidates.Select(s => s.StylistId).Distinct().ToArray();
+        var candidateIds = candidates.Select(s => s.StylistId)
+            .Where(id => id != excludedStylistId)
+            .Distinct()
+            .ToArray();
+        if (candidateIds.Length == 0) return null;
         var day = date.ToDateTime(TimeOnly.MinValue);
         var nextDay = day.AddDays(1);
         // Proposed PO policy: appointment count, Pending + Confirmed, stable ID tie-break.

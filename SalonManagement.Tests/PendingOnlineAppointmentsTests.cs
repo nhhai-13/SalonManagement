@@ -155,8 +155,9 @@ public sealed class PendingOnlineAppointmentsTests
         var action = await new PendingAppointmentsController(db, TimeProvider.System).Get();
         var response = action.Result as OkObjectResult;
         var items = response!.Value as List<PendingAppointmentResponse>;
+        Assert.IsNotNull(items);
 
-        Assert.IsTrue(items!.Single(item => item.Reference == "ONLINE06").IsOverdue);
+        Assert.IsTrue(items.Single(item => item.Reference == "ONLINE06").IsOverdue);
         Assert.IsFalse(items.Single(item => item.Reference == "ONLINE07").IsOverdue);
     }
 
