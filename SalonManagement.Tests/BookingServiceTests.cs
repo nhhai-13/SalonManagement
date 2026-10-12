@@ -34,6 +34,10 @@ public sealed class BookingServiceTests
         var bookings = CreateService(db);
 
         var first = await bookings.CreateAsync(Request("0901234567"), confirmedByReception: false);
+        var existingCustomer = await db.Customers.SingleAsync();
+        existingCustomer.Email = "saved@example.com";
+        existingCustomer.Notes = "Ghi chú được giữ lại";
+        await db.SaveChangesAsync();
         var second = await bookings.CreateAsync(Request("+84 901-234-567", new TimeOnly(11, 0)), confirmedByReception: true);
 
         Assert.True(second.IsReturningCustomer);
@@ -41,6 +45,8 @@ public sealed class BookingServiceTests
         Assert.Equal("Confirmed", second.Status);
         Assert.Equal(1, await db.Customers.CountAsync());
         Assert.Equal(2, await db.Appointments.CountAsync());
+        Assert.Equal("saved@example.com", existingCustomer.Email);
+        Assert.Equal("Ghi chú được giữ lại", existingCustomer.Notes);
     }
 
     [Fact]

@@ -113,6 +113,53 @@ public sealed class CustomerProfileManagementServiceTests
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task LookupByPhoneAsync_MatchesEquivalentPhoneAndIncludesProfileSummary()
+    {
+        await using var db = CreateDb();
+        db.Customers.Add(Customer());
+        db.Appointments.Add(Appointment(1, "Completed"));
+        await db.SaveChangesAsync();
+
+        var result = await new CustomerProfileManagementService(db).LookupByPhoneAsync("+84 (901) 234-567");
+
+        Assert.True(result.IsReturningCustomer);
+        Assert.NotNull(result.Profile);
+        Assert.Equal(1, result.Profile.CustomerId);
+        Assert.Equal(1, result.Profile.VisitCount);
+    }
+
+    [Fact]
+    public async Task LookupByPhoneAsync_ReturnsNewCustomerWhenNoProfileExists()
+    {
+        await using var db = CreateDb();
+
+        var result = await new CustomerProfileManagementService(db).LookupByPhoneAsync("0901234567");
+
+        Assert.False(result.IsReturningCustomer);
+        Assert.Null(result.Profile);
+    }
+
+    [Fact]
+    public async Task LookupByPhoneAsync_RejectsInvalidOrDuplicatePhones()
+    {
+        await using var db = CreateDb();
+        db.Customers.AddRange(
+            Customer(),
+            new Customer
+            {
+                CustomerId = 2,
+                FullName = "Hồ sơ trùng",
+                Phone = "+84 901 234 567",
+                NormalizedPhone = "0901234567"
+            });
+        await db.SaveChangesAsync();
+        var service = new CustomerProfileManagementService(db);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.LookupByPhoneAsync("0901234567abc"));
+        await Assert.ThrowsAsync<DuplicateCustomerPhoneException>(() => service.LookupByPhoneAsync("0901234567"));
+    }
+
     private static Customer Customer() => new()
     {
         CustomerId = 1,

@@ -17,3 +17,7 @@ public sealed record CustomerProfileResponse(
     string? Notes,
     DateTime CreatedAt,
     DateTime? UpdatedAt);
+
+public sealed record CustomerPhoneLookupResponse(
+    bool IsReturningCustomer,
+    CustomerProfileResponse? Profile);

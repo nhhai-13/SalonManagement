@@ -10,6 +10,25 @@ namespace SalonManagement.Controllers;
 [Authorize(Roles = RoleGroups.FrontDesk)]
 public sealed class ReceptionCustomersController(CustomerProfileManagementService customers) : ControllerBase
 {
+    [HttpGet("lookup")]
+    public async Task<ActionResult<CustomerPhoneLookupResponse>> LookupByPhone(
+        [FromQuery] string phone,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await customers.LookupByPhoneAsync(phone, cancellationToken));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (DuplicateCustomerPhoneException exception)
+        {
+            return Conflict(new { message = exception.Message, code = "duplicate_customer_phone" });
+        }
+    }
+
     [HttpGet("{customerId:int}")]
     public async Task<ActionResult<CustomerProfileResponse>> Get(
         int customerId,

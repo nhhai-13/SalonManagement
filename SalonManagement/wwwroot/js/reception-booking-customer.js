@@ -11,6 +11,7 @@ window.ReceptionBookingCustomerPage = (() => {
             SalonAuth.redirectToLogin();
         });
         byId("reception-booking-customer-form").addEventListener("submit", resolveCustomer);
+        byId("reception-customer-phone").addEventListener("blur", lookupCustomer);
         const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
         byId("reception-booking-date").min = today;
         byId("reception-booking-date").value = new Date(Date.now() + 24 * 60 * 60 * 1000)
@@ -36,6 +37,39 @@ window.ReceptionBookingCustomerPage = (() => {
         const select = byId(id);
         select.replaceChildren(new Option(placeholder, ""));
         options.forEach(item => select.add(new Option(item.name, item.id)));
+    }
+
+    async function lookupCustomer() {
+        const phone = byId("reception-customer-phone").value.trim();
+        const result = byId("reception-customer-lookup");
+        result.replaceChildren();
+        if (!phone) return;
+
+        result.className = "mt-2 small text-muted";
+        result.textContent = "Đang kiểm tra hồ sơ theo số điện thoại...";
+        try {
+            const response = await SalonAuth.authenticatedFetch(`/api/reception/customers/lookup?phone=${encodeURIComponent(phone)}`);
+            if (response.status === 401) return SalonAuth.redirectToLogin("Vui lòng đăng nhập bằng tài khoản lễ tân.");
+            const lookup = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(lookup.message || "Không thể kiểm tra hồ sơ khách.");
+
+            result.replaceChildren();
+            if (!lookup.isReturningCustomer || !lookup.profile) {
+                result.textContent = "Chưa có hồ sơ cho số điện thoại này; hệ thống sẽ tạo hồ sơ khi lưu lịch.";
+                return;
+            }
+
+            result.className = "mt-2 small text-success";
+            result.append(`Đã nhận diện hồ sơ #${lookup.profile.customerId}: ${lookup.profile.fullName} `);
+            const link = document.createElement("a");
+            link.href = `/reception/customers/${lookup.profile.customerId}`;
+            link.className = "alert-link";
+            link.textContent = "Xem và cập nhật hồ sơ";
+            result.append(link);
+        } catch (error) {
+            result.className = "mt-2 small text-danger";
+            result.textContent = error.message || "Không thể kiểm tra hồ sơ khách.";
+        }
     }
 
     async function resolveCustomer(event) {

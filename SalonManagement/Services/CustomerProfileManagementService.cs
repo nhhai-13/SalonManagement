@@ -23,24 +23,25 @@ public sealed class CustomerProfileManagementService(ApplicationDbContext dbCont
         if (customer is null)
             return null;
 
-        var appointmentStatuses = await dbContext.Appointments.AsNoTracking()
-            .Where(appointment => appointment.CustomerId == customerId)
-            .Select(appointment => new { appointment.AppointmentId, appointment.Status })
-            .ToListAsync(cancellationToken);
-        var uniqueAppointments = appointmentStatuses
-            .GroupBy(appointment => appointment.AppointmentId)
-            .Select(group => group.First());
+        return await BuildResponseAsync(customer, cancellationToken);
+    }
 
-        return new CustomerProfileResponse(
-            customer.CustomerId,
-            customer.FullName,
-            customer.Phone,
-            customer.Email,
-            uniqueAppointments.Count(appointment => VisitedStatuses.Contains(appointment.Status)),
-            uniqueAppointments.Count(appointment => NoShowStatuses.Contains(appointment.Status)),
-            customer.Notes,
-            customer.CreatedAt,
-            customer.UpdatedAt);
+    public async Task<CustomerPhoneLookupResponse> LookupByPhoneAsync(
+        string phone,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedPhone = CustomerProfileService.NormalizeAndValidatePhone(phone);
+        var matches = await dbContext.Customers.AsNoTracking()
+            .Where(customer => customer.NormalizedPhone == normalizedPhone)
+            .OrderBy(customer => customer.CustomerId)
+            .Take(2)
+            .ToListAsync(cancellationToken);
+        if (matches.Count > 1)
+            throw new DuplicateCustomerPhoneException(phone);
+        if (matches.Count == 0)
+            return new CustomerPhoneLookupResponse(false, null);
+
+        return new CustomerPhoneLookupResponse(true, await BuildResponseAsync(matches[0], cancellationToken));
     }
 
     public async Task<CustomerProfileResponse?> UpdateAsync(
@@ -89,5 +90,27 @@ public sealed class CustomerProfileManagementService(ApplicationDbContext dbCont
         }
 
         return await GetByIdAsync(customerId, cancellationToken);
+    }
+
+    private async Task<CustomerProfileResponse> BuildResponseAsync(Customer customer, CancellationToken cancellationToken)
+    {
+        var appointmentStatuses = await dbContext.Appointments.AsNoTracking()
+            .Where(appointment => appointment.CustomerId == customer.CustomerId)
+            .Select(appointment => new { appointment.AppointmentId, appointment.Status })
+            .ToListAsync(cancellationToken);
+        var uniqueAppointments = appointmentStatuses
+            .GroupBy(appointment => appointment.AppointmentId)
+            .Select(group => group.First());
+
+        return new CustomerProfileResponse(
+            customer.CustomerId,
+            customer.FullName,
+            customer.Phone,
+            customer.Email,
+            uniqueAppointments.Count(appointment => VisitedStatuses.Contains(appointment.Status)),
+            uniqueAppointments.Count(appointment => NoShowStatuses.Contains(appointment.Status)),
+            customer.Notes,
+            customer.CreatedAt,
+            customer.UpdatedAt);
     }
 }

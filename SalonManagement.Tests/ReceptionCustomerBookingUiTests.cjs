@@ -20,7 +20,10 @@ class FakeElement {
     addEventListener(name, handler) { this.listeners[name] = handler; }
     replaceChildren(...items) { this.options = [...items]; }
     add(item) { this.options.push(item); }
-    append(...items) { this.appended = [...(this.appended || []), ...items]; }
+    append(...items) {
+        this.appended = [...(this.appended || []), ...items];
+        this.textContent += items.filter(item => typeof item === "string").join("");
+    }
 }
 
 async function createPage(response) {
@@ -30,6 +33,7 @@ async function createPage(response) {
         "reception-booking-customer-page": new FakeElement(),
         "reception-customer-name": new FakeElement("Khách thử"),
         "reception-customer-phone": new FakeElement("+84 901-234-567"),
+        "reception-customer-lookup": new FakeElement(),
         "reception-booking-service": new FakeElement("4"),
         "reception-booking-stylist": new FakeElement("2"),
         "reception-booking-date": new FakeElement("2026-10-13"),
@@ -43,7 +47,17 @@ async function createPage(response) {
         window: {},
         document: { getElementById: id => elements[id], createElement: () => new FakeElement() },
         SalonAuth: {
-            authenticatedFetch: async (...args) => { calls.push(args); return response; },
+            authenticatedFetch: async (...args) => {
+                calls.push(args);
+                if (args[0].startsWith("/api/reception/customers/lookup")) {
+                    return {
+                        ok: true,
+                        status: 200,
+                        json: async () => ({ isReturningCustomer: true, profile: { customerId: 41, fullName: "Khách quen" } })
+                    };
+                }
+                return response;
+            },
             redirectToLogin() { throw new Error("unexpected redirect"); }
         },
         localStorage: { getItem: () => null },
@@ -74,6 +88,17 @@ test("reception booking links to the existing customer profile", async () => {
     assert.equal(JSON.parse(page.calls[0][1].body).stylistId, 2);
     assert.equal(JSON.parse(page.calls[0][1].body).startTime, "10:00:00");
     assert.equal(page.elements["reception-customer-result"].appended[1].href, "/reception/customers/8");
+});
+
+test("reception booking recognizes and links the customer profile before creating an appointment", async () => {
+    const page = await createPage({ ok: true, status: 200, json: async () => ({ isReturningCustomer: true, customerId: 41, appointmentId: 22 }) });
+    await page.elements["reception-customer-phone"].listeners.blur();
+
+    const lookup = page.calls.find(call => call[0].startsWith("/api/reception/customers/lookup"));
+    assert.ok(lookup);
+    assert.match(lookup[0], /phone=%2B84%20901-234-567/);
+    assert.match(page.elements["reception-customer-lookup"].textContent, /Khách quen/);
+    assert.equal(page.elements["reception-customer-lookup"].appended[1].href, "/reception/customers/41");
 });
 
 test("reception booking creates an appointment and new profile", async () => {

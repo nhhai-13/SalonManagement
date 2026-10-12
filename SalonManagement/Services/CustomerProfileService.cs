@@ -22,18 +22,25 @@ public sealed class CustomerProfileService(ApplicationDbContext dbContext)
             : digits;
     }
 
+    public static string NormalizeAndValidatePhone(string phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone) || !HasValidPhoneCharacters(phone))
+            throw new ArgumentException("Số điện thoại chỉ được chứa chữ số và dấu phân cách hợp lệ.", nameof(phone));
+
+        var normalizedPhone = NormalizePhone(phone);
+        if (normalizedPhone.Length != 10 || !normalizedPhone.StartsWith('0'))
+            throw new ArgumentException("Vui lòng nhập số điện thoại hợp lệ.", nameof(phone));
+
+        return normalizedPhone;
+    }
+
     public async Task<ResolveBookingCustomerResponse> ResolveForBookingAsync(
         ResolveBookingCustomerRequest request,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.FullName))
             throw new ArgumentException("Vui lòng nhập họ tên khách.", nameof(request));
-        if (!HasValidPhoneCharacters(request.Phone))
-            throw new ArgumentException("Số điện thoại chỉ được chứa chữ số và dấu phân cách hợp lệ.", nameof(request));
-
-        var normalizedPhone = NormalizePhone(request.Phone);
-        if (normalizedPhone.Length != 10 || !normalizedPhone.StartsWith('0'))
-            throw new ArgumentException("Vui lòng nhập số điện thoại hợp lệ.", nameof(request));
+        var normalizedPhone = NormalizeAndValidatePhone(request.Phone);
 
         var phoneLock = PhoneLocks.GetOrAdd(normalizedPhone, _ => new SemaphoreSlim(1, 1));
         await phoneLock.WaitAsync(cancellationToken);
