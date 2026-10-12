@@ -1,0 +1,176 @@
+@{
+    ViewData["Title"] = "Tạo lịch tại quầy";
+}
+
+<div class="container mt-4">
+    <h2>Tạo lịch hẹn tại quầy</h2>
+    <p class="text-muted">Nhập thông tin để tạo lịch cho khách hàng.</p>
+
+    <form id="bookingForm">
+        <div class="mb-3">
+            <label class="form-label">Tên khách hàng *</label>
+            <input type="text" id="customerName"
+                   class="form-control" required maxlength="150">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Số điện thoại *</label>
+            <input type="tel" id="phone"
+                   class="form-control"
+                   pattern="0[0-9]{9}" maxlength="10"
+                   title="Nhập số điện thoại gồm 10 chữ số, bắt đầu bằng 0"
+                   required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Dịch vụ *</label>
+            <select id="serviceId" class="form-select" required>
+                <option value="">-- Chọn dịch vụ --</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Thợ thực hiện *</label>
+            <select id="stylistId" class="form-select" required>
+                <option value="">-- Chọn thợ --</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Ngày đặt lịch *</label>
+            <input type="date" id="bookingDate"
+                   class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Giờ bắt đầu *</label>
+            <select id="startTime" class="form-select" required>
+                <option value="">-- Chọn giờ --</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            Tạo lịch hẹn
+        </button>
+    </form>
+
+    <div id="bookingMessage" class="mt-3" role="status"></div>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+    const form = document.getElementById("bookingForm");
+    const serviceSelect = document.getElementById("serviceId");
+    const stylistSelect = document.getElementById("stylistId");
+    const dateInput = document.getElementById("bookingDate");
+    const timeSelect = document.getElementById("startTime");
+    const message = document.getElementById("bookingMessage");
+
+    async function loadOptions(url, select, idField, nameField) {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error("Không tải được danh sách.");
+        }
+
+        const items = await response.json();
+
+        for (const item of items) {
+            const option = document.createElement("option");
+            option.value = item[idField];
+            option.textContent = item[nameField];
+            select.appendChild(option);
+        }
+    }
+
+    // Khung giờ tạm để kiểm tra giao diện.
+    function loadTimes() {
+        timeSelect.innerHTML =
+            '<option value="">-- Chọn giờ --</option>';
+
+        for (let hour = 8; hour < 20; hour++) {
+            for (const minute of [0, 30]) {
+                const time =
+                    String(hour).padStart(2, "0") + ":" +
+                    String(minute).padStart(2, "0");
+
+                const option = document.createElement("option");
+                option.value = time;
+                option.textContent = time;
+                timeSelect.appendChild(option);
+            }
+        }
+    }
+
+    try {
+        await Promise.all([
+            loadOptions(
+                "/api/reception/bookings/services",
+                serviceSelect,
+                "serviceId",
+                "serviceName"
+            ),
+            loadOptions(
+                "/api/reception/bookings/stylists",
+                stylistSelect,
+                "stylistId",
+                "fullName"
+            )
+        ]);
+
+        loadTimes();
+    } catch (error) {
+        message.textContent = error.message;
+        message.className = "mt-3 text-danger";
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const button = form.querySelector('button[type="submit"]');
+        button.disabled = true;
+        message.textContent = "";
+
+        const data = {
+            customerName: document.getElementById("customerName").value.trim(),
+            phone: document.getElementById("phone").value.trim(),
+            serviceId: Number(serviceSelect.value),
+            stylistId: Number(stylistSelect.value),
+            date: dateInput.value,
+            startTime: timeSelect.value + ":00"
+        };
+
+        try {
+            const response = await fetch("/api/reception/bookings", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message ||
+                    result.title ||
+                    "Không thể tạo lịch hẹn."
+                );
+            }
+
+            message.textContent =
+                "Tạo lịch thành công! Mã lịch: " +
+                result.appointmentId;
+
+            message.className = "mt-3 text-success";
+            form.reset();
+
+        } catch (error) {
+            message.textContent = error.message;
+            message.className = "mt-3 text-danger";
+        } finally {
+            button.disabled = false;
+        }
+    });
+});
+</script>
