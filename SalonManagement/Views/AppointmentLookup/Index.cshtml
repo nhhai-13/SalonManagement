@@ -2,86 +2,454 @@
     ViewData["Title"] = "Tra cứu lịch hẹn";
 }
 
-<div class="container py-4" style="max-width: 600px">
-    <h1 class="h3">Tra cứu lịch hẹn</h1>
-    <p class="text-muted">Nhập mã lịch hẹn 8 ký tự hoặc số điện thoại.</p>
+<div class="lookup-page">
+    <div class="container py-5" style="max-width: 800px">
 
-    <form id="lookup-form">
-        <div class="input-group">
-            <input id="lookup-query" class="form-control" required />
-            <button class="btn btn-primary" type="submit">Tra cứu</button>
+        <!-- HEADER -->
+        <div class="text-center mb-5">
+            <div class="lookup-icon-wrap mb-3">
+                <i class="bi bi-calendar2-check"></i>
+            </div>
+            <h1 class="lookup-title">Tra cứu lịch hẹn</h1>
+            <p class="lookup-subtitle">
+                Nhập <strong>mã lịch hẹn 8 ký tự</strong> hoặc <strong>số điện thoại</strong>
+                để xem thông tin và quản lý lịch hẹn của bạn.
+            </p>
         </div>
-    </form>
 
-    <div id="lookup-message" class="mt-3"></div>
-    <div id="lookup-list" class="mt-3"></div>
+        <!-- SEARCH CARD -->
+        <div class="card lookup-search-card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <form id="lookup-form" autocomplete="off">
+                    <label class="form-label fw-semibold mb-2">
+                        <i class="bi bi-search me-1"></i>Thông tin tra cứu
+                    </label>
+                    <div class="input-group input-group-lg">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="bi bi-key text-muted"></i>
+                        </span>
+                        <input id="lookup-query"
+                               class="form-control border-start-0 ps-0"
+                               placeholder="VD: ABCD2345 hoặc 0901234567"
+                               required
+                               autofocus />
+                        <button class="btn btn-lookup px-4" type="submit">
+                            <i class="bi bi-search me-1"></i>Tra cứu
+                        </button>
+                    </div>
+                    <div class="form-text mt-2">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Mã lịch hẹn được gửi trong email xác nhận khi bạn đặt lịch.
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MESSAGE -->
+        <div id="lookup-message"></div>
+
+        <!-- LOADING -->
+        <div id="lookup-loading" class="text-center py-4 d-none">
+            <div class="spinner-border text-secondary" role="status"></div>
+            <p class="text-muted mt-2">Đang tra cứu...</p>
+        </div>
+
+        <!-- RESULT LIST -->
+        <div id="lookup-list"></div>
+
+        <!-- HELP SECTION -->
+        <div id="lookup-help" class="lookup-help mt-5">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="help-card">
+                        <i class="bi bi-1-circle text-primary"></i>
+                        <h6>Tìm mã</h6>
+                        <p>Kiểm tra email xác nhận để lấy mã 8 ký tự.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="help-card">
+                        <i class="bi bi-2-circle text-primary"></i>
+                        <h6>Tra cứu</h6>
+                        <p>Nhập mã hoặc SĐT đã dùng khi đặt lịch.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="help-card">
+                        <i class="bi bi-3-circle text-primary"></i>
+                        <h6>Quản lý</h6>
+                        <p>Huỷ lịch nếu còn ≥ 120 phút trước giờ hẹn.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
 </div>
 
 @section Scripts {
     <script>
-        const form = document.getElementById('lookup-form');
-        const queryInput = document.getElementById('lookup-query');
-        const message = document.getElementById('lookup-message');
-        const list = document.getElementById('lookup-list');
+        (function () {
+            const form = document.getElementById('lookup-form');
+            const queryInput = document.getElementById('lookup-query');
+            const message = document.getElementById('lookup-message');
+            const list = document.getElementById('lookup-list');
+            const loading = document.getElementById('lookup-loading');
+            const help = document.getElementById('lookup-help');
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const url = `/appointments/lookup/search?query=${encodeURIComponent(queryInput.value)}`;
-            const res = await fetch(url);
-            const data = await res.json();
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
 
-            list.replaceChildren();
-            message.textContent = data.error || '';
-            message.className = data.error ? 'alert alert-info mt-3' : 'mt-3';
+                const query = queryInput.value.trim();
+                if (!query) {
+                    showMessage('Vui lòng nhập mã lịch hẹn hoặc số điện thoại.', 'warning');
+                    return;
+                }
 
-            if (data.error) return;
+                // Reset UI
+                message.innerHTML = '';
+                list.innerHTML = '';
+                loading.classList.remove('d-none');
+                help.classList.add('d-none');
 
-            const cards = data.appointments.map((a) => {
-                const item = document.createElement('article');
-                item.className = 'card mb-2';
+                try {
+                    const res = await fetch(`/appointments/lookup/search?query=${encodeURIComponent(query)}`);
+                    const data = await res.json();
 
-                const statusBadge = `<span class="badge text-bg-secondary float-end">${a.status}</span>`;
-                const services = (a.services || []).join(', ');
-                const canCancel = a.status === 'Đã xác nhận' || a.status === 'Chờ xác nhận';
+                    loading.classList.add('d-none');
 
-                item.innerHTML = `
-                    <div class="card-body">
-                        <strong>${a.reference}</strong>${statusBadge}
-                        <div class="mt-2">${services}</div>
-                        <div>Thợ: ${a.stylistName}</div>
-                        <div>${a.date} · ${a.startTime}–${a.endTime} · ${a.durationMinutes} phút</div>
-                        ${canCancel ? `<button class="btn btn-sm btn-danger mt-2 btn-cancel" data-ref="${a.reference}">Huỷ lịch</button>` : ''}
-                    </div>
-                `;
-                return item;
+                    if (data.error) {
+                        showMessage(data.error, 'info');
+                        showHelp();
+                        return;
+                    }
+
+                    if (!data.appointments || data.appointments.length === 0) {
+                        showMessage('Không tìm thấy lịch hẹn nào.', 'info');
+                        showHelp();
+                        return;
+                    }
+
+                    renderResults(data.appointments);
+                } catch (err) {
+                    loading.classList.add('d-none');
+                    showMessage('Có lỗi xảy ra khi tra cứu. Vui lòng thử lại.', 'danger');
+                }
             });
 
-            list.replaceChildren(...cards);
-
-            document.querySelectorAll('.btn-cancel').forEach((btn) => {
-                btn.addEventListener('click', () => cancelAppointment(btn.dataset.ref));
-            });
-        });
-
-        async function cancelAppointment(reference) {
-            const reason = prompt(`Nhập lý do huỷ lịch ${reference} (tuỳ chọn):`) ?? '';
-            if (!confirm(`Bạn chắc chắn muốn huỷ lịch hẹn ${reference}?`)) return;
-
-            const res = await fetch('/appointments/lookup/cancel', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reference, reason })
-            });
-            const data = await res.json();
-
-            if (!res.ok) {
-                alert(`Lỗi: ${data.error}`);
-                return;
+            function showMessage(text, type) {
+                const icons = { info: 'info-circle', warning: 'exclamation-triangle', danger: 'x-circle', success: 'check-circle' };
+                message.innerHTML = `
+                    <div class="alert alert-${type} d-flex align-items-start gap-2">
+                        <i class="bi bi-${icons[type] || 'info-circle'} fs-5"></i>
+                        <div>${escapeHtml(text)}</div>
+                    </div>`;
             }
 
-            alert('Đã huỷ lịch hẹn thành công.');
-            queryInput.value = reference;
-            form.dispatchEvent(new Event('submit'));
-        }
+            function showHelp() {
+                help.classList.remove('d-none');
+            }
+
+            function renderResults(appointments) {
+                const cards = appointments.map((a) => {
+                    const statusClass = getStatusClass(a.status);
+                    const canCancel = a.status === 'Đã xác nhận' || a.status === 'Chờ xác nhận';
+                    const services = (a.services || []).map(s => `<span class="service-tag">${escapeHtml(s)}</span>`).join('');
+
+                    return `
+                        <div class="card lookup-result-card shadow-sm border-0 mb-3">
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <div class="lookup-ref-label">Mã lịch hẹn</div>
+                                        <div class="lookup-ref">${escapeHtml(a.reference)}</div>
+                                    </div>
+                                    <span class="badge status-badge ${statusClass}">
+                                        ${escapeHtml(a.status)}
+                                    </span>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-sm-6">
+                                        <div class="info-row">
+                                            <i class="bi bi-calendar-event"></i>
+                                            <div>
+                                                <div class="info-label">Ngày hẹn</div>
+                                                <div class="info-value">${escapeHtml(a.date)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <div class="info-row">
+                                            <i class="bi bi-clock"></i>
+                                            <div>
+                                                <div class="info-label">Thời gian</div>
+                                                <div class="info-value">${escapeHtml(a.startTime)} – ${escapeHtml(a.endTime)} <span class="text-muted small">(${a.durationMinutes} phút)</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <div class="info-row">
+                                            <i class="bi bi-person-badge"></i>
+                                            <div>
+                                                <div class="info-label">Thợ phụ trách</div>
+                                                <div class="info-value">${escapeHtml(a.stylistName || 'Chưa phân công')}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <div class="info-row">
+                                            <i class="bi bi-scissors"></i>
+                                            <div>
+                                                <div class="info-label">Dịch vụ</div>
+                                                <div class="info-value">${services || '—'}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                ${canCancel ? `
+                                    <div class="text-end border-top pt-3">
+                                        <button class="btn btn-outline-danger btn-sm btn-cancel"
+                                                data-ref="${escapeHtml(a.reference)}">
+                                            <i class="bi bi-x-circle me-1"></i>Huỷ lịch hẹn
+                                        </button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>`;
+                }).join('');
+
+                list.innerHTML = cards;
+
+                document.querySelectorAll('.btn-cancel').forEach((btn) => {
+                    btn.addEventListener('click', () => cancelAppointment(btn.dataset.ref));
+                });
+            }
+
+            async function cancelAppointment(reference) {
+                const reason = prompt(`Lý do huỷ lịch ${reference} (tuỳ chọn):`) ?? '';
+                if (!confirm(`Bạn chắc chắn muốn huỷ lịch hẹn ${reference}?\n\nLịch đã huỷ không thể khôi phục.`)) return;
+
+                const res = await fetch('/appointments/lookup/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reference, reason })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showMessage(data.error || 'Không thể huỷ lịch.', 'danger');
+                    return;
+                }
+
+                showMessage('Đã huỷ lịch hẹn thành công.', 'success');
+                queryInput.value = reference;
+                form.dispatchEvent(new Event('submit'));
+            }
+
+            function getStatusClass(status) {
+                switch (status) {
+                    case 'Đã xác nhận': return 'status-confirmed';
+                    case 'Chờ xác nhận': return 'status-pending';
+                    case 'Đã huỷ': return 'status-cancelled';
+                    case 'Đã hoàn thành': return 'status-completed';
+                    case 'Không đến': return 'status-noshow';
+                    default: return 'status-default';
+                }
+            }
+
+            function escapeHtml(text) {
+                if (text === null || text === undefined) return '';
+                return String(text)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+        })();
     </script>
+
+    <style>
+        .lookup-page {
+            background: linear-gradient(180deg, #faf8f5 0%, #ffffff 40%);
+            min-height: calc(100vh - 80px);
+        }
+
+        .lookup-icon-wrap {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b6f47 0%, #a8895e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 32px;
+            box-shadow: 0 8px 20px rgba(139, 111, 71, 0.25);
+        }
+
+        .lookup-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c2418;
+            margin-bottom: 0.5rem;
+        }
+
+        .lookup-subtitle {
+            color: #6b6259;
+            font-size: 1rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .lookup-search-card {
+            border-radius: 16px;
+            background: #fff;
+        }
+
+        .btn-lookup {
+            background: #8b6f47;
+            color: #fff;
+            border: none;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+            .btn-lookup:hover {
+                background: #6d5638;
+                color: #fff;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(139, 111, 71, 0.3);
+            }
+
+        .lookup-result-card {
+            border-radius: 16px;
+            border-left: 4px solid #8b6f47 !important;
+            transition: all 0.2s;
+        }
+
+            .lookup-result-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+            }
+
+        .lookup-ref-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #999;
+            font-weight: 600;
+        }
+
+        .lookup-ref {
+            font-family: 'DM Sans', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2c2418;
+            letter-spacing: 2px;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .status-confirmed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-completed {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-noshow {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .status-default {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .info-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+            .info-row > i {
+                font-size: 1.25rem;
+                color: #8b6f47;
+                margin-top: 2px;
+            }
+
+        .info-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #999;
+            font-weight: 600;
+        }
+
+        .info-value {
+            color: #2c2418;
+            font-weight: 500;
+        }
+
+        .service-tag {
+            display: inline-block;
+            background: #f3ede4;
+            color: #6d5638;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            margin: 2px 2px 0 0;
+        }
+
+        .lookup-help .help-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            height: 100%;
+            border: 1px solid #f0ebe3;
+        }
+
+            .lookup-help .help-card i {
+                font-size: 2rem;
+                margin-bottom: 8px;
+                display: block;
+            }
+
+            .lookup-help .help-card h6 {
+                font-weight: 700;
+                color: #2c2418;
+                margin-bottom: 4px;
+            }
+
+            .lookup-help .help-card p {
+                color: #6b6259;
+                font-size: 0.875rem;
+                margin: 0;
+            }
+    </style>
 }
