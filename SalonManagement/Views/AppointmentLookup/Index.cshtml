@@ -1,3 +1,87 @@
-@{ ViewData["Title"] = "Tra cứu lịch hẹn"; }
-<div class="container py-4" style="max-width:600px"><h1 class="h3">Tra cứu lịch hẹn</h1><p class="text-muted">Nhập mã lịch hẹn 8 ký tự hoặc số điện thoại.</p><form id="lookup-form"><div class="input-group"><input id="lookup-query" class="form-control" required /><button class="btn btn-primary" type="submit">Tra cứu</button></div></form><div id="lookup-message" class="mt-3"></div><div id="lookup-list" class="mt-3"></div></div>
-@section Scripts { <script>const form=document.getElementById('lookup-form'),query=document.getElementById('lookup-query'),message=document.getElementById('lookup-message'),list=document.getElementById('lookup-list');form.addEventListener('submit',async e=>{e.preventDefault();const r=await fetch(`/appointments/lookup/search?query=${encodeURIComponent(query.value)}`),d=await r.json();list.replaceChildren();message.textContent=d.error||'';message.className=d.error?'alert alert-info mt-3':'mt-3';if(!d.error)list.replaceChildren(...d.appointments.map(a=>{const item=document.createElement('div');item.className='card mb-2';item.innerHTML=`<div class="card-body"><strong>${a.reference}</strong><br>${a.date} · ${a.startTime}</div>`;return item;}));});</script> }
+@{
+    ViewData["Title"] = "Tra cứu lịch hẹn";
+}
+
+<div class="container py-4" style="max-width: 600px">
+    <h1 class="h3">Tra cứu lịch hẹn</h1>
+    <p class="text-muted">Nhập mã lịch hẹn 8 ký tự hoặc số điện thoại.</p>
+
+    <form id="lookup-form">
+        <div class="input-group">
+            <input id="lookup-query" class="form-control" required />
+            <button class="btn btn-primary" type="submit">Tra cứu</button>
+        </div>
+    </form>
+
+    <div id="lookup-message" class="mt-3"></div>
+    <div id="lookup-list" class="mt-3"></div>
+</div>
+
+@section Scripts {
+    <script>
+        const form = document.getElementById('lookup-form');
+        const queryInput = document.getElementById('lookup-query');
+        const message = document.getElementById('lookup-message');
+        const list = document.getElementById('lookup-list');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = `/appointments/lookup/search?query=${encodeURIComponent(queryInput.value)}`;
+            const res = await fetch(url);
+            const data = await res.json();
+
+            list.replaceChildren();
+            message.textContent = data.error || '';
+            message.className = data.error ? 'alert alert-info mt-3' : 'mt-3';
+
+            if (data.error) return;
+
+            const cards = data.appointments.map((a) => {
+                const item = document.createElement('article');
+                item.className = 'card mb-2';
+
+                const statusBadge = `<span class="badge text-bg-secondary float-end">${a.status}</span>`;
+                const services = (a.services || []).join(', ');
+                const canCancel = a.status === 'Đã xác nhận' || a.status === 'Chờ xác nhận';
+
+                item.innerHTML = `
+                    <div class="card-body">
+                        <strong>${a.reference}</strong>${statusBadge}
+                        <div class="mt-2">${services}</div>
+                        <div>Thợ: ${a.stylistName}</div>
+                        <div>${a.date} · ${a.startTime}–${a.endTime} · ${a.durationMinutes} phút</div>
+                        ${canCancel ? `<button class="btn btn-sm btn-danger mt-2 btn-cancel" data-ref="${a.reference}">Huỷ lịch</button>` : ''}
+                    </div>
+                `;
+                return item;
+            });
+
+            list.replaceChildren(...cards);
+
+            document.querySelectorAll('.btn-cancel').forEach((btn) => {
+                btn.addEventListener('click', () => cancelAppointment(btn.dataset.ref));
+            });
+        });
+
+        async function cancelAppointment(reference) {
+            const reason = prompt(`Nhập lý do huỷ lịch ${reference} (tuỳ chọn):`) ?? '';
+            if (!confirm(`Bạn chắc chắn muốn huỷ lịch hẹn ${reference}?`)) return;
+
+            const res = await fetch('/appointments/lookup/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reference, reason })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(`Lỗi: ${data.error}`);
+                return;
+            }
+
+            alert('Đã huỷ lịch hẹn thành công.');
+            queryInput.value = reference;
+            form.dispatchEvent(new Event('submit'));
+        }
+    </script>
+}
