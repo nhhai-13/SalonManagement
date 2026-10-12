@@ -308,7 +308,7 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
                     AppointmentId = appointment.AppointmentId,
                     Version = previousVersion + 1,
                     RecipientEmail = appointment.Customer.Email.Trim(),
-                    CustomerName = appointment.Customer.FullName,
+                    CustomerName = appointment.CustomerName ?? appointment.Customer.FullName,
                     ServiceNames = serviceNames.Length <= 1000 ? serviceNames : serviceNames[..1000],
                     AppointmentDate = appointment.AppointmentDate,
                     OldStylistName = appointment.Stylist.FullName,

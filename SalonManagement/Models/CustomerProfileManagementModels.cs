@@ -21,3 +21,15 @@ public sealed record CustomerProfileResponse(
 public sealed record CustomerPhoneLookupResponse(
     bool IsReturningCustomer,
     CustomerProfileResponse? Profile);
+
+public sealed record CustomerSearchResult(
+    int CustomerId,
+    string FullName,
+    string Phone,
+    string? Email,
+    int VisitCount);
+
+public sealed record CustomerSearchResponse(
+    IReadOnlyList<CustomerSearchResult> Results,
+    int TotalCount,
+    bool HasMore);

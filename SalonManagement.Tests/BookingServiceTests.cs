@@ -47,6 +47,100 @@ public sealed class BookingServiceTests
         Assert.Equal(2, await db.Appointments.CountAsync());
         Assert.Equal("saved@example.com", existingCustomer.Email);
         Assert.Equal("Ghi chú được giữ lại", existingCustomer.Notes);
+        Assert.Equal("Khách thử", existingCustomer.FullName);
+        Assert.All(await db.Appointments.ToListAsync(), appointment => Assert.Equal("Khách thử", appointment.CustomerName));
+    }
+
+    [Fact]
+    public async Task CreateAsync_KeepingProfileNameStoresDifferentNameOnlyOnNewAppointment()
+    {
+        await using var db = CreateDb(Guid.NewGuid().ToString());
+        SeedOptions(db);
+        var service = CreateService(db);
+        var first = await service.CreateAsync(Request("0901234567"), confirmedByReception: false);
+        var customer = await db.Customers.SingleAsync(item => item.CustomerId == first.CustomerId);
+        customer.FullName = "Tên hồ sơ cũ";
+        await db.SaveChangesAsync();
+
+        var result = await service.CreateAsync(
+            Request("0901234567", new TimeOnly(11, 0), "Tên trên lịch mới"),
+            confirmedByReception: true);
+
+        Assert.Equal("Tên hồ sơ cũ", customer.FullName);
+        Assert.Equal("Tên hồ sơ cũ", (await db.Customers.SingleAsync()).FullName);
+        Assert.Equal("Khách thử", (await db.Appointments.SingleAsync(item => item.AppointmentId == first.AppointmentId)).CustomerName);
+        Assert.Equal("Tên trên lịch mới", (await db.Appointments.SingleAsync(item => item.AppointmentId == result.AppointmentId)).CustomerName);
+        Assert.Empty(await db.CustomerProfileChangeLogs.ToListAsync());
+    }
+
+    [Fact]
+    public async Task CreateAsync_UpdatesProfileNameOnlyAfterExplicitReceptionConfirmationAndAuditsChange()
+    {
+        await using var db = CreateDb(Guid.NewGuid().ToString());
+        SeedOptions(db);
+        var service = CreateService(db);
+        var first = await service.CreateAsync(Request("0901234567"), confirmedByReception: false);
+        var customer = await db.Customers.SingleAsync(item => item.CustomerId == first.CustomerId);
+        customer.FullName = "Tên hồ sơ cũ";
+        await db.SaveChangesAsync();
+
+        var result = await service.CreateAsync(
+            Request("0901234567", new TimeOnly(11, 0), "Tên mới đã xác nhận", updateCustomerProfileName: true),
+            confirmedByReception: true,
+            changedByUserId: "staff-7",
+            changedByEmail: "reception@example.test");
+
+        Assert.Equal("Tên mới đã xác nhận", (await db.Customers.SingleAsync()).FullName);
+        Assert.Equal("Khách thử", (await db.Appointments.SingleAsync(item => item.AppointmentId == first.AppointmentId)).CustomerName);
+        Assert.Equal("Tên mới đã xác nhận", (await db.Appointments.SingleAsync(item => item.AppointmentId == result.AppointmentId)).CustomerName);
+        var change = await db.CustomerProfileChangeLogs.SingleAsync();
+        Assert.Equal("Tên hồ sơ cũ", change.PreviousFullName);
+        Assert.Equal("Tên mới đã xác nhận", change.UpdatedFullName);
+        Assert.Equal("staff-7", change.ChangedByUserId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DoesNotChangeProfileWhenAppointmentSaveFails()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options);
+        await db.Database.EnsureCreatedAsync();
+        SeedOptions(db);
+        db.Customers.Add(new Customer
+        {
+            FullName = "Tên hồ sơ cũ",
+            Phone = "0901234567",
+            NormalizedPhone = "0901234567"
+        });
+        await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER RejectAppointment BEFORE INSERT ON Appointments BEGIN SELECT RAISE(ABORT, 'appointment rejected'); END;");
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => CreateService(db).CreateAsync(
+            Request("0901234567", fullName: "Tên mới", updateCustomerProfileName: true),
+            confirmedByReception: true,
+            changedByUserId: "staff-7",
+            changedByEmail: "reception@example.test"));
+
+        db.ChangeTracker.Clear();
+        Assert.Equal("Tên hồ sơ cũ", (await db.Customers.AsNoTracking().SingleAsync()).FullName);
+        Assert.Empty(await db.Appointments.AsNoTracking().ToListAsync());
+        Assert.Empty(await db.CustomerProfileChangeLogs.AsNoTracking().ToListAsync());
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsProfileNameUpdateOutsideReceptionFlow()
+    {
+        await using var db = CreateDb(Guid.NewGuid().ToString());
+        SeedOptions(db);
+        var request = Request("0901234567", updateCustomerProfileName: true);
+
+        await Assert.ThrowsAsync<BookingValidationException>(() => CreateService(db)
+            .CreateAsync(request, confirmedByReception: false));
+
+        Assert.Empty(await db.Customers.ToListAsync());
+        Assert.Empty(await db.Appointments.ToListAsync());
     }
 
     [Fact]
@@ -134,8 +228,12 @@ public sealed class BookingServiceTests
     private static BookingService CreateService(ApplicationDbContext db) =>
         new(db, new CustomerProfileService(db));
 
-    private static CreateBookingRequest Request(string phone, TimeOnly? start = null) =>
-        new("Khách thử", phone, 1, 1, DateOnly.FromDateTime(DateTime.Now).AddDays(1), start ?? new TimeOnly(10, 0));
+    private static CreateBookingRequest Request(
+        string phone,
+        TimeOnly? start = null,
+        string fullName = "Khách thử",
+        bool updateCustomerProfileName = false) =>
+        new(fullName, phone, 1, 1, DateOnly.FromDateTime(DateTime.Now).AddDays(1), start ?? new TimeOnly(10, 0), updateCustomerProfileName);
 
     private static void SeedOptions(ApplicationDbContext db)
     {

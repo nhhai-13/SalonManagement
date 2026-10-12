@@ -1,5 +1,10 @@
 window.ReceptionBookingCustomerPage = (() => {
     const byId = id => document.getElementById(id);
+    let recognizedProfile = null;
+    let lastLookedUpPhone = null;
+    let nameDecision = null;
+    let lookupSequence = 0;
+    let lookupTask = Promise.resolve(null);
 
     async function initialize() {
         byId("booking-customer-logout").addEventListener("click", async () => {
@@ -11,7 +16,13 @@ window.ReceptionBookingCustomerPage = (() => {
             SalonAuth.redirectToLogin();
         });
         byId("reception-booking-customer-form").addEventListener("submit", resolveCustomer);
-        byId("reception-customer-phone").addEventListener("blur", lookupCustomer);
+        byId("reception-customer-phone").addEventListener("blur", () => (lookupTask = lookupCustomer()));
+        byId("reception-customer-name").addEventListener("input", () => {
+            nameDecision = null;
+            updateNameWarning();
+        });
+        byId("reception-customer-keep-profile-name").addEventListener("click", () => selectNameDecision(false));
+        byId("reception-customer-update-profile-name").addEventListener("click", () => selectNameDecision(true));
         const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
         byId("reception-booking-date").min = today;
         byId("reception-booking-date").value = new Date(Date.now() + 24 * 60 * 60 * 1000)
@@ -42,13 +53,19 @@ window.ReceptionBookingCustomerPage = (() => {
     async function lookupCustomer() {
         const phone = byId("reception-customer-phone").value.trim();
         const result = byId("reception-customer-lookup");
+        const sequence = ++lookupSequence;
         result.replaceChildren();
-        if (!phone) return;
+        recognizedProfile = null;
+        lastLookedUpPhone = phone;
+        nameDecision = null;
+        updateNameWarning();
+        if (!phone) return null;
 
         result.className = "mt-2 small text-muted";
         result.textContent = "Đang kiểm tra hồ sơ theo số điện thoại...";
         try {
             const response = await SalonAuth.authenticatedFetch(`/api/reception/customers/lookup?phone=${encodeURIComponent(phone)}`);
+            if (sequence !== lookupSequence || phone !== byId("reception-customer-phone").value.trim()) return null;
             if (response.status === 401) return SalonAuth.redirectToLogin("Vui lòng đăng nhập bằng tài khoản lễ tân.");
             const lookup = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(lookup.message || "Không thể kiểm tra hồ sơ khách.");
@@ -56,9 +73,10 @@ window.ReceptionBookingCustomerPage = (() => {
             result.replaceChildren();
             if (!lookup.isReturningCustomer || !lookup.profile) {
                 result.textContent = "Chưa có hồ sơ cho số điện thoại này; hệ thống sẽ tạo hồ sơ khi lưu lịch.";
-                return;
+                return null;
             }
 
+            recognizedProfile = lookup.profile;
             result.className = "mt-2 small text-success";
             result.append(`Đã nhận diện hồ sơ #${lookup.profile.customerId}: ${lookup.profile.fullName} `);
             const link = document.createElement("a");
@@ -66,15 +84,46 @@ window.ReceptionBookingCustomerPage = (() => {
             link.className = "alert-link";
             link.textContent = "Xem và cập nhật hồ sơ";
             result.append(link);
+            updateNameWarning();
+            return recognizedProfile;
         } catch (error) {
+            if (sequence !== lookupSequence || phone !== byId("reception-customer-phone").value.trim()) return null;
             result.className = "mt-2 small text-danger";
             result.textContent = error.message || "Không thể kiểm tra hồ sơ khách.";
+            return null;
         }
+    }
+
+    function namesMatch(first, second) {
+        const normalize = value => (value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("vi-VN");
+        return normalize(first) === normalize(second);
+    }
+
+    function updateNameWarning() {
+        const warning = byId("reception-customer-name-warning");
+        const shouldWarn = recognizedProfile && !namesMatch(
+            byId("reception-customer-name").value,
+            recognizedProfile.fullName);
+        warning.classList.toggle("d-none", !shouldWarn);
+        if (!shouldWarn) {
+            byId("reception-customer-name-choice").textContent = "";
+            return false;
+        }
+        byId("reception-customer-profile-name").textContent = recognizedProfile.fullName;
+        byId("reception-customer-appointment-name").textContent = byId("reception-customer-name").value.trim();
+        return true;
+    }
+
+    function selectNameDecision(updateProfile) {
+        nameDecision = updateProfile;
+        byId("reception-customer-name-choice").textContent = updateProfile
+            ? "Bạn đã chọn cập nhật tên hồ sơ sau khi lịch được lưu thành công."
+            : "Tên hồ sơ sẽ được giữ nguyên; tên bạn nhập chỉ lưu trên lịch mới.";
     }
 
     async function resolveCustomer(event) {
         event.preventDefault();
-        const name = byId("reception-customer-name").value.trim();
+        let name = byId("reception-customer-name").value.trim();
         const phone = byId("reception-customer-phone").value.trim();
         const serviceId = byId("reception-booking-service").value;
         const stylistId = byId("reception-booking-stylist").value;
@@ -83,6 +132,20 @@ window.ReceptionBookingCustomerPage = (() => {
         const button = byId("reception-customer-submit");
         if (!name || !phone || !serviceId || !stylistId || !appointmentDate || !startTime) {
             showResult("Vui lòng nhập đủ thông tin khách, dịch vụ, chuyên viên và thời gian hẹn.", "danger");
+            return;
+        }
+
+        if (lastLookedUpPhone !== phone) lookupTask = lookupCustomer();
+        await lookupTask;
+        name = byId("reception-customer-name").value.trim();
+        if (!name) {
+            showResult("Vui lòng nhập họ tên khách.", "danger");
+            byId("reception-customer-name").focus();
+            return;
+        }
+        if (updateNameWarning() && nameDecision === null) {
+            showResult("Vui lòng chọn giữ nguyên tên hồ sơ hoặc xác nhận cập nhật tên trước khi tạo lịch.", "warning");
+            byId("reception-customer-name-warning").scrollIntoView?.({ behavior: "smooth", block: "center" });
             return;
         }
 
@@ -98,7 +161,8 @@ window.ReceptionBookingCustomerPage = (() => {
                     serviceId: Number(serviceId),
                     stylistId: Number(stylistId),
                     appointmentDate,
-                    startTime: startTime.length === 5 ? `${startTime}:00` : startTime
+                    startTime: startTime.length === 5 ? `${startTime}:00` : startTime,
+                    updateCustomerProfileName: nameDecision === true
                 })
             });
             if (response.status === 401) return SalonAuth.redirectToLogin("Vui lòng đăng nhập bằng tài khoản lễ tân.");

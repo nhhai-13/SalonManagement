@@ -244,6 +244,10 @@ namespace SalonManagement.Data.Migrations
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
 
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<TimeSpan>("EndTime")
                         .HasColumnType("time");
 

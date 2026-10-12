@@ -787,6 +787,26 @@ BEGIN
 END;
 GO
 
+IF COL_LENGTH(N'Appointments', N'CustomerName') IS NULL
+    ALTER TABLE [Appointments] ADD [CustomerName] nvarchar(150) NULL;
+GO
+
+UPDATE Appointments
+SET CustomerName = Customers.FullName
+FROM Customers
+WHERE Customers.CustomerId = Appointments.CustomerId AND Appointments.CustomerName IS NULL;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261012020000_AddAppointmentCustomerName'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261012020000_AddAppointmentCustomerName', N'8.0.30');
+END;
+GO
+
 COMMIT;
 GO
 

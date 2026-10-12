@@ -137,6 +137,7 @@ namespace SalonManagement.Data
             {
                 entity.HasKey(appointment => appointment.AppointmentId);
                 entity.Property(appointment => appointment.Status).HasMaxLength(30);
+                entity.Property(appointment => appointment.CustomerName).HasMaxLength(150);
 
                 entity.HasOne(appointment => appointment.Customer)
                     .WithMany(customer => customer.Appointments)

@@ -85,7 +85,7 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
 
         var appointments = appointmentEntities.Select(appointment => new ScheduleCoordinationAppointment(
                 appointment.AppointmentId,
-                appointment.Customer.FullName,
+                appointment.CustomerName ?? appointment.Customer.FullName,
                 appointment.Customer.Phone,
                 appointment.Customer.Email,
                 appointment.AppointmentServices
@@ -257,7 +257,7 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
             item.Category == ScheduleContactCategories.NoAlternative
                 ? "Chưa tìm được phương án"
                 : "Chuyển lịch thất bại",
-            item.Appointment.Customer.FullName,
+            item.Appointment.CustomerName ?? item.Appointment.Customer.FullName,
             item.Appointment.Customer.Phone,
             item.Appointment.AppointmentServices
                 .OrderBy(service => service.AppointmentServiceId)

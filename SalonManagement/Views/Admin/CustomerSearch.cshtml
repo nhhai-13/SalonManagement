@@ -1,0 +1,42 @@
+@{
+    ViewData["Title"] = "Tìm hồ sơ khách";
+}
+
+<main id="customer-search-page" class="py-4 d-none" aria-labelledby="customer-search-title">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <span class="text-uppercase text-muted small fw-semibold">Lễ tân</span>
+            <h1 id="customer-search-title" class="h2 mb-1">Tìm hồ sơ khách</h1>
+            <p class="text-muted mb-0">Tìm theo tên hoặc số điện thoại, có thể nhập tên không dấu.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-primary" href="/reception/bookings/new">Đặt lịch tại quầy</a>
+            <button id="customer-search-logout" class="btn btn-outline-danger" type="button">Đăng xuất</button>
+        </div>
+    </div>
+
+    <section class="card shadow-sm">
+        <div class="card-body">
+            <form id="customer-search-form" class="row g-2" role="search">
+                <div class="col">
+                    <label class="visually-hidden" for="customer-search-query">Tên hoặc số điện thoại</label>
+                    <input id="customer-search-query" class="form-control" type="search" maxlength="100" autocomplete="off" placeholder="Tên hoặc số điện thoại" />
+                </div>
+                <div class="col-auto"><button class="btn btn-primary" type="submit">Tìm hồ sơ</button></div>
+            </form>
+            <div id="customer-search-status" class="mt-3 small text-muted" role="status" aria-live="polite">Nhập ít nhất 2 ký tự để tìm.</div>
+            <div class="table-responsive mt-3">
+                <table id="customer-search-table" class="table table-hover align-middle d-none">
+                    <thead><tr><th scope="col">Họ tên</th><th scope="col">Số điện thoại</th><th scope="col">Email</th><th scope="col">Số lần đến</th><th scope="col"><span class="visually-hidden">Hành động</span></th></tr></thead>
+                    <tbody id="customer-search-results"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</main>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script src="~/js/customer-search.js" asp-append-version="true"></script>
+    <script>ReceptionCustomerSearchPage.initialize();</script>
+}

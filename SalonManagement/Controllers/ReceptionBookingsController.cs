@@ -17,7 +17,12 @@ public sealed class ReceptionBookingsController(BookingService bookings) : Contr
     {
         try
         {
-            return Ok(await bookings.CreateAsync(request, confirmedByReception: true, cancellationToken));
+            return Ok(await bookings.CreateAsync(
+                request,
+                confirmedByReception: true,
+                cancellationToken: cancellationToken,
+                changedByUserId: User.FindFirst("sub")?.Value ?? string.Empty,
+                changedByEmail: User.FindFirst("email")?.Value ?? string.Empty));
         }
         catch (ArgumentException exception)
         {

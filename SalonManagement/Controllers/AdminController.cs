@@ -44,6 +44,9 @@ public class AdminController : Controller
     [HttpGet("reception/bookings/new")]
     public IActionResult ReceptionBookingCustomer() => View("BookingCustomer");
 
+    [HttpGet("reception/customers")]
+    public IActionResult ReceptionCustomerSearch() => View("CustomerSearch");
+
     [HttpGet("reception/customers/{customerId:int}")]
     public IActionResult ReceptionCustomerProfile(int customerId)
     {

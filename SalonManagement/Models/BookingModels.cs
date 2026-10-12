@@ -8,7 +8,8 @@ public sealed record CreateBookingRequest(
     [param: Range(1, int.MaxValue)] int ServiceId,
     [param: Range(1, int.MaxValue)] int StylistId,
     DateOnly AppointmentDate,
-    TimeOnly StartTime);
+    TimeOnly StartTime,
+    bool UpdateCustomerProfileName = false);
 
 public sealed record BookingOption(int Id, string Name);
 

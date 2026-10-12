@@ -6,6 +6,8 @@
 
         public int CustomerId { get; set; }
 
+        public string? CustomerName { get; set; }
+
         public int StylistId { get; set; }
 
         public DateTime AppointmentDate { get; set; }

@@ -10,6 +10,15 @@ namespace SalonManagement.Controllers;
 [Authorize(Roles = RoleGroups.FrontDesk)]
 public sealed class ReceptionCustomersController(CustomerProfileManagementService customers) : ControllerBase
 {
+    [HttpGet]
+    public async Task<ActionResult<CustomerSearchResponse>> Search(
+        [FromQuery] string query,
+        CancellationToken cancellationToken)
+    {
+        try { return Ok(await customers.SearchAsync(query, cancellationToken)); }
+        catch (ArgumentException exception) { return BadRequest(new { message = exception.Message }); }
+    }
+
     [HttpGet("lookup")]
     public async Task<ActionResult<CustomerPhoneLookupResponse>> LookupByPhone(
         [FromQuery] string phone,

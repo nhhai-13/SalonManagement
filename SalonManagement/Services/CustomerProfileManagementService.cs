@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Text;
 using SalonManagement.Data;
 using SalonManagement.Models;
 
@@ -6,6 +8,7 @@ namespace SalonManagement.Services;
 
 public sealed class CustomerProfileManagementService(ApplicationDbContext dbContext)
 {
+    private const int MaxSearchResults = 25;
     private static readonly HashSet<string> VisitedStatuses = new(StringComparer.OrdinalIgnoreCase)
     {
         "Completed"
@@ -15,6 +18,84 @@ public sealed class CustomerProfileManagementService(ApplicationDbContext dbCont
     {
         "NoShow", "No Show"
     };
+
+    public async Task<CustomerSearchResponse> SearchAsync(string query, CancellationToken cancellationToken = default)
+    {
+        var normalizedQuery = NormalizeName(query);
+        var phoneQuery = NormalizePhoneQuery(query);
+        if (normalizedQuery.Length < 2 && phoneQuery.Length < 2)
+            throw new ArgumentException("Vui lòng nhập ít nhất 2 ký tự để tìm hồ sơ khách.", nameof(query));
+        if (normalizedQuery.Length > 100)
+            throw new ArgumentException("Từ khóa tìm kiếm không được vượt quá 100 ký tự.", nameof(query));
+
+        var customers = await dbContext.Customers.AsNoTracking()
+            .Where(customer => customer.IsActive)
+            .Select(customer => new
+            {
+                customer.CustomerId,
+                customer.FullName,
+                customer.Phone,
+                customer.NormalizedPhone,
+                customer.Email
+            })
+            .ToListAsync(cancellationToken);
+
+        var matching = customers.Select(customer =>
+        {
+            var name = NormalizeName(customer.FullName);
+            var phone = NormalizePhoneQuery(string.IsNullOrWhiteSpace(customer.NormalizedPhone)
+                ? customer.Phone
+                : customer.NormalizedPhone);
+            var phoneMatches = phoneQuery.Length >= 2 && phone.Contains(phoneQuery, StringComparison.Ordinal);
+            var nameMatches = normalizedQuery.Length >= 2 && name.Contains(normalizedQuery, StringComparison.Ordinal);
+            var exact = name.Equals(normalizedQuery, StringComparison.Ordinal) ||
+                (phoneQuery.Length >= 2 && phone.Equals(phoneQuery, StringComparison.Ordinal));
+            var prefix = name.StartsWith(normalizedQuery, StringComparison.Ordinal) ||
+                (phoneQuery.Length >= 2 && phone.StartsWith(phoneQuery, StringComparison.Ordinal));
+            return new { Customer = customer, Name = name, Matches = nameMatches || phoneMatches, Rank = exact ? 0 : prefix ? 1 : 2 };
+        })
+        .Where(item => item.Matches)
+        .OrderBy(item => item.Rank)
+        .ThenBy(item => item.Name, StringComparer.Ordinal)
+        .ThenBy(item => item.Customer.CustomerId)
+        .ToList();
+
+        var page = matching.Take(MaxSearchResults).ToList();
+        var ids = page.Select(item => item.Customer.CustomerId).ToArray();
+        var completedAppointments = await dbContext.Appointments.AsNoTracking()
+            .Where(appointment => ids.Contains(appointment.CustomerId))
+            .Select(appointment => new { appointment.CustomerId, appointment.AppointmentId, appointment.Status })
+            .ToListAsync(cancellationToken);
+        var visitCounts = completedAppointments
+            .Where(appointment => VisitedStatuses.Contains(appointment.Status))
+            .GroupBy(appointment => appointment.CustomerId)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.AppointmentId).Distinct().Count());
+
+        var results = page.Select(item => new CustomerSearchResult(
+            item.Customer.CustomerId, item.Customer.FullName, item.Customer.Phone,
+            item.Customer.Email, visitCounts.GetValueOrDefault(item.Customer.CustomerId))).ToArray();
+        return new CustomerSearchResponse(results, matching.Count, matching.Count > MaxSearchResults);
+    }
+
+    private static string NormalizeName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var decomposed = value.Trim().Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(decomposed.Length);
+        foreach (var character in decomposed)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark) continue;
+            builder.Append(character == 'đ' ? 'd' : character == 'Đ' ? 'D' : character);
+        }
+        return string.Join(' ', builder.ToString().Normalize(NormalizationForm.FormC)
+            .ToLowerInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static string NormalizePhoneQuery(string? value)
+    {
+        var digits = new string((value ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+        return digits.StartsWith("84", StringComparison.Ordinal) ? "0" + digits[2..] : digits;
+    }
 
     public async Task<CustomerProfileResponse?> GetByIdAsync(int customerId, CancellationToken cancellationToken = default)
     {

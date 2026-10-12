@@ -14,6 +14,13 @@ public sealed class CustomerProfileService(ApplicationDbContext dbContext)
 {
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> PhoneLocks = new(StringComparer.Ordinal);
 
+    public static bool AreEquivalentNames(string? first, string? second)
+    {
+        static string Normalize(string? name) => string.Join(' ', (name ?? string.Empty)
+            .Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return string.Equals(Normalize(first), Normalize(second), StringComparison.OrdinalIgnoreCase);
+    }
+
     public static string NormalizePhone(string phone)
     {
         var digits = new string((phone ?? string.Empty).Where(character => character is >= '0' and <= '9').ToArray());

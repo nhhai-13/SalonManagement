@@ -29,8 +29,12 @@ public sealed class BookingService(ApplicationDbContext dbContext, CustomerProfi
     public async Task<CreateBookingResponse> CreateAsync(
         CreateBookingRequest request,
         bool confirmedByReception,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string changedByUserId = "",
+        string changedByEmail = "")
     {
+        if (request.UpdateCustomerProfileName && !confirmedByReception)
+            throw new BookingValidationException("Chỉ lễ tân mới có thể xác nhận cập nhật tên hồ sơ khách.");
         var service = await dbContext.Services.SingleOrDefaultAsync(
             item => item.ServiceId == request.ServiceId && item.IsActive, cancellationToken)
             ?? throw new BookingValidationException("Dịch vụ không tồn tại hoặc đã ngừng hoạt động.");
@@ -101,6 +105,7 @@ public sealed class BookingService(ApplicationDbContext dbContext, CustomerProfi
             var appointment = new Appointment
             {
                 CustomerId = await FindCustomerIdAsync(request.Phone, cancellationToken),
+                CustomerName = request.FullName.Trim(),
                 StylistId = stylist.StylistId,
                 AppointmentDate = appointmentDate,
                 StartTime = request.StartTime.ToTimeSpan(),
@@ -118,6 +123,35 @@ public sealed class BookingService(ApplicationDbContext dbContext, CustomerProfi
                 }
             };
             dbContext.Appointments.Add(appointment);
+
+            if (resolution.IsReturningCustomer && request.UpdateCustomerProfileName)
+            {
+                if (string.IsNullOrWhiteSpace(changedByUserId) || string.IsNullOrWhiteSpace(changedByEmail))
+                    throw new BookingValidationException("Không xác định được lễ tân xác nhận cập nhật tên hồ sơ.");
+
+                var customer = await dbContext.Customers.SingleAsync(
+                    item => item.CustomerId == appointment.CustomerId, cancellationToken);
+                var newName = request.FullName.Trim();
+                if (!CustomerProfileService.AreEquivalentNames(customer.FullName, newName))
+                {
+                    var changedAt = DateTime.UtcNow;
+                    dbContext.CustomerProfileChangeLogs.Add(new CustomerProfileChangeLog
+                    {
+                        CustomerId = customer.CustomerId,
+                        ChangedByUserId = changedByUserId,
+                        ChangedByEmail = changedByEmail.Trim(),
+                        PreviousFullName = customer.FullName,
+                        PreviousEmail = customer.Email,
+                        PreviousNotes = customer.Notes,
+                        UpdatedFullName = newName,
+                        UpdatedEmail = customer.Email,
+                        UpdatedNotes = customer.Notes,
+                        ChangedAtUtc = changedAt
+                    });
+                    customer.FullName = newName;
+                    customer.UpdatedAt = changedAt;
+                }
+            }
             await dbContext.SaveChangesAsync(cancellationToken);
             if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
