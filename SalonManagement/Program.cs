@@ -193,6 +193,7 @@ builder.Services.AddAuthentication()
 // =====================================
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<AppointmentAnalyticsService>();
 
 builder.Services.AddScoped<
     ITokenService,

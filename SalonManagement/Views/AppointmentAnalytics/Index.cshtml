@@ -1,0 +1,33 @@
+@model SalonManagement.Models.AppointmentAnalyticsRequest
+@{
+    ViewData["Title"] = "Phân tích lịch hẹn";
+}
+<h1>Phân tích lịch hẹn</h1>
+<p>Ngày hẹn hiện tại theo giờ Việt Nam (UTC+7). Mỗi lịch hẹn được đếm một lần, gồm mọi trạng thái.</p>
+<form id="analytics-form" action="/api/appointment-analytics" class="row g-3 mb-4" novalidate>
+    <div class="col-sm-4">
+        <label for="StartDate" class="form-label">Ngày bắt đầu</label>
+        <input id="StartDate" name="StartDate" type="date" class="form-control" value="@Model.StartDate?.ToString("yyyy-MM-dd")" required aria-describedby="start-error" />
+        <span id="start-error" class="text-danger" aria-live="polite"></span>
+    </div>
+    <div class="col-sm-4">
+        <label for="EndDate" class="form-label">Ngày kết thúc</label>
+        <input id="EndDate" name="EndDate" type="date" class="form-control" value="@Model.EndDate?.ToString("yyyy-MM-dd")" required aria-describedby="end-error" />
+        <span id="end-error" class="text-danger" aria-live="polite"></span>
+    </div>
+    <div class="col-sm-4 align-self-start pt-sm-4"><button class="btn btn-primary mt-sm-2" type="submit">Xem</button></div>
+</form>
+<p>Tối đa @SalonManagement.Models.AppointmentAnalyticsRequest.MaximumDays ngày.</p>
+<p id="request-error" class="text-danger" role="alert"></p>
+<section id="analytics-results" aria-live="polite" hidden>
+    <h2 id="viewing-range" class="h5"></h2>
+    <p id="empty-reason" hidden></p>
+    <p id="sample-warning" class="text-warning" hidden>Mẫu nhỏ: dưới 20 lịch hẹn.</p>
+    <div id="metric-cards"><div class="row g-3">
+        <div class="col-md-6"><div class="card p-3"><h3 class="h5">Tỉ lệ không đến</h3><strong id="no-show-rate" class="fs-2"></strong><small id="no-show-count" class="text-muted"></small></div></div>
+        <div class="col-md-6"><div class="card p-3"><h3 class="h5">Tỉ lệ huỷ</h3><strong id="cancellation-rate" class="fs-2"></strong><small id="cancellation-count" class="text-muted"></small></div></div>
+    </div></div>
+</section>
+@section Scripts {
+    <script src="~/js/appointment-analytics.js" asp-append-version="true"></script>
+}
