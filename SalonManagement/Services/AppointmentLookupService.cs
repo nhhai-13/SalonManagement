@@ -123,7 +123,9 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
 
     private static AppointmentLookupItem ToItem(Appointment appointment)
     {
-        var duration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
+        var serviceDuration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
+        var scheduledDuration = (appointment.EndTime - appointment.StartTime).TotalMinutes;
+        var duration = scheduledDuration > 0 ? (int)scheduledDuration : serviceDuration;
 
         return new(
             appointment.BookingReference,

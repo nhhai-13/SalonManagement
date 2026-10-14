@@ -211,6 +211,33 @@ public class AppointmentLookupServiceTests
         Assert.Equal("cancel", audit!.Action);
         Assert.Equal("Confirmed", audit.PreviousStatus);
         Assert.Equal("Cancelled", audit.NewStatus);
+
+        // After cancellation, the lookup card must keep the duration from the actual scheduled slot.
+        // The catalog snapshot is intentionally shorter to verify the appointment time is authoritative.
+        var service = new Service
+        {
+            ServiceId = 1,
+            ServiceName = "Cắt tóc nam",
+            DurationMinutes = 30,
+            Price = 100_000m
+        };
+        ctx.Services.Add(service);
+        ctx.AppointmentServices.Add(new AppointmentService
+        {
+            Appointment = updated,
+            Service = service,
+            ServiceId = service.ServiceId,
+            DurationMinutes = 30,
+            Price = service.Price
+        });
+        await ctx.SaveChangesAsync();
+
+        var lookupAfterCancellation = await svc.SearchAsync("TEST0001");
+        var cancelledItem = Assert.Single(lookupAfterCancellation.Items);
+        Assert.Equal("Đã huỷ", cancelledItem.Status);
+        Assert.Equal(TimeSpan.FromHours(10), cancelledItem.StartTime);
+        Assert.Equal(TimeSpan.FromHours(11), cancelledItem.EndTime);
+        Assert.Equal(60, cancelledItem.DurationMinutes);
     }
 
     // ============================================================
