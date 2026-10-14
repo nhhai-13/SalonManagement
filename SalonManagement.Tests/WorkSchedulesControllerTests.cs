@@ -14,6 +14,35 @@ namespace SalonManagement.Tests;
 public sealed class WorkSchedulesControllerTests
 {
     [Fact]
+    public async Task Sqlite_CanListCreateRejectOverlapsAndCopyWeek()
+    {
+        await using var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection).Options, new HttpContextAccessor());
+        await db.Database.EnsureCreatedAsync();
+        var stylist = await AddStylistAsync(db, "Trần Thu Hà");
+        var date = new DateTime(2026, 10, 15);
+        foreach (var start in new[] { 13, 8 })
+        {
+            var controller = CreateController(db);
+            await controller.Create(new CreateWorkScheduleViewModel { StylistId = stylist.StylistId,
+                WorkDate = date, StartTime = TimeSpan.FromHours(start), EndTime = TimeSpan.FromHours(start + 3) });
+            Assert.True(controller.ModelState.IsValid);
+        }
+        var result = Assert.IsType<ViewResult>(await CreateController(db).Index(stylist.StylistId, date));
+        var model = Assert.IsType<WeeklyWorkScheduleViewModel>(result.Model);
+        Assert.Equal(new[] { TimeSpan.FromHours(8), TimeSpan.FromHours(13) }, model.Schedules.Select(s => s.StartTime));
+        var conflict = CreateController(db);
+        await conflict.Create(new CreateWorkScheduleViewModel { StylistId = stylist.StylistId,
+            WorkDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(12) });
+        Assert.False(conflict.ModelState.IsValid);
+        Assert.Equal(2, await db.WorkSchedules.CountAsync());
+        await CreateController(db).CopyWeek(new CopyWorkWeekViewModel { StylistId = stylist.StylistId, SourceWeekStart = date });
+        Assert.Equal(2, await db.WorkSchedules.CountAsync(s => s.WorkDate == date.AddDays(7)));
+    }
+
+    [Fact]
     public void Controller_AllowsOnlyOwnerRole()
     {
         var authorize = Assert.Single(typeof(WorkSchedulesController).GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>());

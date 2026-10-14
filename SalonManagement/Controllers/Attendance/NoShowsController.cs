@@ -31,7 +31,9 @@ public class NoShowsController(ApplicationDbContext db, NoShowService operations
     public async Task<IActionResult> Create()
     {
         await BookingLists();
-        return View(new DeskBookingRequest { StartsAt = clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime.AddMinutes(15) });
+        var suggested = clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime.AddMinutes(15);
+        return View(new DeskBookingRequest { StartsAt = new DateTime(suggested.Year, suggested.Month,
+            suggested.Day, suggested.Hour, suggested.Minute, 0) });
     }
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(DeskBookingRequest request, [FromServices] DeskBookingService bookings)
