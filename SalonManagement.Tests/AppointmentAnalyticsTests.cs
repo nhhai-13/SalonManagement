@@ -18,6 +18,47 @@ namespace SalonManagement.Tests;
 public class AppointmentAnalyticsTests
 {
     [Theory]
+    [InlineData(1)]
+    [InlineData(365)]
+    public async Task HourlyBucketsCountStartTimeOnceWithAllStatusesAndEmptyHours(int days)
+    {
+        await using var db = CreateDb();
+        var day = new DateTime(2026, 1, 1);
+        foreach (var item in new[] {
+            (TimeSpan.Zero, "Pending"), (new TimeSpan(9, 59, 0), "Cancelled"),
+            (TimeSpan.FromHours(10), "NoShow"), (TimeSpan.FromHours(10), "Confirmed"),
+            (new TimeSpan(23, 59, 0), "Completed") })
+            db.Appointments.Add(new Appointment { AppointmentDate = day, StartTime = item.Item1,
+                EndTime = item.Item1.Add(TimeSpan.FromHours(3)), Status = item.Item2 });
+        db.Appointments.Add(new Appointment { AppointmentDate = day.AddDays(days), StartTime = TimeSpan.FromHours(10) });
+        await db.SaveChangesAsync();
+        var report = await new AppointmentAnalyticsService(db).GetAsync(new() {
+            StartDate = DateOnly.FromDateTime(day), EndDate = DateOnly.FromDateTime(day.AddDays(days - 1)) });
+        Assert.Equal(24, report.HourlyBuckets.Count);
+        Assert.Equal(5, report.Total);
+        Assert.Equal(report.Total, report.HourlyBuckets.Sum(bucket => bucket.Count));
+        Assert.Equal(1, report.HourlyBuckets[0].Count);
+        Assert.Equal(1, report.HourlyBuckets[9].Count);
+        Assert.Equal(2, report.HourlyBuckets[10].Count);
+        Assert.Equal(0, report.HourlyBuckets[11].Count);
+        Assert.Equal(1, report.HourlyBuckets[23].Count);
+        Assert.Equal("24:00", report.HourlyBuckets[23].End);
+        Assert.Equal(20m, report.NoShowRate);
+        Assert.Equal(20m, report.CancellationRate);
+    }
+
+    [Fact]
+    public async Task InvalidStoredTimesAreReportedWithoutSilentlyDroppingAppointments()
+    {
+        await using var db = CreateDb();
+        db.Appointments.AddRange(new Appointment { AppointmentDate = new DateTime(2026, 9, 1), StartTime = TimeSpan.FromDays(1) },
+            new Appointment { AppointmentDate = new DateTime(2026, 9, 1), StartTime = TimeSpan.FromMinutes(-1) });
+        await db.SaveChangesAsync();
+        var report = await new AppointmentAnalyticsService(db).GetAsync(Range());
+        Assert.Equal(2, report.UnassignedTimeCount);
+        Assert.Equal(report.Total, report.HourlyBuckets.Sum(bucket => bucket.Count) + report.UnassignedTimeCount);
+    }
+    [Theory]
     [InlineData("Owner", true)]
     [InlineData("Admin", false)]
     [InlineData("Receptionist", false)]
@@ -61,6 +102,8 @@ public class AppointmentAnalyticsTests
         Assert.Equal(2, report.Total);
         Assert.Equal(50m, report.NoShowRate);
         Assert.Equal(50m, report.CancellationRate);
+        Assert.Equal(1, report.HourlyBuckets[0].Count);
+        Assert.Equal(1, report.HourlyBuckets[23].Count);
     }
 
     [Theory]
@@ -99,6 +142,8 @@ public class AppointmentAnalyticsTests
         Assert.Null(result.CancellationRate);
         Assert.Equal("Không có lịch hẹn trong khoảng ngày này", result.EmptyReason);
         Assert.False(result.IsSmallSample);
+        Assert.Equal(24, result.HourlyBuckets.Count);
+        Assert.All(result.HourlyBuckets, bucket => Assert.Equal(0, bucket.Count));
     }
 
     [Fact]

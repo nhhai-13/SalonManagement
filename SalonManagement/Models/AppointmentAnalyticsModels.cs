@@ -30,8 +30,12 @@ public record AppointmentAnalyticsResponse(
     public string? EmptyReason => Total == 0 ? "Không có lịch hẹn trong khoảng ngày này" : null;
     public bool IsSmallSample => Total is > 0 and < 20;
     public string TimeZone => "Asia/Ho_Chi_Minh";
+    public IReadOnlyList<AppointmentHourlyBucket> HourlyBuckets { get; init; } = [];
+    public int UnassignedTimeCount { get; init; }
 
     private decimal? Rate(int count) => Total == 0
         ? null
         : Math.Round(count * 100m / Total, 1, MidpointRounding.AwayFromZero);
 }
+
+public record AppointmentHourlyBucket(string Start, string End, int Count);

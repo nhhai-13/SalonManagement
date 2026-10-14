@@ -27,6 +27,15 @@
         <div class="col-md-6"><div class="card p-3"><h3 class="h5">Tỉ lệ không đến</h3><strong id="no-show-rate" class="fs-2"></strong><small id="no-show-count" class="text-muted"></small></div></div>
         <div class="col-md-6"><div class="card p-3"><h3 class="h5">Tỉ lệ huỷ</h3><strong id="cancellation-rate" class="fs-2"></strong><small id="cancellation-count" class="text-muted"></small></div></div>
     </div></div>
+    <section id="hourly-chart-section" class="mt-4" hidden aria-labelledby="hourly-chart-title">
+        <h3 id="hourly-chart-title" class="h5">Số lượt hẹn theo khung giờ</h3>
+        <p class="text-muted">Khung 60 phút, tính theo giờ bắt đầu; gồm lịch huỷ và không đến.</p>
+        <p id="unassigned-times" class="text-warning" hidden></p>
+        <div class="overflow-auto border rounded p-3">
+            <svg id="hourly-chart" viewBox="0 0 1240 340" style="min-width:1000px;width:100%;height:auto" role="group" aria-label="Biểu đồ cột số lượt hẹn theo khung giờ"></svg>
+        </div>
+        <p id="hourly-detail" class="mt-2" role="status">Rê, chạm hoặc dùng phím Tab để xem chi tiết từng cột.</p>
+    </section>
 </section>
 @section Scripts {
     <script src="~/js/appointment-analytics.js" asp-append-version="true"></script>
