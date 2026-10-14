@@ -4,6 +4,12 @@ public interface IEmailService
     Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword);
     Task SendPasswordResetEmailAsync(string toEmail, string resetLink);
     Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode);
+    Task SendBookingConfirmationEmailAsync(string toEmail, string customerName, string bookingReference,
+        string servicesSummary, string stylistName, DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime,
+        string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh") => Task.CompletedTask;
+    Task SendAppointmentReminderEmailAsync(string toEmail, string customerName, string bookingReference,
+        string servicesSummary, string stylistName, DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime,
+        string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh") => Task.CompletedTask;
     Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
         => throw new NotSupportedException("Appointment change email sender is not registered.");
     Task SendRescheduleNotificationEmailAsync(string toEmail, string customerName, string stylistName,

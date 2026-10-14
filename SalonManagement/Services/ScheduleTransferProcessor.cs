@@ -294,6 +294,21 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
             appointmentEntry.Property(item => item.Status).IsModified = true;
             appointmentEntry.Property(item => item.UpdatedAt).IsModified = true;
 
+            var reminder = await dbContext.AppointmentEmailDeliveries.FirstOrDefaultAsync(item =>
+                item.AppointmentId == appointment.AppointmentId && item.Kind == AppointmentEmailKinds.Reminder,
+                cancellationToken);
+            if (reminder is not null && reminder.Status is not AppointmentEmailStatuses.Sent and not AppointmentEmailStatuses.Failed)
+            {
+                var appointmentStart = new DateTimeOffset(
+                    DateTime.SpecifyKind(appointment.AppointmentDate.Date.Add(start), DateTimeKind.Unspecified),
+                    TimeSpan.FromHours(7));
+                reminder.AppointmentStartAt = appointmentStart;
+                var dueAt = appointmentStart.AddHours(-24);
+                var now = DateTimeOffset.UtcNow;
+                reminder.NextAttemptAt = dueAt > now ? dueAt : now;
+                if (reminder.Status != AppointmentEmailStatuses.NoEmail) reminder.Status = AppointmentEmailStatuses.Queued;
+            }
+
             if (!string.IsNullOrWhiteSpace(appointment.Customer.Email))
             {
                 var previousVersion = await dbContext.ScheduleChangeNotifications

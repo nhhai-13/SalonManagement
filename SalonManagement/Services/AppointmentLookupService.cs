@@ -100,6 +100,9 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         appointment.CancelReason = reason;
         appointment.UpdatedAt = now.UtcDateTime;
         appointment.Version = Guid.NewGuid();
+        var reminder = await db.AppointmentEmailDeliveries.FirstOrDefaultAsync(item => item.AppointmentId == appointment.AppointmentId && item.Kind == AppointmentEmailKinds.Reminder);
+        if (reminder is not null && reminder.Status is AppointmentEmailStatuses.Queued or AppointmentEmailStatuses.Retrying)
+            reminder.Status = AppointmentEmailStatuses.Cancelled;
 
         db.AppointmentAudits.Add(new AppointmentAudit
         {
@@ -154,6 +157,7 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         "Arrived" => "Đã đến",
         "InProgress" => "Đang thực hiện",
         "Completed" => "Đã hoàn thành",
+        "Closed" => "Đã đóng",
         "Cancelled" => "Đã huỷ",
         "NoShow" => "Không đến",
         _ => status

@@ -52,7 +52,7 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
     [HttpPost("{appointmentId:int}/confirm")]
     public async Task<IActionResult> Confirm(int appointmentId)
     {
-        var appointment = await db.Appointments.SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
+        var appointment = await db.Appointments.Include(item => item.Customer).SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
         if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
         if (appointment.Status != "PendingConfirmation") return Conflict(new { error = "Lịch hẹn này đã được xử lý." });
 
@@ -63,8 +63,22 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         appointment.ConfirmedByUserId = userId;
         appointment.ConfirmedAt = SalonClock.GetLocalNow(timeProvider);
         appointment.UpdatedAt = appointment.ConfirmedAt;
+        var now = timeProvider.GetUtcNow();
+        var email = appointment.Customer.Email?.Trim();
+        var reminderStart = CheckInService.StartsAt(appointment);
+        db.AppointmentEmailDeliveries.Add(new AppointmentEmailDelivery
+        {
+            AppointmentId = appointment.AppointmentId,
+            Kind = AppointmentEmailKinds.Reminder,
+            RecipientEmail = string.IsNullOrWhiteSpace(email) ? null : email,
+            Status = string.IsNullOrWhiteSpace(email) ? AppointmentEmailStatuses.NoEmail : AppointmentEmailStatuses.Queued,
+            AppointmentStartAt = reminderStart,
+            NextAttemptAt = reminderStart.AddHours(-24) > now ? reminderStart.AddHours(-24) : now,
+            CreatedAt = now
+        });
         await db.SaveChangesAsync();
-        return Ok(new { appointment.AppointmentId, appointment.Status, appointment.ConfirmedByUserId, appointment.ConfirmedAt });
+        return Ok(new { appointment.AppointmentId, appointment.Status, appointment.ConfirmedByUserId, appointment.ConfirmedAt,
+            needsPhoneReminder = string.IsNullOrWhiteSpace(email) });
     }
 
     [HttpGet("rejection-reasons")]
@@ -89,6 +103,9 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         appointment.RejectedByUserId = userId;
         appointment.RejectedAt = SalonClock.GetLocalNow(timeProvider);
         appointment.UpdatedAt = appointment.RejectedAt;
+        var pendingReminder = await db.AppointmentEmailDeliveries.FirstOrDefaultAsync(item => item.AppointmentId == appointment.AppointmentId && item.Kind == AppointmentEmailKinds.Reminder);
+        if (pendingReminder is not null && pendingReminder.Status is AppointmentEmailStatuses.Queued or AppointmentEmailStatuses.Retrying)
+            pendingReminder.Status = AppointmentEmailStatuses.Cancelled;
         await db.SaveChangesAsync();
         return Ok(new { appointment.AppointmentId, appointment.Status, appointment.RejectionReason, appointment.RejectedByUserId, appointment.RejectedAt });
     }

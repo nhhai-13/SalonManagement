@@ -13,6 +13,54 @@ public sealed class EmailService(
     IConfiguration configuration,
     IWebHostEnvironment env) : IEmailService
 {
+    public Task SendBookingConfirmationEmailAsync(string toEmail, string customerName, string bookingReference,
+        string servicesSummary, string stylistName, DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime,
+        string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh") =>
+        SendAppointmentNoticeAsync("booking-confirmation", "Xác nhận lịch hẹn tại Luminol Salon", "Lịch hẹn của bạn đã được ghi nhận",
+            toEmail, customerName, bookingReference, servicesSummary, stylistName, appointmentDate, startTime, endTime, salonAddress);
+
+    public Task SendAppointmentReminderEmailAsync(string toEmail, string customerName, string bookingReference,
+        string servicesSummary, string stylistName, DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime,
+        string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh") =>
+        SendAppointmentNoticeAsync("appointment-reminder", "Nhắc lịch hẹn tại Luminol Salon", "Nhắc bạn sắp đến lịch hẹn",
+            toEmail, customerName, bookingReference, servicesSummary, stylistName, appointmentDate, startTime, endTime, salonAddress);
+
+    private async Task SendAppointmentNoticeAsync(string template, string subject, string heading,
+        string toEmail, string customerName, string bookingReference, string servicesSummary, string stylistName,
+        DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime, string salonAddress)
+    {
+        var smtp = configuration.GetSection("SmtpSettings");
+        var server = smtp["Server"];
+        var sender = smtp["SenderEmail"];
+        var username = smtp["Username"];
+        var password = smtp["Password"];
+        if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(sender) ||
+            string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            if (env.IsDevelopment())
+            {
+                logger.LogInformation("[FALLBACK {Template}] to {Email}; reference {Reference}; {Date:dd/MM/yyyy} {Start:hh\\:mm}.",
+                    template, toEmail, bookingReference, appointmentDate, startTime);
+                return;
+            }
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi email lịch hẹn.");
+        }
+
+        var html = $"""<html lang="vi"><body><h2>{WebUtility.HtmlEncode(heading)}</h2><p>Chào {WebUtility.HtmlEncode(customerName)},</p><p>Mã tra cứu: <strong>{WebUtility.HtmlEncode(bookingReference)}</strong></p><p>Dịch vụ: {WebUtility.HtmlEncode(servicesSummary)}</p><p>Nhân viên: {WebUtility.HtmlEncode(stylistName)}</p><p>Thời gian: {appointmentDate:dd/MM/yyyy}, {startTime.ToString(@"hh\:mm")}–{endTime.ToString(@"hh\:mm")}</p><p>Địa chỉ salon: {WebUtility.HtmlEncode(salonAddress)}</p></body></html>""";
+        using var client = new SmtpClient(server, smtp.GetValue<int>("Port", 587))
+        {
+            EnableSsl = true, UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(username, password), Timeout = 15000
+        };
+        using var message = new MailMessage
+        {
+            From = new MailAddress(sender, smtp["SenderName"] ?? "Luminol Salon"),
+            Subject = subject, IsBodyHtml = true, Body = html
+        };
+        message.To.Add(toEmail);
+        await client.SendMailAsync(message);
+    }
+
     public async Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
     {
         var smtp = configuration.GetSection("SmtpSettings");
