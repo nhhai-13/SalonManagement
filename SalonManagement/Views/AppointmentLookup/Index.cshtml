@@ -239,6 +239,7 @@
                                         </button>
                                     </div>
                                 ` : ''}
+                                ${a.reviewUrl ? `<div class="text-end border-top pt-3"><a class="btn btn-primary btn-sm" href="${escapeHtml(a.reviewUrl)}"><i class="bi bi-star me-1"></i>Đánh giá dịch vụ</a></div>` : ''}
                             </div>
                         </div>`;
                 }).join('');

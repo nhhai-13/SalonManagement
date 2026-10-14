@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Services;
 
@@ -18,6 +19,10 @@ public sealed class AppointmentLookupController(
     public async Task<IActionResult> Search(string? query)
     {
         var result = await new AppointmentLookupService(db, timeProvider).SearchAsync(query);
+        var references = result.Items.Where(item => item.Status == "Đã đóng").Select(item => item.Reference).ToList();
+        var reviewableReferences = references.Count == 0 ? new List<string>() : await db.StylistReviews.AsNoTracking()
+            .Where(review => references.Contains(review.Appointment.BookingReference) && review.Rating == null && review.ExpiresAt > DateTime.UtcNow)
+            .Select(review => review.Appointment.BookingReference).ToListAsync();
         return Ok(new
         {
             error = result.Error,
@@ -32,7 +37,10 @@ public sealed class AppointmentLookupController(
                 item.DurationMinutes,
                 item.CancelledAt,
                 item.CancelledBy,
-                item.Status
+                item.Status,
+                reviewUrl = reviewableReferences.Contains(item.Reference)
+                    ? Url.Action("CreateByReference", "Reviews", new { reference = item.Reference }, Request.Scheme)
+                    : null
             })
         });
     }
