@@ -14,6 +14,7 @@ public class AdminController : Controller
     private const string RegisterView = "~/Views/Admin/Authentication/Register.cshtml";
     private const string VerifyEmailView = "~/Views/Admin/Authentication/VerifyEmail.cshtml";
 
+    [AllowAnonymous]
     [HttpGet("admin/login")]
     public IActionResult Login()
     {
@@ -21,15 +22,19 @@ public class AdminController : Controller
         return View(LoginView);
     }
 
+    [AllowAnonymous]
     [HttpGet("reception/login")]
     public IActionResult ReceptionLogin() => Redirect($"/admin/login{Request.QueryString}");
 
+    [AllowAnonymous]
     [HttpGet("owner/login")]
     public IActionResult OwnerLogin() => Redirect($"/admin/login{Request.QueryString}");
 
+    [AllowAnonymous]
     [HttpGet("stylist/login")]
     public IActionResult StylistLogin() => Redirect($"/admin/login{Request.QueryString}");
 
+    [AllowAnonymous]
     [HttpGet("reception/register")]
     public IActionResult ReceptionRegister()
     {
@@ -37,6 +42,7 @@ public class AdminController : Controller
         return View(RegisterView);
     }
 
+    [AllowAnonymous]
     [HttpGet("stylist/register")]
     public IActionResult StylistRegister()
     {
@@ -44,6 +50,7 @@ public class AdminController : Controller
         return View(RegisterView);
     }
 
+    [AllowAnonymous]
     [HttpGet("verify-email")]
     public IActionResult VerifyEmail([FromQuery] string? email, [FromQuery] string? portal)
     {
@@ -71,9 +78,11 @@ public class AdminController : Controller
 
 public class StaffPortalController : Controller
 {
+    [Authorize(Roles = UserRoles.Receptionist)]
     [HttpGet("reception")]
     public IActionResult Reception() => View();
 
+    [Authorize(Roles = UserRoles.Stylist)]
     [HttpGet("stylist")]
     public IActionResult Stylist() => View();
 }
