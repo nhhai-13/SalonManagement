@@ -17,15 +17,25 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
     {
         var selectedDate = (date ?? VietnamTime.Today).Date;
         ViewBag.SelectedDate = selectedDate.ToString("yyyy-MM-dd");
-        var appointments = await db.Appointments.AsNoTracking()
+        IQueryable<Appointment> query = db.Appointments.AsNoTracking()
             .Include(item => item.Customer)
             .Include(item => item.Stylist)
             .Include(item => item.AppointmentServices)
                 .ThenInclude(item => item.Service)
             .Include(item => item.Invoice)
-            .Where(item => item.AppointmentDate.Date == selectedDate)
-            .OrderBy(item => item.StartTime)
-            .ToListAsync();
+            .Where(item => item.AppointmentDate.Date == selectedDate);
+
+        if (User.IsInRole(UserRoles.Stylist))
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var stylistId = await db.Users.Where(user => user.Id == userId)
+                .Select(user => user.StylistId).SingleOrDefaultAsync();
+            if (!stylistId.HasValue) return Forbid();
+            query = query.Where(item => item.StylistId == stylistId.Value ||
+                item.AppointmentServices.Any(service => service.StylistId == stylistId.Value));
+        }
+
+        var appointments = await query.OrderBy(item => item.StartTime).ToListAsync();
 
         return View(appointments);
     }
@@ -46,6 +56,30 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
         if (appointment is null)
         {
             return NotFound();
+        }
+
+        var isStylist = User.IsInRole(UserRoles.Stylist);
+        var canViewTechnicalNotes = isStylist || User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner);
+        if (isStylist)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var stylistId = await db.Users.Where(user => user.Id == userId)
+                .Select(user => user.StylistId).SingleOrDefaultAsync();
+            if (!stylistId.HasValue ||
+                (appointment.StylistId != stylistId.Value &&
+                 !appointment.AppointmentServices.Any(service => service.StylistId == stylistId.Value)))
+            {
+                return Forbid();
+            }
+        }
+        else if (!canViewTechnicalNotes)
+        {
+            foreach (var service in appointment.AppointmentServices)
+            {
+                service.TechnicalNotes = null;
+                service.TechnicalNotesUpdatedBy = null;
+                service.TechnicalNotesUpdatedAt = null;
+            }
         }
 
         var history = new List<AppointmentHistoryRow>();
@@ -85,6 +119,10 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                         TechnicalNotes = service?.TechnicalNotes
                     }))
                 .ToList();
+            if (!canViewTechnicalNotes)
+            {
+                foreach (var row in history) row.TechnicalNotes = null;
+            }
         }
         catch (Exception exception)
         {
