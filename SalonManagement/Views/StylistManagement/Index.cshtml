@@ -9,7 +9,10 @@
             <h1 class="sl-page-title h2 mb-1">Hồ sơ thợ</h1>
             <p class="text-muted mb-0">Quản lý dịch vụ đảm nhận và trạng thái làm việc.</p>
         </div>
-        <a asp-action="Create" class="sl-btn sl-btn-primary btn btn-primary">Tạo hồ sơ thợ</a>
+        <div class="d-flex gap-2">
+            <a asp-controller="StylistReviews" asp-action="Index" class="btn btn-outline-primary">Đánh giá của khách</a>
+            <a asp-action="Create" class="sl-btn sl-btn-primary btn btn-primary">Tạo hồ sơ thợ</a>
+        </div>
     </div>
 
     @if (TempData["Success"] is string success)
