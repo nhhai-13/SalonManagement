@@ -116,7 +116,8 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
             s.WorkDate >= day && s.WorkDate < nextDay && s.Status == "Working")
             .OrderBy(s => s.StartTime).Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync();
         var busy = await db.Appointments.AsNoTracking().Where(a => qualifiedIds.Contains(a.StylistId) &&
-            a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled" && a.Status != AppointmentStatuses.NoShow)
+            a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled" &&
+            a.Status != AppointmentStatuses.NoShow && a.Status != "Rejected")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
         var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
                 qualifiedIds.Contains(timeOff.StylistId) && timeOff.OffDate == date)
