@@ -22,6 +22,12 @@
 
         public DateTime? UpdatedAt { get; set; }
 
+        public DateTime? ClosedAt { get; set; }
+
+        public string? ClosedByUserId { get; set; }
+
+        public string? ClosedByName { get; set; }
+
         public Customer Customer { get; set; } = null!;
 
         public Stylist Stylist { get; set; } = null!;

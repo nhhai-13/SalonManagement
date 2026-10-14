@@ -25,5 +25,11 @@
 
         public ICollection<Appointment> Appointments { get; set; }
             = new List<Appointment>();
+
+        public ICollection<AppointmentService> AppointmentServices { get; set; }
+            = new List<AppointmentService>();
+
+        public ICollection<InvoiceAdjustment> InvoiceAdjustments { get; set; }
+            = new List<InvoiceAdjustment>();
     }
 }

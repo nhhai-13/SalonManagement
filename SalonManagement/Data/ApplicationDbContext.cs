@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Models;
 
@@ -29,6 +30,10 @@ namespace SalonManagement.Data
 
         public DbSet<Invoice> Invoices => Set<Invoice>();
 
+        public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
+
+        public DbSet<InvoiceAdjustment> InvoiceAdjustments => Set<InvoiceAdjustment>();
+
         public DbSet<Payment> Payments => Set<Payment>();
 
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
@@ -36,6 +41,18 @@ namespace SalonManagement.Data
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            // Keep the existing Identity key column limits from the initial schema.
+            builder.Entity<IdentityUserLogin<string>>(entity =>
+            {
+                entity.Property(item => item.LoginProvider).HasMaxLength(128);
+                entity.Property(item => item.ProviderKey).HasMaxLength(128);
+            });
+            builder.Entity<IdentityUserToken<string>>(entity =>
+            {
+                entity.Property(item => item.LoginProvider).HasMaxLength(128);
+                entity.Property(item => item.Name).HasMaxLength(128);
+            });
 
             builder.Entity<RefreshToken>(entity =>
             {
@@ -135,6 +152,9 @@ namespace SalonManagement.Data
             {
                 entity.HasKey(item => item.AppointmentServiceId);
                 entity.Property(item => item.Price).HasPrecision(18, 2);
+                entity.Property(item => item.CollectedAmount).HasPrecision(18, 2);
+                entity.Property(item => item.TechnicalNotes).HasMaxLength(500);
+                entity.Property(item => item.TechnicalNotesUpdatedBy).HasMaxLength(256);
 
                 entity.HasOne(item => item.Appointment)
                     .WithMany(appointment => appointment.AppointmentServices)
@@ -145,13 +165,12 @@ namespace SalonManagement.Data
                     .HasForeignKey(item => item.ServiceId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                entity.HasIndex(item =>
-                    new
-                    {
-                        item.AppointmentId,
-                        item.ServiceId
-                    })
-                    .IsUnique();
+                entity.HasOne(item => item.Stylist)
+                    .WithMany(stylist => stylist.AppointmentServices)
+                    .HasForeignKey(item => item.StylistId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(item => new { item.AppointmentId, item.ServiceId });
             });
 
             builder.Entity<Invoice>(entity =>
@@ -165,6 +184,46 @@ namespace SalonManagement.Data
                 entity.HasOne(invoice => invoice.Appointment)
                     .WithOne(appointment => appointment.Invoice)
                     .HasForeignKey<Invoice>(invoice => invoice.AppointmentId);
+
+                entity.HasIndex(invoice => invoice.AppointmentId).IsUnique();
+            });
+
+            builder.Entity<InvoiceLine>(entity =>
+            {
+                entity.HasKey(line => line.InvoiceLineId);
+                entity.Property(line => line.ServiceName).HasMaxLength(150).IsRequired();
+                entity.Property(line => line.UnitPrice).HasPrecision(18, 2);
+                entity.HasOne(line => line.Invoice)
+                    .WithMany(invoice => invoice.Lines)
+                    .HasForeignKey(line => line.InvoiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(line => line.AppointmentService)
+                    .WithOne(item => item.InvoiceLine)
+                    .HasForeignKey<InvoiceLine>(line => line.AppointmentServiceId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(line => line.AppointmentServiceId).IsUnique();
+            });
+
+            builder.Entity<InvoiceAdjustment>(entity =>
+            {
+                entity.HasKey(adjustment => adjustment.InvoiceAdjustmentId);
+                entity.Property(adjustment => adjustment.Description).HasMaxLength(150).IsRequired();
+                entity.Property(adjustment => adjustment.AmountDelta).HasPrecision(18, 2);
+                entity.Property(adjustment => adjustment.Reason).HasMaxLength(500).IsRequired();
+                entity.Property(adjustment => adjustment.CreatedByUserId).HasMaxLength(450).IsRequired();
+                entity.Property(adjustment => adjustment.CreatedByName).HasMaxLength(256).IsRequired();
+                entity.HasOne(adjustment => adjustment.Invoice)
+                    .WithMany(invoice => invoice.Adjustments)
+                    .HasForeignKey(adjustment => adjustment.InvoiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(adjustment => adjustment.InvoiceLine)
+                    .WithMany()
+                    .HasForeignKey(adjustment => adjustment.InvoiceLineId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(adjustment => adjustment.Stylist)
+                    .WithMany(stylist => stylist.InvoiceAdjustments)
+                    .HasForeignKey(adjustment => adjustment.StylistId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<Payment>(entity =>
@@ -173,7 +232,7 @@ namespace SalonManagement.Data
                 entity.Property(payment => payment.Amount).HasPrecision(18, 2);
                 entity.Property(payment => payment.PaymentMethod).HasMaxLength(50);
                 entity.Property(payment => payment.PaymentStatus).HasMaxLength(30);
-                entity.Property(payment => payment.TransactionCode).HasMaxLength(100);
+                entity.Property(payment => payment.TransactionCode).HasMaxLength(500);
 
                 entity.HasOne(payment => payment.Invoice)
                     .WithMany(invoice => invoice.Payments)
