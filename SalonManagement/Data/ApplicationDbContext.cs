@@ -46,6 +46,7 @@ public ApplicationDbContext(
         public DbSet<ScheduleChangeNotification> ScheduleChangeNotifications => Set<ScheduleChangeNotification>();
 
         public DbSet<Invoice> Invoices => Set<Invoice>();
+        public DbSet<DiscountCoupon> DiscountCoupons => Set<DiscountCoupon>();
 
         public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
 
@@ -470,6 +471,13 @@ private class AuditEntry
                 entity.HasKey(invoice => invoice.InvoiceId);
                 entity.Property(invoice => invoice.Subtotal).HasPrecision(18, 2);
                 entity.Property(invoice => invoice.DiscountAmount).HasPrecision(18, 2);
+                entity.Property(invoice => invoice.DiscountValueSnapshot).HasPrecision(18, 2);
+                entity.Property(invoice => invoice.DiscountCodeSnapshot).HasMaxLength(32);
+                entity.Property(invoice => invoice.DiscountTypeSnapshot).HasMaxLength(16);
+                entity.HasOne(invoice => invoice.DiscountCoupon)
+                    .WithMany(coupon => coupon.Invoices)
+                    .HasForeignKey(invoice => invoice.DiscountCouponId)
+                    .OnDelete(DeleteBehavior.Restrict);
                 entity.Property(invoice => invoice.TotalAmount).HasPrecision(18, 2);
                 entity.Property(invoice => invoice.Status).HasMaxLength(30);
 
@@ -478,6 +486,15 @@ private class AuditEntry
                     .HasForeignKey<Invoice>(invoice => invoice.AppointmentId);
 
                 entity.HasIndex(invoice => invoice.AppointmentId).IsUnique();
+            });
+
+            builder.Entity<DiscountCoupon>(entity =>
+            {
+                entity.HasKey(coupon => coupon.DiscountCouponId);
+                entity.HasIndex(coupon => coupon.Code).IsUnique();
+                entity.Property(coupon => coupon.Code).HasMaxLength(32).IsRequired();
+                entity.Property(coupon => coupon.DiscountType).HasMaxLength(16).IsRequired();
+                entity.Property(coupon => coupon.Value).HasPrecision(18, 2);
             });
 
             builder.Entity<InvoiceLine>(entity =>

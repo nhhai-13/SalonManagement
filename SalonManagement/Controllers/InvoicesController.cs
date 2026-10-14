@@ -106,6 +106,50 @@ public class InvoicesController(ApplicationDbContext db) : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApplyDiscount(ApplyDiscountViewModel model)
+    {
+        var invoice = await LoadInvoice(model.InvoiceId);
+        if (invoice is null) return NotFound();
+        if (invoice.Status != "Unpaid" || invoice.ClosedAt is not null)
+            return LockedInvoice(model.InvoiceId);
+
+        var code = model.Code?.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(code))
+        {
+            invoice.DiscountCouponId = null;
+            invoice.DiscountCoupon = null;
+            invoice.DiscountCodeSnapshot = null;
+            invoice.DiscountTypeSnapshot = null;
+            invoice.DiscountValueSnapshot = null;
+            invoice.DiscountAmount = 0;
+            Recalculate(invoice);
+            await db.SaveChangesAsync();
+            TempData["Success"] = "Đã gỡ mã giảm giá.";
+            return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
+        }
+
+        var coupon = await db.DiscountCoupons.FirstOrDefaultAsync(item => item.Code == code);
+        var today = VietnamTime.Today.Date;
+        if (coupon is null || today < coupon.StartsOn.Date || today > coupon.EndsOn.Date)
+        {
+            TempData["Error"] = "Mã giảm giá không tồn tại hoặc đã hết hạn.";
+            return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
+        }
+
+        invoice.DiscountCouponId = coupon.DiscountCouponId;
+        invoice.DiscountCoupon = coupon;
+        invoice.DiscountCodeSnapshot = coupon.Code;
+        invoice.DiscountTypeSnapshot = coupon.DiscountType;
+        invoice.DiscountValueSnapshot = coupon.Value;
+        invoice.DiscountAmount = DiscountCalculator.Calculate(invoice.Subtotal, coupon.DiscountType, coupon.Value);
+        Recalculate(invoice);
+        await db.SaveChangesAsync();
+        TempData["Success"] = "Đã áp dụng mã giảm giá.";
+        return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddService(int id, AddInvoiceServiceViewModel model)
     {
         var invoice = await LoadInvoice(id);
@@ -149,6 +193,8 @@ public class InvoicesController(ApplicationDbContext db) : Controller
                 unitPrice = service.Price,
                 formattedUnitPrice = Money(service.Price),
                 formattedCollectedAmount = Money(appointmentService.CollectedAmount),
+                formattedSubtotal = Money(invoice.Subtotal),
+                formattedDiscount = Money(invoice.DiscountAmount),
                 formattedTotal = Money(invoice.TotalAmount)
             });
         }
@@ -172,7 +218,7 @@ public class InvoicesController(ApplicationDbContext db) : Controller
         Recalculate(invoice);
         await db.SaveChangesAsync();
         if (Request.Headers["Accept"].ToString().Contains("application/json", StringComparison.OrdinalIgnoreCase))
-            return Json(new { formattedTotal = Money(invoice.TotalAmount) });
+            return Json(new { formattedSubtotal = Money(invoice.Subtotal), formattedDiscount = Money(invoice.DiscountAmount), formattedTotal = Money(invoice.TotalAmount) });
         return RedirectToAction(nameof(Details), new { id });
     }
 
@@ -346,6 +392,7 @@ public class InvoicesController(ApplicationDbContext db) : Controller
                 .ThenInclude(item => item.Appointment)
                     .ThenInclude(item => item.Stylist)
         .Include(item => item.Payments)
+        .Include(item => item.DiscountCoupon)
         .Include(item => item.Adjustments)
             .ThenInclude(item => item.Stylist)
         .Include(item => item.Adjustments)
@@ -355,6 +402,8 @@ public class InvoicesController(ApplicationDbContext db) : Controller
     private static void Recalculate(Invoice invoice)
     {
         invoice.Subtotal = invoice.Lines.Sum(line => line.UnitPrice);
+        if (invoice.DiscountCouponId.HasValue && invoice.DiscountTypeSnapshot is not null && invoice.DiscountValueSnapshot.HasValue)
+            invoice.DiscountAmount = DiscountCalculator.Calculate(invoice.Subtotal, invoice.DiscountTypeSnapshot, invoice.DiscountValueSnapshot.Value);
         invoice.TotalAmount = invoice.Subtotal - invoice.DiscountAmount;
     }
 
