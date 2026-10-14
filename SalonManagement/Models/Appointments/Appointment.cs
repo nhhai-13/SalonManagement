@@ -16,6 +16,12 @@ namespace SalonManagement.Models
 
         public string Status { get; set; } = "Pending";
 
+        public string BookingReference { get; set; } = string.Empty;
+
+        public DateTimeOffset? CancelledAt { get; set; }
+        public string? CancelledBy { get; set; }
+        public string? CancelReason { get; set; }
+
         public DateTimeOffset? CheckedInAt { get; set; }
         public int LateMinutes { get; set; }
         public DateTimeOffset? NoShowAt { get; set; }

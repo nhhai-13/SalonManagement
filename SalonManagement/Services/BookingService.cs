@@ -78,6 +78,23 @@ public class BookingService : IBookingService
         return CalculateTotals(orderedServices);
     }
 
+    public static string? NormalizePhone(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return null;
+
+        // Xoá ký tự không phải số
+        var digits = new string(input.Where(char.IsDigit).ToArray());
+
+        // Chuẩn hoá về 10 số bắt đầu bằng 0
+        if (digits.StartsWith("84") && digits.Length == 11)
+            digits = "0" + digits.Substring(2);
+
+        // Kiểm tra format Việt Nam
+        if (digits.Length != 10 || !digits.StartsWith("0"))
+            return null;
+
+        return digits;
+    }
     public async Task<BookingSelectServicesViewModel> GetSelectServicesViewModelAsync(IEnumerable<int>? preselectedServiceIds = null)
     {
         var preselectedSet = preselectedServiceIds?.ToHashSet() ?? new HashSet<int>();
