@@ -32,6 +32,7 @@ public record AppointmentAnalyticsResponse(
     public string TimeZone => "Asia/Ho_Chi_Minh";
     public IReadOnlyList<AppointmentHourlyBucket> HourlyBuckets { get; init; } = [];
     public int UnassignedTimeCount { get; init; }
+    public IReadOnlyList<AppointmentDayTypeComparison> DayTypes { get; init; } = [];
 
     private decimal? Rate(int count) => Total == 0
         ? null
@@ -39,3 +40,17 @@ public record AppointmentAnalyticsResponse(
 }
 
 public record AppointmentHourlyBucket(string Start, string End, int Count);
+
+public record AppointmentComparisonBucket(string Start, string End, int Count, decimal AveragePerDay, bool IsPeak);
+
+public record AppointmentDayTypeComparison(
+    string Key, string Label, int DayCount, int Total, int NoShowCount, int CancelledCount,
+    IReadOnlyList<AppointmentComparisonBucket>? HourlyBuckets, int UnassignedTimeCount)
+{
+    public decimal? AveragePerDay => DayCount == 0 ? null : Math.Round(Total / (decimal)DayCount, 1, MidpointRounding.AwayFromZero);
+    public decimal? NoShowRate => Total == 0 ? null : Math.Round(NoShowCount * 100m / Total, 1, MidpointRounding.AwayFromZero);
+    public decimal? CancellationRate => Total == 0 ? null : Math.Round(CancelledCount * 100m / Total, 1, MidpointRounding.AwayFromZero);
+    public string? EmptyReason => DayCount == 0
+        ? $"Khoảng ngày chưa có {Label.ToLowerInvariant()}"
+        : Total == 0 ? "Không có lịch hẹn trong nhóm ngày này" : null;
+}

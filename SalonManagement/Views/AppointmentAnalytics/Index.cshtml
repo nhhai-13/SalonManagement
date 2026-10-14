@@ -36,6 +36,18 @@
         </div>
         <p id="hourly-detail" class="mt-2" role="status">Rê, chạm hoặc dùng phím Tab để xem chi tiết từng cột.</p>
     </section>
+    <section id="day-comparison" class="mt-4" hidden aria-labelledby="day-comparison-title">
+        <h3 id="day-comparison-title" class="h5">So sánh theo loại ngày</h3>
+        <p class="text-muted">So sánh lượt hẹn trung bình mỗi ngày, kể cả ngày không có lịch. Ngày lễ xếp theo thứ trong tuần.</p>
+        <div id="comparison-charts" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px"></div>
+        <div class="table-responsive mt-3">
+            <table class="table table-bordered">
+                <caption>Chỉ số theo loại ngày trong khoảng đang xem. Dấu — nghĩa là không có mẫu số.</caption>
+                <thead><tr><th scope="col">Chỉ số</th><th scope="col">Ngày thường</th><th scope="col">Thứ bảy</th><th scope="col">Chủ nhật</th></tr></thead>
+                <tbody id="comparison-table"></tbody>
+            </table>
+        </div>
+    </section>
 </section>
 @section Scripts {
     <script src="~/js/appointment-analytics.js" asp-append-version="true"></script>
