@@ -108,13 +108,16 @@ public class BookingService : IBookingService
     {
         // 1. Kiểm tra WorkSchedules của Stylist
         var scheduleTimes = await _context.WorkSchedules.AsNoTracking()
-            .Where(ws => ws.EndTime > ws.StartTime && (ws.Status == "Working" || string.IsNullOrEmpty(ws.Status)))
+            .Where(ws => ws.Status == "Working" || string.IsNullOrEmpty(ws.Status))
             .Select(ws => new { ws.StartTime, ws.EndTime })
             .ToListAsync();
 
         if (scheduleTimes.Count > 0)
         {
+            // TimeSpan ordering is not translated by every EF Core provider (notably SQLite).
+            // Filter invalid/overnight rows after materialization, matching the query semantics.
             var maxMinutes = scheduleTimes
+                .Where(ws => ws.EndTime > ws.StartTime)
                 .Select(ws => (int)(ws.EndTime - ws.StartTime).TotalMinutes)
                 .DefaultIfEmpty(0)
                 .Max();
