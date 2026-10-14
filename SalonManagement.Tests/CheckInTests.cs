@@ -33,7 +33,9 @@ public class CheckInTests
         Assert.Equal(allowed, CheckInService.CanCheckIn(a, Start.AddMinutes(minutes)));
         if (!allowed) await Assert.ThrowsAsync<InvalidOperationException>(() => new CheckInService(db, new Clock { Now = Start.AddMinutes(minutes) }).Apply(a.AppointmentId, "check-in", "desk"));
     }
-    [Theory] [InlineData(15, 0)] [InlineData(16, 16)]
+    [Theory]
+    [InlineData(-15, 0)] [InlineData(-1, 0)] [InlineData(0, 0)]
+    [InlineData(1, 0)] [InlineData(15, 0)] [InlineData(16, 16)]
     public async Task CheckInPersistsArrivalNotificationAndAuditOnce(int minutes, int late)
     {
         await using var db = Db(); var a = await Seed(db); var clock = new Clock { Now = Start.AddMinutes(minutes) };

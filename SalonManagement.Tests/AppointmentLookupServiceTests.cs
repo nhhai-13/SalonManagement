@@ -176,8 +176,14 @@ public class AppointmentLookupServiceTests
     // ============================================================
     // TEST 6: CancelAsync — thành công (>= 120 phút)
     // ============================================================
-    [Fact]
-    public async Task CancelAsync_MoreThan120Minutes_Succeeds()
+    [Theory]
+    [InlineData(15)]
+    [InlineData(30)]
+    [InlineData(45)]
+    [InlineData(60)]
+    [InlineData(90)]
+    [InlineData(120)]
+    public async Task CancelAsync_MoreThan120Minutes_SucceedsAndLookupKeepsScheduledDuration(int durationMinutes)
     {
         using var ctx = CreateContext();
         var (custId, stylId) = await SeedBaseAsync(ctx);
@@ -186,7 +192,7 @@ public class AppointmentLookupServiceTests
         var startTime = new TimeSpan(10, 0, 0);
 
         var appt = await SeedAppointmentAsync(ctx, custId, stylId, "TEST0001",
-            appointmentDate, startTime, new TimeSpan(11, 0, 0));
+            appointmentDate, startTime, startTime.Add(TimeSpan.FromMinutes(durationMinutes)));
 
         // Clock giả lập: 2026-10-15 07:00 (còn 3 tiếng = 180 phút)
         var clock = new FixedTimeProvider(
@@ -236,8 +242,8 @@ public class AppointmentLookupServiceTests
         var cancelledItem = Assert.Single(lookupAfterCancellation.Items);
         Assert.Equal("Đã huỷ", cancelledItem.Status);
         Assert.Equal(TimeSpan.FromHours(10), cancelledItem.StartTime);
-        Assert.Equal(TimeSpan.FromHours(11), cancelledItem.EndTime);
-        Assert.Equal(60, cancelledItem.DurationMinutes);
+        Assert.Equal(startTime.Add(TimeSpan.FromMinutes(durationMinutes)), cancelledItem.EndTime);
+        Assert.Equal(durationMinutes, cancelledItem.DurationMinutes);
         Assert.Equal(new DateTimeOffset(2026, 10, 15, 0, 0, 0, TimeSpan.Zero), cancelledItem.CancelledAt);
         Assert.Equal("Khách hàng", cancelledItem.CancelledBy);
     }
