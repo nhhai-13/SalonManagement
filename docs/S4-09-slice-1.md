@@ -7,7 +7,7 @@ Màn hình: `/admin/appointment-analytics`. API GET: `/api/appointment-analytics
 - Chỉ role `Owner`, dùng JWT hiện có (header hoặc cookie đăng nhập).
 - Mẫu số gồm tất cả trạng thái, kể cả Pending và lịch tương lai; một AppointmentId là một lịch, không join dịch vụ/thợ.
 - Ngày hẹn hiện tại (`AppointmentDate`/`StartTime`) là giờ địa phương Việt Nam UTC+7; không dùng CreatedAt. Hai ngày biên đều được tính.
-- Không đến: `NoShow`; huỷ: `Cancelled` hoặc `Canceled`, không phân biệt hoa thường. Dữ liệu hiện chưa có bộ trạng thái chuẩn ngoài Pending; cần đồng bộ tên khi triển khai nghiệp vụ cập nhật trạng thái.
+- Không đến: `AppointmentStatuses.NoShow`; huỷ: `AppointmentStatuses.Cancelled` hoặc tên cũ `Canceled`, không phân biệt hoa thường. Đã đối chiếu bộ trạng thái trên develop.
 - Tối đa 366 ngày tính cả hai ngày biên; mặc định đầu tháng hiện tại đến hôm nay theo UTC+7.
 - Làm tròn nửa lên 1 chữ số thập phân; mẫu dưới 20 lịch có cảnh báo Mẫu nhỏ.
 - Mẫu số bằng 0: hai tỉ lệ null và emptyReason; khác với có lịch và tỉ lệ 0,0 %.

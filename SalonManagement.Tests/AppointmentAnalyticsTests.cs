@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
+using System.Security.Claims;
 using SalonManagement.Controllers;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -14,6 +17,52 @@ namespace SalonManagement.Tests;
 
 public class AppointmentAnalyticsTests
 {
+    [Theory]
+    [InlineData("Owner", true)]
+    [InlineData("Admin", false)]
+    [InlineData("Receptionist", false)]
+    [InlineData("Stylist", false)]
+    [InlineData("Customer", false)]
+    [InlineData(null, false)]
+    public async Task AuthorizationPolicyRejectsEveryOtherRole(string? role, bool expected)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddAuthorization();
+        using var provider = services.BuildServiceProvider();
+        var attribute = Assert.Single(typeof(AppointmentAnalyticsController)
+            .GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>());
+        var policy = await AuthorizationPolicy.CombineAsync(provider.GetRequiredService<IAuthorizationPolicyProvider>(), [attribute]);
+        var identity = role is null ? new ClaimsIdentity() : new ClaimsIdentity([new Claim(ClaimTypes.Role, role)], "test");
+        var result = await provider.GetRequiredService<IAuthorizationService>()
+            .AuthorizeAsync(new ClaimsPrincipal(identity), null, policy!);
+        Assert.Equal(expected, result.Succeeded);
+    }
+
+    [Fact]
+    public async Task RelationalQueryIncludesLastDayAndExcludesFollowingMidnight()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite(connection).Options, new HttpContextAccessor());
+        await db.Database.EnsureCreatedAsync();
+        var customer = new Customer { FullName = "Test customer", Phone = "0900000000" };
+        var stylist = new Stylist { FullName = "Test stylist" };
+        db.Appointments.AddRange(
+            new Appointment { Customer = customer, Stylist = stylist, BookingReference = "TEST-1",
+                AppointmentDate = new DateTime(2026, 9, 1), Status = "NoShow" },
+            new Appointment { Customer = customer, Stylist = stylist, BookingReference = "TEST-2",
+                AppointmentDate = new DateTime(2026, 9, 30), StartTime = new TimeSpan(23, 59, 0), Status = "Cancelled" },
+            new Appointment { Customer = customer, Stylist = stylist, BookingReference = "TEST-3",
+                AppointmentDate = new DateTime(2026, 10, 1), Status = "Pending" });
+        await db.SaveChangesAsync();
+        var report = await new AppointmentAnalyticsService(db).GetAsync(Range());
+        Assert.Equal(2, report.Total);
+        Assert.Equal(50m, report.NoShowRate);
+        Assert.Equal(50m, report.CancellationRate);
+    }
+
     [Theory]
     [InlineData(80, 6, 4, 7.5, 5.0)]
     [InlineData(3, 1, 2, 33.3, 66.7)]

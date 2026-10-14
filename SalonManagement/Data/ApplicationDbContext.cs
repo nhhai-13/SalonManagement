@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using SalonManagement.Models;
 namespace SalonManagement.Data
 {
-    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+    public partial class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
 
@@ -23,34 +23,67 @@ public ApplicationDbContext(
 
         public DbSet<Stylist> Stylists => Set<Stylist>();
 
+        public DbSet<StylistService> StylistServices => Set<StylistService>();
+
         public DbSet<Service> Services => Set<Service>();
 
         public DbSet<ServiceGroup> ServiceGroups => Set<ServiceGroup>();
 
         public DbSet<WorkSchedule> WorkSchedules => Set<WorkSchedule>();
+        public DbSet<StylistBreak> StylistBreaks => Set<StylistBreak>();
+        public DbSet<StylistDayOff> StylistDaysOff => Set<StylistDayOff>();
 
         public DbSet<Appointment> Appointments => Set<Appointment>();
 
+        public DbSet<AppointmentChangeLog> AppointmentChangeLogs => Set<AppointmentChangeLog>();
+        public DbSet<AppointmentChangeEmail> AppointmentChangeEmails => Set<AppointmentChangeEmail>();
+
         public DbSet<AppointmentService> AppointmentServices => Set<AppointmentService>();
+
+        public DbSet<ScheduleContactFollowUp> ScheduleContactFollowUps => Set<ScheduleContactFollowUp>();
+
+        public DbSet<ScheduleChangeNotification> ScheduleChangeNotifications => Set<ScheduleChangeNotification>();
 
         public DbSet<Invoice> Invoices => Set<Invoice>();
 
         public DbSet<Payment> Payments => Set<Payment>();
 
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
+
+        public DbSet<ShopHoliday> ShopHolidays => Set<ShopHoliday>();
         
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
+
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+        public DbSet<RescheduleChangeLog> RescheduleChangeLogs => Set<RescheduleChangeLog>();
 public override int SaveChanges()
 {
     return SaveChangesAsync().GetAwaiter().GetResult();
 }
 
+public override int SaveChanges(bool acceptAllChangesOnSuccess)
+{
+    if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
+    return SaveChanges();
+}
+
+public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+{
+    if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
+    return SaveChangesAsync(cancellationToken);
+}
+
 public override async Task<int> SaveChangesAsync(
     CancellationToken cancellationToken = default)
 {
+    ChangeTracker.DetectChanges();
+    await AssignMissingBookingReferencesAsync(cancellationToken);
+    if (ChangeTracker.Entries<AuditLog>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+        throw new InvalidOperationException("Nhật ký hệ thống chỉ đọc, không được sửa hoặc xoá.");
     var auditEntries = CreateAuditEntries();
 
-    var result = await base.SaveChangesAsync(cancellationToken);
+    var result = await base.SaveChangesAsync(true, cancellationToken);
 
     if (auditEntries.Count > 0)
     {
@@ -62,8 +95,10 @@ public override async Task<int> SaveChangesAsync(
             {
                 Timestamp = DateTime.UtcNow,
                 UserId = _httpContextAccessor.HttpContext?.User?
-                    .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
-                UserName = _httpContextAccessor.HttpContext?.User?.Identity?.Name,
+                    .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    ?? _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value,
+                UserName = _httpContextAccessor.HttpContext?.User?.FindFirst("email")?.Value
+                    ?? _httpContextAccessor.HttpContext?.User?.Identity?.Name,
                 Action = entry.Action,
                 EntityType = entry.EntityType,
                 EntityId = entry.EntityId,
@@ -71,7 +106,7 @@ public override async Task<int> SaveChangesAsync(
             });
         }
 
-        await base.SaveChangesAsync(cancellationToken);
+        await base.SaveChangesAsync(true, cancellationToken);
     }
 
     return result;
@@ -80,6 +115,7 @@ public override async Task<int> SaveChangesAsync(
 private List<AuditEntry> CreateAuditEntries()
 {
     ChangeTracker.DetectChanges();
+
 
     var entries = new List<AuditEntry>();
 
@@ -95,6 +131,7 @@ private List<AuditEntry> CreateAuditEntries()
         var entityType = entry.Entity.GetType().Name;
 
         if (entityType != nameof(ApplicationUser) &&
+            entry.Entity is not Microsoft.AspNetCore.Identity.IdentityUserRole<string> &&
             entityType != nameof(Service) &&
             entityType != nameof(WorkSchedule) &&
             entityType != nameof(Appointment) &&
@@ -109,6 +146,7 @@ private List<AuditEntry> CreateAuditEntries()
         {
             foreach (var property in entry.Properties)
             {
+                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
                 changes[property.Metadata.Name] = property.CurrentValue;
             }
         }
@@ -116,6 +154,7 @@ private List<AuditEntry> CreateAuditEntries()
         {
             foreach (var property in entry.Properties)
             {
+                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
                 if (property.IsModified)
                 {
                     changes[property.Metadata.Name] = new
@@ -130,6 +169,7 @@ private List<AuditEntry> CreateAuditEntries()
         {
             foreach (var property in entry.Properties)
             {
+                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
                 changes[property.Metadata.Name] = property.OriginalValue;
             }
         }
@@ -152,11 +192,15 @@ private List<AuditEntry> CreateAuditEntries()
     return entries;
 }
 
+private static bool IsSensitiveAuditProperty(string name) => name is
+    "PasswordHash" or "SecurityStamp" or "ConcurrencyStamp" or "EmailVerificationCodeHash";
+
 private static string? GetEntityId(object entity)
 {
     return entity switch
     {
         ApplicationUser user => user.Id,
+        Microsoft.AspNetCore.Identity.IdentityUserRole<string> role => role.UserId,
         Service service => service.ServiceId.ToString(),
         WorkSchedule schedule => schedule.WorkScheduleId.ToString(),
         Appointment appointment => appointment.AppointmentId.ToString(),
@@ -176,6 +220,7 @@ private class AuditEntry
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            ConfigureAttendanceModels(builder);
 
             builder.Entity<RefreshToken>(entity =>
             {
@@ -196,6 +241,29 @@ private class AuditEntry
                 entity.Property(hours => hours.TimeZoneId).HasMaxLength(64);
                 entity.HasIndex(hours => hours.DayOfWeek).IsUnique();
             });
+            builder.Entity<ShopHoliday>(entity =>
+            {
+                entity.HasKey(holiday => holiday.ShopHolidayId);
+                entity.Property(holiday => holiday.Reason).HasMaxLength(250);
+                entity.HasIndex(holiday => holiday.HolidayDate).IsUnique();
+            });
+            
+            builder.Entity<StylistTimeOff>(entity =>
+           {
+                entity.HasKey(timeOff => timeOff.StylistTimeOffId);
+                entity.Property(timeOff => timeOff.Reason)
+                    .HasMaxLength(250);
+                entity.HasOne(timeOff => timeOff.Stylist)
+                    .WithMany()
+                    .HasForeignKey(timeOff => timeOff.StylistId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(timeOff => new
+           {
+                timeOff.StylistId,
+                timeOff.OffDate
+          });
+        });
 
             builder.Entity<Customer>(entity =>
             {
@@ -205,7 +273,10 @@ private class AuditEntry
                 entity.Property(customer => customer.Email).HasMaxLength(256);
                 entity.Property(customer => customer.Gender).HasMaxLength(20);
                 entity.HasIndex(customer => customer.Phone);
+                entity.HasIndex(customer => customer.FullName);
             });
+
+            builder.Entity<Appointment>().Property(appointment => appointment.Version).IsConcurrencyToken();
 
             builder.Entity<Stylist>(entity =>
             {
@@ -214,6 +285,8 @@ private class AuditEntry
                 entity.Property(stylist => stylist.Phone).HasMaxLength(20);
                 entity.Property(stylist => stylist.Email).HasMaxLength(256);
                 entity.Property(stylist => stylist.Specialty).HasMaxLength(200);
+                entity.Property(stylist => stylist.Description).HasMaxLength(500);
+                entity.Property(stylist => stylist.ProfileImagePath).HasMaxLength(300);
             });
 
             builder.Entity<ServiceGroup>(entity =>
@@ -234,6 +307,21 @@ private class AuditEntry
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
+            builder.Entity<StylistService>(entity =>
+            {
+                entity.HasKey(item => new { item.StylistId, item.ServiceId });
+
+                entity.HasOne(item => item.Stylist)
+                    .WithMany(stylist => stylist.Services)
+                    .HasForeignKey(item => item.StylistId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(item => item.Service)
+                    .WithMany(service => service.Stylists)
+                    .HasForeignKey(item => item.ServiceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             builder.Entity<WorkSchedule>(entity =>
             {
                 entity.HasKey(schedule => schedule.WorkScheduleId);
@@ -245,6 +333,19 @@ private class AuditEntry
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(schedule => new { schedule.StylistId, schedule.WorkDate });
+            });
+
+            builder.Entity<StylistBreak>(entity =>
+            {
+                entity.HasKey(item => item.StylistBreakId);
+                entity.HasIndex(item => new { item.StylistId, item.BreakDate });
+                entity.HasOne(item => item.Stylist).WithMany(stylist => stylist.Breaks).HasForeignKey(item => item.StylistId).OnDelete(DeleteBehavior.Cascade);
+            });
+            builder.Entity<StylistDayOff>(entity =>
+            {
+                entity.HasKey(item => item.StylistDayOffId);
+                entity.HasIndex(item => new { item.StylistId, item.OffDate }).IsUnique();
+                entity.HasOne(item => item.Stylist).WithMany(stylist => stylist.DaysOff).HasForeignKey(item => item.StylistId).OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<Appointment>(entity =>
@@ -271,6 +372,24 @@ private class AuditEntry
                     });
             });
 
+            builder.Entity<AppointmentChangeLog>(entity =>
+            {
+                entity.HasKey(log => log.AppointmentChangeLogId);
+                entity.Property(log => log.ActorId).HasMaxLength(450).IsRequired();
+                entity.Property(log => log.ActorName).HasMaxLength(256).IsRequired();
+                entity.HasIndex(log => new { log.AppointmentId, log.ChangedAt });
+            });
+
+            builder.Entity<AppointmentChangeEmail>(entity =>
+            {
+                entity.HasKey(email => email.AppointmentChangeEmailId);
+                entity.Property(email => email.RecipientEmail).HasMaxLength(256).IsRequired();
+                entity.Property(email => email.StylistName).HasMaxLength(150).IsRequired();
+                entity.Property(email => email.Status).HasMaxLength(20).IsRequired();
+                entity.Property(email => email.LastError).HasMaxLength(1000);
+                entity.HasIndex(email => new { email.Status, email.NextAttemptAt });
+            });
+
             builder.Entity<AppointmentService>(entity =>
             {
                 entity.HasKey(item => item.AppointmentServiceId);
@@ -292,6 +411,39 @@ private class AuditEntry
                         item.ServiceId
                     })
                     .IsUnique();
+            });
+
+            builder.Entity<ScheduleContactFollowUp>(entity =>
+            {
+                entity.HasKey(item => item.ScheduleContactFollowUpId);
+                entity.Property(item => item.Category).HasMaxLength(30).IsRequired();
+                entity.Property(item => item.Reason).HasMaxLength(500).IsRequired();
+                entity.Property(item => item.ContactStatus).HasMaxLength(30).IsRequired();
+                entity.Property(item => item.ContactNote).HasMaxLength(1000);
+                entity.HasOne(item => item.Appointment)
+                    .WithOne(appointment => appointment.ScheduleContactFollowUp)
+                    .HasForeignKey<ScheduleContactFollowUp>(item => item.AppointmentId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(item => item.AppointmentId).IsUnique();
+                entity.HasIndex(item => new { item.OriginalAppointmentDate, item.ContactStatus, item.Category });
+            });
+
+            builder.Entity<ScheduleChangeNotification>(entity =>
+            {
+                entity.HasKey(item => item.ScheduleChangeNotificationId);
+                entity.Property(item => item.RecipientEmail).HasMaxLength(256).IsRequired();
+                entity.Property(item => item.CustomerName).HasMaxLength(150).IsRequired();
+                entity.Property(item => item.ServiceNames).HasMaxLength(1000).IsRequired();
+                entity.Property(item => item.OldStylistName).HasMaxLength(150).IsRequired();
+                entity.Property(item => item.NewStylistName).HasMaxLength(150).IsRequired();
+                entity.Property(item => item.Status).HasMaxLength(30).IsRequired();
+                entity.Property(item => item.LastError).HasMaxLength(1000);
+                entity.HasOne(item => item.Appointment)
+                    .WithMany(appointment => appointment.ScheduleChangeNotifications)
+                    .HasForeignKey(item => item.AppointmentId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(item => new { item.AppointmentId, item.Version }).IsUnique();
+                entity.HasIndex(item => new { item.Status, item.NextAttemptAt });
             });
 
             builder.Entity<Invoice>(entity =>
@@ -318,6 +470,24 @@ private class AuditEntry
                 entity.HasOne(payment => payment.Invoice)
                     .WithMany(invoice => invoice.Payments)
                     .HasForeignKey(payment => payment.InvoiceId);
+            });
+
+            builder.Entity<RescheduleChangeLog>(entity =>
+            {
+                entity.HasKey(log => log.Id);
+                entity.Property(log => log.ModifiedByUserId).HasMaxLength(450);
+                entity.Property(log => log.ModifiedByUserName).HasMaxLength(256);
+                entity.Property(log => log.OldStylistName).HasMaxLength(150);
+                entity.Property(log => log.NewStylistName).HasMaxLength(150);
+                entity.Property(log => log.Reason).HasMaxLength(500);
+
+                entity.HasOne(log => log.Appointment)
+                    .WithMany()
+                    .HasForeignKey(log => log.AppointmentId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(log => log.AppointmentId);
+                entity.HasIndex(log => log.ChangedAtUtc);
             });
         }
     }

@@ -22,8 +22,8 @@ public class AppointmentAnalyticsService(ApplicationDbContext db)
             .ToListAsync(cancellationToken);
         return new(request.StartDate.Value, request.EndDate.Value,
             groups.Sum(g => g.Count),
-            groups.Where(g => string.Equals(g.Status, "NoShow", StringComparison.OrdinalIgnoreCase)).Sum(g => g.Count),
-            groups.Where(g => string.Equals(g.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
+            groups.Where(g => string.Equals(g.Status, AppointmentStatuses.NoShow, StringComparison.OrdinalIgnoreCase)).Sum(g => g.Count),
+            groups.Where(g => string.Equals(g.Status, AppointmentStatuses.Cancelled, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(g.Status, "Canceled", StringComparison.OrdinalIgnoreCase)).Sum(g => g.Count));
     }
 }

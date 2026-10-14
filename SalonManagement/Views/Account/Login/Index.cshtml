@@ -1,0 +1,111 @@
+@{ Layout = "_AuthLayout"; ViewData["Title"] = "Đăng nhập"; }
+
+<div class="sl-auth-page">
+
+  @* ── Left: Showcase ────────────────────────────────── *@
+  <div class="sl-auth-showcase">
+    <a class="brand" href="/" style="z-index:1;position:relative;">
+      <span class="brand-mark" style="border-color:rgba(255,255,255,.55);">L</span>
+      <span>
+        <strong>Luminol</strong>
+        <small>Salon &amp; Spa</small>
+      </span>
+    </a>
+
+    <div class="showcase-copy" style="position:relative;z-index:1;">
+      <span class="eyebrow" style="color:#c5d0fa;">Cổng nhân viên</span>
+      <h1>Chào mừng<br/>trở lại.</h1>
+      <p>Quản lý lịch hẹn, dịch vụ và đội ngũ của salon một cách hiệu quả và dễ dàng.</p>
+    </div>
+
+    <div class="showcase-footer" style="position:relative;z-index:1;">
+      <span class="divider"></span>
+      <span>Luminol Salon Management</span>
+    </div>
+  </div>
+
+  @* ── Right: Form ───────────────────────────────────── *@
+  <div class="sl-auth-panel">
+    @* Mobile brand *@
+    <a class="sl-auth-logo-mobile brand mobile-brand" href="/">
+      <span class="brand-mark" style="width:38px;height:38px;font-size:20px;">L</span>
+      <span>
+        <strong style="font-size:18px;">Luminol</strong>
+        <small>Salon &amp; Spa</small>
+      </span>
+    </a>
+
+    <div class="sl-auth-card">
+      <div class="sl-auth-heading login-heading">
+        <span class="sl-eyebrow eyebrow">Cổng nhân viên</span>
+        <h2>Đăng nhập</h2>
+        <p>Nhập thông tin tài khoản của bạn để tiếp tục.</p>
+      </div>
+
+      @if (TempData["SuccessMessage"] != null)
+      {
+          <div class="login-alert login-alert-success" role="alert">
+              <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+              <span>@TempData["SuccessMessage"]</span>
+          </div>
+      }
+
+      <div id="login-error" class="login-alert d-none" role="alert"></div>
+
+      <form id="login-form" novalidate>
+        <div class="field-group">
+          <label for="email" class="sl-label">Địa chỉ email</label>
+          <div class="input-wrap">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <input id="email" name="email" type="email" class="sl-input"
+                   placeholder="example@salon.vn" autocomplete="username" autofocus required />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="label-row">
+            <label for="password" class="sl-label">Mật khẩu</label>
+            <a asp-controller="Account" asp-action="ForgotPassword">Quên mật khẩu?</a>
+          </div>
+          <div class="input-wrap">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="password" name="password" type="password" class="sl-input"
+                   placeholder="Nhập mật khẩu" autocomplete="current-password" required />
+            <button class="password-toggle" type="button" aria-label="Hiện/Ẩn mật khẩu" aria-pressed="false">
+              <svg class="eye-open" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-closed" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <label class="remember-option">
+          <input type="checkbox" id="remember">
+          Ghi nhớ đăng nhập
+        </label>
+
+        <button id="login-submit" type="submit" class="login-button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          <div class="button-spinner"></div>
+          Đăng nhập
+        </button>
+      </form>
+
+      <div class="auth-help">
+        <p class="support-note">
+          Nhân viên salon?
+          <a href="/admin/login">Vào cổng quản trị</a>
+        </p>
+      </div>
+
+      <p class="copyright">
+        &copy; @DateTime.Now.Year Luminol Salon &amp; Spa
+      </p>
+    </div>
+  </div>
+
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>SalonAuth.bindLoginForm();</script>
+}

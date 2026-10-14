@@ -9,7 +9,7 @@ Dự án quản lý Salon hỗ trợ khởi chạy môi trường Staging/Develo
 Mở Terminal tại thư mục gốc của dự án và chạy:
 
 ```powershell
-dotnet run --project SalonManagement
+dotnet run --project SalonManagement --launch-profile Staging
 ```
 
 Ứng dụng sẽ tự động áp dụng migration, nạp dữ liệu mẫu và tạo các tài khoản demo nếu dữ liệu chưa tồn tại.
@@ -18,12 +18,14 @@ dotnet run --project SalonManagement
 
 ## 2. Thông tin Staging và tài khoản Demo
 
-Ứng dụng chạy tại địa chỉ: **http://localhost:5129**
+Staging cục bộ: **http://localhost:5129**. Đăng nhập cả bốn vai trò tại **http://localhost:5129/admin/login**. Chưa có địa chỉ staging công khai được triển khai.
 
 | Vai trò | Email | Mật khẩu |
 | :--- | :--- | :--- |
-| **Admin** | admin@gmail.com | Admin@123 |
-| **Staff** | staff@gmail.com | Staff@123 |
+| **Admin** | admin@salon.local | Admin123! |
+| **Owner** | owner@salon.local | Owner123! |
+| **Receptionist** | receptionist@salon.local | Reception123! |
+| **Stylist** | stylist@salon.local | Stylist123! |
 
 > Các tài khoản trên chỉ được sử dụng cho môi trường phát triển và thử nghiệm.
 
@@ -47,7 +49,7 @@ Trên máy chủ triển khai, có thể dùng biến môi trường thay cho Us
 
 ```powershell
 $env:ConnectionStrings__DefaultConnection = "Server=TEN_MAY_CHU,1433;Database=SalonManagementDB;User Id=TEN_DANG_NHAP;Password=MAT_KHAU;Encrypt=True;TrustServerCertificate=True;MultipleActiveResultSets=True"
-dotnet run --project SalonManagement
+dotnet run --project SalonManagement --launch-profile Staging
 ```
 
 Giá trị trong `appsettings.json` và `appsettings.Development.json` chỉ là cấu hình SQL Server LocalDB dự phòng cho một máy. Để tất cả thành viên nhìn thấy cùng dữ liệu, mọi người phải cấu hình cùng một địa chỉ SQL Server dùng chung theo một trong hai cách trên.
