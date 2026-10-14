@@ -1,0 +1,36 @@
+@model SalonManagement.Models.ViewModels.Owner.AppointmentAnalyticsViewModel
+@{
+    ViewData["Title"] = "Báo cáo lịch hẹn";
+    var max = Math.Max(1, Model.TotalByHour.Select(item => item.Count).DefaultIfEmpty(0).Max());
+}
+<div class="container py-4">
+    <h1 class="h3 mb-3">Báo cáo lịch hẹn</h1>
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-end mb-4">
+        <label class="form-label mb-0">Từ ngày<input class="form-control" type="date" name="from" value="@Model.From.ToString("yyyy-MM-dd")" /></label>
+        <label class="form-label mb-0">Đến ngày<input class="form-control" type="date" name="to" value="@Model.To.ToString("yyyy-MM-dd")" /></label>
+        <button class="btn btn-primary" type="submit">Cập nhật</button>
+    </form>
+    @if (Model.Error is not null) { <div class="alert alert-danger">@Model.Error</div> }
+    else
+    {
+        <div class="row g-3 mb-4"><div class="col-md-4"><div class="card card-body"><span>Tổng lượt hẹn</span><strong class="fs-4">@Model.TotalAppointments</strong></div></div><div class="col-md-4"><div class="card card-body"><span>Tỉ lệ không đến</span><strong class="fs-4">@(Model.TotalAppointments == 0 ? 0 : 100d * Model.NoShows / Model.TotalAppointments).ToString("N1")%</strong></div></div><div class="col-md-4"><div class="card card-body"><span>Tỉ lệ hủy</span><strong class="fs-4">@(Model.TotalAppointments == 0 ? 0 : 100d * Model.Cancellations / Model.TotalAppointments).ToString("N1")%</strong></div></div></div>
+        <section class="card border-0 shadow-sm mb-4"><div class="card-body"><h2 class="h5">Lượt hẹn theo khung giờ</h2><p class="small text-secondary">Đếm mỗi lịch theo giờ bắt đầu trong dải 09:00–20:59; lịch ngoài dải vẫn nằm trong tổng lượt và tỉ lệ, không vào biểu đồ theo giờ.</p>
+            @if (Model.TotalAppointments == 0) { <p class="text-secondary mb-0">Không có lịch hẹn trong khoảng ngày này.</p> }
+            else { <div class="d-flex align-items-end gap-2" style="height:240px" role="img" aria-label="Biểu đồ số lượt hẹn theo khung giờ">
+                @foreach (var hour in Model.TotalByHour) { var height = 100.0 * hour.Count / max; <div class="d-flex flex-column align-items-center justify-content-end flex-fill h-100" title="@hour.Hour.ToString("00"):00 - @((hour.Hour + 1).ToString("00")):00: @hour.Count lượt"><strong class="small">@hour.Count</strong><div class="bg-primary rounded-top w-100" style="height:@height%; min-height:2px"></div><span class="small text-secondary mt-1">@hour.Hour.ToString("00")</span></div> }
+            </div> }
+        </div></section>
+        <section class="card border-0 shadow-sm"><div class="card-body"><h2 class="h5">So sánh theo loại ngày</h2>
+            <div class="table-responsive"><table class="table"><thead><tr><th></th>@foreach (var group in Model.DayTypes) { <th>@group.Name</th> }</tr></thead><tbody>
+                <tr><th>Số ngày</th>@foreach (var group in Model.DayTypes) { <td>@group.Days</td> }</tr>
+                <tr><th>Lượt hẹn</th>@foreach (var group in Model.DayTypes) { <td>@group.Appointments</td> }</tr>
+                <tr><th>Trung bình/ngày</th>@foreach (var group in Model.DayTypes) { <td>@group.PerDay.ToString("N2")</td> }</tr>
+                <tr><th>Tỉ lệ không đến</th>@foreach (var group in Model.DayTypes) { <td>@group.NoShowRate.ToString("N1")%</td> }</tr>
+                <tr><th>Tỉ lệ hủy</th>@foreach (var group in Model.DayTypes) { <td>@group.CancellationRate.ToString("N1")%</td> }</tr>
+            </tbody></table></div>
+            <div class="row g-3">@foreach (var group in Model.DayTypes) { <div class="col-lg-4"><h3 class="h6">@group.Name</h3>@if (group.Days == 0) { <p class="small text-secondary">Khoảng ngày chưa có @(group.Name == "Chủ nhật" ? "chủ nhật" : group.Name.ToLowerInvariant()).</p> } else { <div class="d-flex align-items-end gap-1" style="height:130px">
+                @for (var index = 0; index < group.HourlyPerDay.Count; index++) { var hour = index + 9; var value = group.HourlyPerDay[index]; var peak = hour == group.PeakHour && value > 0; var top = Math.Max(1, Model.DayTypes.SelectMany(item => item.HourlyPerDay).DefaultIfEmpty(0).Max()); <div class="d-flex flex-column align-items-center justify-content-end flex-fill h-100" title="@hour.ToString("00"):00: @value.ToString("N2") lượt/ngày"><span class="small">@(peak ? "Cao điểm" : "")</span><div class="@(peak ? "bg-warning" : "bg-info") rounded-top w-100" style="height:@(100 * value / top)%; min-height:2px"></div><span class="small">@hour.ToString("00")</span></div> }
+            </div> } }</div> }
+        </div></section>
+    }
+</div>
