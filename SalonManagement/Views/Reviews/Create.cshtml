@@ -1,0 +1,8 @@
+@model SalonManagement.Models.ViewModels.StylistReviewViewModel
+@{ ViewData["Title"] = "Đánh giá dịch vụ"; }
+<div class="container py-5" style="max-width:680px"><div class="card border-0 shadow-sm"><div class="card-body p-4 p-md-5"><p class="text-uppercase text-secondary small">Luminol Salon &amp; Spa</p><h1 class="h3">Đánh giá lần ghé thăm</h1><p class="text-secondary">Cảm ơn @Model.CustomerName đã trải nghiệm dịch vụ với @Model.StylistName. Đánh giá của bạn giúp chúng tôi phục vụ tốt hơn.</p>
+    <form asp-action="Create" method="post" class="vstack gap-3">@Html.AntiForgeryToken()<input asp-for="Token" type="hidden" /><input asp-for="StylistName" type="hidden" /><input asp-for="CustomerName" type="hidden" />
+        <div><label asp-for="Rating" class="form-label">Mức hài lòng (1–5 sao)</label><select asp-for="Rating" class="form-select"><option value="0">Chọn số sao</option><option value="1">1 sao</option><option value="2">2 sao</option><option value="3">3 sao</option><option value="4">4 sao</option><option value="5">5 sao</option></select><span asp-validation-for="Rating" class="text-danger"></span></div>
+        <div><label asp-for="Comment" class="form-label">Chia sẻ thêm (không bắt buộc)</label><textarea asp-for="Comment" class="form-control" rows="4" maxlength="1000"></textarea><span asp-validation-for="Comment" class="text-danger"></span></div>
+        <button class="btn btn-primary" type="submit">Gửi đánh giá</button>
+    </form></div></div></div>

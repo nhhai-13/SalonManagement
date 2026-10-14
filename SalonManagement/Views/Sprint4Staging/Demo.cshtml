@@ -1,0 +1,15 @@
+@model IReadOnlyList<string>
+@{
+    ViewData["Title"] = "Kịch bản demo Sprint 4";
+    var accounts = new[] { ("Admin", "admin@salon.local", "Admin123!"), ("Chủ tiệm", "owner@salon.local", "Owner123!"), ("Lễ tân", "receptionist@salon.local", "Reception123!"), ("Thợ", "stylist@salon.local", "Stylist123!") };
+    var routes = new[] { "/Booking/Index", "/Sprint4Staging/Emails", "/ReceptionSchedule/Index", "/CheckIn/Index", "/Appointments/Index", "/Invoices/Index", "/Invoices/Index", "/Sprint4Staging/Emails", "/Sprint4Staging/Emails", "/OwnerReports/Index" };
+}
+<div class="container py-4"><h1 class="h3">Kịch bản demo Sprint 4</h1><p class="text-secondary">Chỉ khả dụng trong môi trường staging. Đánh dấu tiến độ được lưu trên trình duyệt này.</p>
+    <div class="d-flex gap-2 mb-4"><a class="btn btn-outline-primary" asp-action="Health">Kiểm tra staging</a><a class="btn btn-outline-primary" asp-action="Rehearsals">Nhật ký diễn tập</a></div>
+    <section class="card card-body mb-4"><h2 class="h5">Tài khoản mẫu</h2><div class="table-responsive"><table class="table mb-0"><thead><tr><th>Vai trò</th><th>Email</th><th>Mật khẩu</th></tr></thead><tbody>@foreach (var account in accounts) { <tr><td>@account.Item1</td><td>@account.Item2</td><td><code>@account.Item3</code></td></tr> }</tbody></table></div><small class="text-danger">Chỉ dùng các tài khoản này trên staging.</small></section>
+    <ol class="list-group list-group-numbered" id="demo-steps">@for (var index = 0; index < Model.Count; index++) { var step = Model[index]; <li class="list-group-item d-flex gap-3 align-items-center"><input class="form-check-input flex-shrink-0 demo-check" type="checkbox" aria-label="Đánh dấu @step đã xong" /><span class="flex-grow-1">@step</span><a class="btn btn-sm btn-outline-primary" href="@routes[index]">Mở màn hình</a><button class="btn btn-sm btn-outline-danger report-issue" type="button" data-step="@step">Báo lỗi</button></li> }</ol>
+    <form id="report-form" asp-action="Rehearsals" method="get" class="mt-3"><button class="btn btn-primary" type="submit">Mở nhật ký để ghi lỗi</button></form>
+</div>
+@section Scripts { <script>
+(() => { const key='sprint4-demo-checklist'; const boxes=[...document.querySelectorAll('.demo-check')]; let done={}; try { done=JSON.parse(localStorage.getItem(key)||'{}'); } catch {} boxes.forEach((box,index)=>{ box.checked=!!done[index]; box.addEventListener('change',()=>{done[index]=box.checked;localStorage.setItem(key,JSON.stringify(done));}); }); document.querySelectorAll('.report-issue').forEach(button=>button.addEventListener('click',()=>location.href='@Url.Action("Rehearsals")?step='+encodeURIComponent(button.dataset.step))); })();
+</script> }

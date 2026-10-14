@@ -10,6 +10,16 @@
 
         public decimal DiscountAmount { get; set; }
 
+        public int? DiscountCouponId { get; set; }
+
+        public string? DiscountCodeSnapshot { get; set; }
+
+        public string? DiscountTypeSnapshot { get; set; }
+
+        public decimal? DiscountValueSnapshot { get; set; }
+
+        public DiscountCoupon? DiscountCoupon { get; set; }
+
         public decimal TotalAmount { get; set; }
 
         public string Status { get; set; } = "Unpaid";

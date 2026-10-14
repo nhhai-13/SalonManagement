@@ -59,17 +59,24 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
         }
 
         var isStylist = User.IsInRole(UserRoles.Stylist);
+        int? currentStylistId = null;
         var canViewTechnicalNotes = isStylist || User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner);
         if (isStylist)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var stylistId = await db.Users.Where(user => user.Id == userId)
+            currentStylistId = await db.Users.Where(user => user.Id == userId)
                 .Select(user => user.StylistId).SingleOrDefaultAsync();
-            if (!stylistId.HasValue ||
-                (appointment.StylistId != stylistId.Value &&
-                 !appointment.AppointmentServices.Any(service => service.StylistId == stylistId.Value)))
+            if (!currentStylistId.HasValue ||
+                (appointment.StylistId != currentStylistId.Value &&
+                 !appointment.AppointmentServices.Any(service => service.StylistId == currentStylistId.Value)))
             {
                 return Forbid();
+            }
+            foreach (var service in appointment.AppointmentServices.Where(service => service.StylistId != currentStylistId.Value))
+            {
+                service.TechnicalNotes = null;
+                service.TechnicalNotesUpdatedBy = null;
+                service.TechnicalNotesUpdatedAt = null;
             }
         }
         else if (!canViewTechnicalNotes)
@@ -103,7 +110,8 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                         StylistName = service.Stylist != null
                             ? service.Stylist.FullName
                             : item.Stylist.FullName,
-                        service.TechnicalNotes
+                        service.TechnicalNotes,
+                        service.StylistId
                     }).ToList()
                 })
                 .ToListAsync();
@@ -116,7 +124,8 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                         AppointmentDate = item.AppointmentDate,
                         ServiceName = service?.ServiceName ?? "Chưa có dịch vụ",
                         StylistName = service?.StylistName ?? "Chưa phân công",
-                        TechnicalNotes = service?.TechnicalNotes
+                        TechnicalNotes = service is not null && (!isStylist || service.StylistId == currentStylistId)
+                            ? service.TechnicalNotes : null
                     }))
                 .ToList();
             if (!canViewTechnicalNotes)
@@ -159,12 +168,8 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             return NotFound();
         }
 
-        var assignedStylist = item.Stylist
-            ?? await db.Stylists.FindAsync(item.Appointment.StylistId);
-        if (assignedStylist is null || !string.Equals(
-                assignedStylist.Email,
-                User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name,
-                StringComparison.OrdinalIgnoreCase))
+        var stylistId = await GetCurrentStylistId();
+        if (!stylistId.HasValue || (item.StylistId != stylistId.Value && item.Appointment.StylistId != stylistId.Value))
         {
             return Forbid();
         }
@@ -193,12 +198,8 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             return NotFound();
         }
 
-        var assignedStylist = item.Stylist
-            ?? await db.Stylists.FindAsync(item.Appointment.StylistId);
-        if (assignedStylist is null || !string.Equals(
-                assignedStylist.Email,
-                User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name,
-                StringComparison.OrdinalIgnoreCase))
+        var stylistId = await GetCurrentStylistId();
+        if (!stylistId.HasValue || (item.StylistId != stylistId.Value && item.Appointment.StylistId != stylistId.Value))
         {
             return Forbid();
         }
@@ -222,4 +223,11 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
     private async Task<int> GetAppointmentId(int appointmentServiceId) =>
         await db.AppointmentServices.Where(item => item.AppointmentServiceId == appointmentServiceId)
             .Select(item => item.AppointmentId).FirstOrDefaultAsync();
+
+    private async Task<int?> GetCurrentStylistId()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return await db.Users.Where(user => user.Id == userId)
+            .Select(user => user.StylistId).SingleOrDefaultAsync();
+    }
 }

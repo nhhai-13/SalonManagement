@@ -11,10 +11,41 @@ public class InvoiceDetailsViewModel
     public decimal AdjustedTotal { get; set; }
 }
 
+public class InvoiceDayViewModel
+{
+    public DateTime SelectedDate { get; init; }
+    public IReadOnlyList<Appointment> Appointments { get; init; } = [];
+    public IReadOnlyList<Invoice> PaidInvoices { get; init; } = [];
+    public decimal SubtotalTotal => PaidInvoices.Sum(item => item.Subtotal);
+    public decimal DiscountTotal => PaidInvoices.Sum(item => item.DiscountAmount);
+    public decimal CollectedTotal => PaidInvoices.Sum(item => item.TotalAmount);
+}
+
 public class AddInvoiceServiceViewModel
 {
     [Required]
     public int ServiceId { get; set; }
+}
+
+public class ApplyDiscountViewModel
+{
+    public int InvoiceId { get; set; }
+    [StringLength(32)]
+    public string? Code { get; set; }
+}
+
+public class DiscountCouponViewModel
+{
+    [Required, StringLength(32)]
+    public string Code { get; set; } = string.Empty;
+    [Required]
+    public string DiscountType { get; set; } = "Percent";
+    [Range(typeof(decimal), "0.01", "100000000")]
+    public decimal Value { get; set; }
+    [DataType(DataType.Date)]
+    public DateTime StartsOn { get; set; }
+    [DataType(DataType.Date)]
+    public DateTime EndsOn { get; set; }
 }
 
 public class PaymentViewModel

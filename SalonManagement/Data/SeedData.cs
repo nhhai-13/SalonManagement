@@ -8,7 +8,8 @@ public static class SeedData
 {
     public static async Task SeedAsync(
         ApplicationDbContext context,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        bool seedDemoAccounts = true)
     {
         // =========================
         // 1. SERVICE GROUPS
@@ -256,6 +257,8 @@ public static class SeedData
         // =========================
         // 4. SAMPLE USERS
         // =========================
+
+        if (!seedDemoAccounts) return;
 
         var sampleUsers = new[]
         {

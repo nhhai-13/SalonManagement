@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
+using SalonManagement.Data;
+using SalonManagement.Models;
 
 namespace SalonManagement.Services;
 
@@ -11,10 +13,12 @@ namespace SalonManagement.Services;
 public sealed class EmailService(
     ILogger<EmailService> logger,
     IConfiguration configuration,
-    IWebHostEnvironment env) : IEmailService
+    IWebHostEnvironment env,
+    ApplicationDbContext db) : IEmailService
 {
     public async Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
     {
+        if (await LogStagingDelivery(toEmail, "appointment-change")) return;
         var smtp = configuration.GetSection("SmtpSettings");
         if (string.IsNullOrWhiteSpace(smtp["Server"]) || string.IsNullOrWhiteSpace(smtp["SenderEmail"]))
         {
@@ -42,6 +46,7 @@ public sealed class EmailService(
 
     public async Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword)
     {
+        if (await LogStagingDelivery(toEmail, "temporary-password")) return;
         var smtp = configuration.GetSection("SmtpSettings");
         if (string.IsNullOrWhiteSpace(smtp["Server"]) || string.IsNullOrWhiteSpace(smtp["SenderEmail"]))
             throw new InvalidOperationException("Chưa cấu hình SMTP để gửi mật khẩu tạm.");
@@ -61,6 +66,7 @@ public sealed class EmailService(
 
     public async Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode)
     {
+        if (await LogStagingDelivery(toEmail, "email-verification")) return;
         var smtpSection = configuration.GetSection("SmtpSettings");
         var server = smtpSection["Server"];
         var senderEmail = smtpSection["SenderEmail"];
@@ -116,6 +122,7 @@ public sealed class EmailService(
 
     public async Task SendPasswordResetEmailAsync(string toEmail, string resetLink)
     {
+        if (await LogStagingDelivery(toEmail, "password-reset")) return;
         var smtpSection = configuration.GetSection("SmtpSettings");
         var server = smtpSection["Server"];
         var portStr = smtpSection["Port"];
@@ -302,6 +309,7 @@ public sealed class EmailService(
         string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh",
         string salonHotline = "1900 1234")
     {
+        if (await LogStagingDelivery(toEmail, "reschedule")) return;
         var smtpSection = configuration.GetSection("SmtpSettings");
         var server = smtpSection["Server"];
         var portStr = smtpSection["Port"];
@@ -367,6 +375,57 @@ public sealed class EmailService(
 
         logger.LogWarning("[FALLBACK EMAIL] Thông báo dời lịch gửi tới {Email} (Thợ: {Stylist}, Ngày: {Date:dd/MM/yyyy}, Giờ: {Start:hh\\:mm}-{End:hh\\:mm})",
             toEmail, stylistName, appointmentDate, startTime, endTime);
+    }
+
+    public async Task SendReviewRequestEmailAsync(string toEmail, string customerName, string stylistName, string reviewUrl)
+    {
+        if (await LogStagingDelivery(toEmail, "review-request", reviewUrl)) return;
+        var smtp = configuration.GetSection("SmtpSettings");
+        var server = smtp["Server"];
+        var sender = smtp["SenderEmail"];
+        var username = smtp["Username"];
+        var password = smtp["Password"];
+        if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(sender) ||
+            string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            if (env.IsDevelopment())
+            {
+                logger.LogInformation("[FALLBACK REVIEW EMAIL] Review link for {Recipient}: {ReviewUrl}", toEmail, reviewUrl);
+                return;
+            }
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi lời mời đánh giá.");
+        }
+
+        using var client = new SmtpClient(server, smtp.GetValue<int>("Port", 587))
+        {
+            EnableSsl = true,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(username, password),
+            Timeout = 15000
+        };
+        using var message = new MailMessage
+        {
+            From = new MailAddress(sender, smtp["SenderName"] ?? "Luminol Salon"),
+            Subject = "Mời bạn đánh giá trải nghiệm tại Luminol Salon",
+            IsBodyHtml = true,
+            Body = $"<p>Chào {WebUtility.HtmlEncode(customerName)}, cảm ơn bạn đã trải nghiệm dịch vụ với {WebUtility.HtmlEncode(stylistName)}.</p><p><a href=\"{WebUtility.HtmlEncode(reviewUrl)}\">Gửi đánh giá của bạn</a></p><p>Liên kết có hiệu lực trong 14 ngày và chỉ dùng một lần.</p>"
+        };
+        message.To.Add(toEmail);
+        await client.SendMailAsync(message);
+    }
+
+    private async Task<bool> LogStagingDelivery(string toEmail, string template, string? summary = null)
+    {
+        if (!env.IsStaging()) return false;
+        logger.LogInformation("[STAGING EMAIL SIMULATION] {Template} to {Recipient}; external delivery suppressed.", template, toEmail);
+        db.StagingEmailMessages.Add(new StagingEmailMessage
+        {
+            Template = template,
+            Recipient = toEmail,
+            Summary = summary ?? "Email được mô phỏng trên staging; không gửi tới hộp thư bên ngoài."
+        });
+        await db.SaveChangesAsync();
+        return true;
     }
 
     private static string BuildRescheduleNotificationHtmlBody(
