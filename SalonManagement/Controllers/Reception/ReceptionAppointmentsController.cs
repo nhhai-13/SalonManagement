@@ -22,7 +22,7 @@ public class ReceptionAppointmentsController : ControllerBase
     /// <summary>
     /// Lấy toàn bộ lịch hẹn và ca làm việc theo ngày cho màn hình lịch ngày của lễ tân.
     /// </summary>
-    [HttpGet("daily-schedule")]
+    [HttpGet("reschedule-calendar")]
     public async Task<IActionResult> GetDailySchedule([FromQuery] string? date, CancellationToken cancellationToken)
     {
         var targetDate = DateTime.Today;
@@ -60,7 +60,7 @@ public class ReceptionAppointmentsController : ControllerBase
     /// Kiểm tra tính hợp lệ trước khi lưu (Kiểm tra kỹ năng F33, ca làm việc, trùng lịch).
     /// </summary>
     [HttpPost("appointments/{id:int}/validate-reschedule")]
-    public async Task<IActionResult> ValidateReschedule([FromRoute] int id, [FromBody] RescheduleAppointmentRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> ValidateReschedule([FromRoute] int id, [FromBody] CalendarRescheduleRequest request, CancellationToken cancellationToken)
     {
         if (request == null || request.NewStylistId <= 0)
         {
@@ -81,7 +81,7 @@ public class ReceptionAppointmentsController : ControllerBase
     /// Thực hiện dời giờ hoặc đổi thợ cho lịch hẹn.
     /// </summary>
     [HttpPost("appointments/{id:int}/reschedule")]
-    public async Task<IActionResult> Reschedule([FromRoute] int id, [FromBody] RescheduleAppointmentRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Reschedule([FromRoute] int id, [FromBody] CalendarRescheduleRequest request, CancellationToken cancellationToken)
     {
         if (request == null || request.NewStylistId <= 0)
         {

@@ -10,10 +10,12 @@ namespace SalonManagement.Services.Appointments;
 public class AppointmentRescheduleService : IAppointmentRescheduleService
 {
     private readonly ApplicationDbContext _db;
+    private readonly IAppointmentRescheduleEmailQueue? _emailQueue;
 
-    public AppointmentRescheduleService(ApplicationDbContext db)
+    public AppointmentRescheduleService(ApplicationDbContext db, IAppointmentRescheduleEmailQueue? emailQueue = null)
     {
         _db = db;
+        _emailQueue = emailQueue;
     }
 
     public async Task<DailyScheduleDto> GetDailyScheduleAsync(DateTime date, CancellationToken cancellationToken = default)
@@ -294,7 +296,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
         return RescheduleValidationResult.Success();
     }
 
-    public async Task<RescheduleResult> RescheduleAppointmentAsync(int appointmentId, RescheduleAppointmentRequest request, string? currentUserId = null, string? currentUserName = null, CancellationToken cancellationToken = default)
+    public async Task<RescheduleResult> RescheduleAppointmentAsync(int appointmentId, CalendarRescheduleRequest request, string? currentUserId = null, string? currentUserName = null, CancellationToken cancellationToken = default)
     {
         var strategy = _db.Database.CreateExecutionStrategy();
 
@@ -357,7 +359,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                 // [AC4 - Audit Trail]: Ghi nhận nhật ký thay đổi lịch hẹn trong cùng transaction
                 if (hasChanged)
                 {
-                    var changeLog = new AppointmentChangeLog
+                    var changeLog = new RescheduleChangeLog
                     {
                         AppointmentId = appointmentId,
                         ModifiedByUserId = string.IsNullOrWhiteSpace(currentUserId) ? "SYSTEM" : currentUserId,
@@ -376,7 +378,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                         ChangedAtUtc = DateTime.UtcNow
                     };
 
-                    _db.AppointmentChangeLogs.Add(changeLog);
+                    _db.RescheduleChangeLogs.Add(changeLog);
                 }
 
                 // Cập nhật thông tin lịch hẹn
@@ -400,6 +402,27 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                     await transaction.CommitAsync(cancellationToken);
                 }
 
+                var servicesSummary = string.Join(", ", appointment.AppointmentServices.Select(s => s.Service?.ServiceName ?? "").Where(s => !string.IsNullOrEmpty(s)));
+
+                // [AC5 - Background Email Queue]: Đẩy vào hàng đợi gửi email nền cho khách (nếu có email)
+                if (_emailQueue != null && appointment.Customer != null && !string.IsNullOrWhiteSpace(appointment.Customer.Email))
+                {
+                    var emailMsg = new RescheduleEmailMessage
+                    {
+                        AppointmentId = appointment.AppointmentId,
+                        CustomerEmail = appointment.Customer.Email,
+                        CustomerName = appointment.Customer.FullName,
+                        StylistName = newStylistName,
+                        AppointmentDate = appointment.AppointmentDate,
+                        StartTime = appointment.StartTime,
+                        EndTime = appointment.EndTime,
+                        ServicesSummary = servicesSummary,
+                        Reason = request.Reason
+                    };
+
+                    await _emailQueue.EnqueueAsync(emailMsg, cancellationToken);
+                }
+
                 var updatedCard = new AppointmentCalendarCardDto
                 {
                     AppointmentId = appointment.AppointmentId,
@@ -413,7 +436,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
                     EndTime = appointment.EndTime,
                     DurationMinutes = totalDuration,
                     Status = appointment.Status,
-                    ServiceNamesSummary = string.Join(", ", appointment.AppointmentServices.Select(s => s.Service?.ServiceName ?? "").Where(s => !string.IsNullOrEmpty(s))),
+                    ServiceNamesSummary = servicesSummary,
                     TotalAmount = appointment.AppointmentServices.Sum(s => s.Price)
                 };
 
@@ -445,7 +468,7 @@ public class AppointmentRescheduleService : IAppointmentRescheduleService
 
     public async Task<List<AppointmentChangeLogDto>> GetRescheduleHistoryAsync(int appointmentId, CancellationToken cancellationToken = default)
     {
-        var logs = await _db.AppointmentChangeLogs.AsNoTracking()
+        var logs = await _db.RescheduleChangeLogs.AsNoTracking()
             .Where(l => l.AppointmentId == appointmentId)
             .OrderByDescending(l => l.ChangedAtUtc)
             .ToListAsync(cancellationToken);
