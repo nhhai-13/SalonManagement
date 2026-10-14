@@ -152,6 +152,22 @@
                             <input type="text" id="reschedule-reason" class="form-control" placeholder="Ví dụ: Khách báo đến trễ 15 phút, thợ bận ca phát sinh..." />
                         </div>
                     </div>
+
+                    <!-- Lịch sử thay đổi / Audit Log (AC4) -->
+                    <div class="mt-4 pt-3 border-top">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold small text-secondary">
+                                <i class="bi bi-clock-history me-1 text-info"></i>Lịch sử dời lịch / Đổi thợ
+                            </span>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.75rem;" id="btn-toggle-history">
+                                <i class="bi bi-chevron-down me-1"></i>Xem lịch sử (<span id="history-count">0</span>)
+                            </button>
+                        </div>
+                        <div id="reschedule-history-container" class="bg-light p-2 rounded border small" style="max-height: 180px; overflow-y: auto; display: none;">
+                            <div class="text-center text-muted py-2" id="reschedule-history-empty">Chưa có lượt thay đổi nào.</div>
+                            <div id="reschedule-history-list"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="modal-footer bg-light border-top">

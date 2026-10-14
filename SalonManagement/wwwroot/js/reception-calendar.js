@@ -244,6 +244,7 @@ window.ReceptionCalendar = (() => {
 
             currentAppointmentDetail = await res.json();
             populateModalData(currentAppointmentDetail);
+            await loadChangeHistory(appointmentId);
             rescheduleModalInstance.show();
         } catch (err) {
             console.error("Lỗi khi mở modal:", err);
@@ -403,6 +404,19 @@ window.ReceptionCalendar = (() => {
             });
         }
 
+        const toggleHistoryBtn = document.getElementById("btn-toggle-history");
+        const historyContainer = document.getElementById("reschedule-history-container");
+        if (toggleHistoryBtn && historyContainer) {
+            toggleHistoryBtn.addEventListener("click", () => {
+                const isHidden = historyContainer.style.display === "none";
+                historyContainer.style.display = isHidden ? "block" : "none";
+                const count = document.getElementById("history-count")?.textContent || "0";
+                toggleHistoryBtn.innerHTML = isHidden 
+                    ? `<i class="bi bi-chevron-up me-1"></i>Thu gọn` 
+                    : `<i class="bi bi-chevron-down me-1"></i>Xem lịch sử (<span id="history-count">${count}</span>)`;
+            });
+        }
+
         if (form) {
             form.addEventListener("submit", async (e) => {
                 e.preventDefault();
@@ -509,14 +523,49 @@ window.ReceptionCalendar = (() => {
         }
     }
 
-    function escapeHtml(str) {
-        if (!str) return "";
-        return String(str)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+    async function loadChangeHistory(appointmentId) {
+        const listEl = document.getElementById("reschedule-history-list");
+        const emptyEl = document.getElementById("reschedule-history-empty");
+        const countEl = document.getElementById("history-count");
+        if (!listEl) return;
+
+        try {
+            const res = await authFetch(`/api/reception/appointments/${appointmentId}/change-history`);
+            if (!res.ok) return;
+
+            const history = await res.json();
+            if (countEl) countEl.textContent = history.length;
+
+            if (history.length === 0) {
+                listEl.innerHTML = "";
+                if (emptyEl) emptyEl.style.display = "block";
+                return;
+            }
+
+            if (emptyEl) emptyEl.style.display = "none";
+            listEl.innerHTML = history.map(item => `
+                <div class="border-bottom pb-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-secondary-subtle text-dark border" style="font-size: 0.7rem;">
+                            <i class="bi bi-calendar-event me-1"></i>${item.formattedChangedAt}
+                        </span>
+                        <span class="text-muted" style="font-size: 0.72rem;">
+                            <i class="bi bi-person me-1"></i>${escapeHtml(item.modifiedByUserName || "Lễ tân")}
+                        </span>
+                    </div>
+                    <div class="mt-1 fw-semibold text-dark" style="font-size: 0.78rem;">
+                        ${escapeHtml(item.formattedChangeSummary)}
+                    </div>
+                    ${item.reason ? `
+                        <div class="text-muted fst-italic mt-1" style="font-size: 0.73rem;">
+                            <i class="bi bi-chat-left-quote me-1"></i>Lý do: "${escapeHtml(item.reason)}"
+                        </div>
+                    ` : ""}
+                </div>
+            `).join("");
+        } catch (err) {
+            console.error("Lỗi tải lịch sử thay đổi:", err);
+        }
     }
 
     return {

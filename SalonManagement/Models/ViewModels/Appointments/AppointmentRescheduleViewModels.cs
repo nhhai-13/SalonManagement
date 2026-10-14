@@ -142,3 +142,27 @@ public class AppointmentCalendarCardDto
     public decimal TotalAmount { get; set; }
     public bool CanReschedule => Status != "Completed" && Status != "Cancelled";
 }
+
+public class AppointmentChangeLogDto
+{
+    public int Id { get; set; }
+    public int AppointmentId { get; set; }
+    public string ModifiedByUserId { get; set; } = string.Empty;
+    public string? ModifiedByUserName { get; set; }
+    public int OldStylistId { get; set; }
+    public int NewStylistId { get; set; }
+    public string? OldStylistName { get; set; }
+    public string? NewStylistName { get; set; }
+    public DateTime OldDate { get; set; }
+    public DateTime NewDate { get; set; }
+    public TimeSpan OldStartTime { get; set; }
+    public TimeSpan NewStartTime { get; set; }
+    public TimeSpan OldEndTime { get; set; }
+    public TimeSpan NewEndTime { get; set; }
+    public string? Reason { get; set; }
+    public DateTime ChangedAtUtc { get; set; }
+    public DateTime ChangedAtLocal { get; set; }
+    public string FormattedChangedAt { get; set; } = string.Empty;
+    public string FormattedChangeSummary { get; set; } = string.Empty;
+}
+

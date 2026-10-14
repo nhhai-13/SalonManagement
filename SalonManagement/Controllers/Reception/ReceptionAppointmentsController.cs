@@ -105,4 +105,14 @@ public class ReceptionAppointmentsController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// [AC4] Lấy lịch sử thay đổi / audit trail của lịch hẹn.
+    /// </summary>
+    [HttpGet("appointments/{id:int}/change-history")]
+    public async Task<IActionResult> GetChangeHistory([FromRoute] int id, CancellationToken cancellationToken)
+    {
+        var history = await _rescheduleService.GetRescheduleHistoryAsync(id, cancellationToken);
+        return Ok(history);
+    }
 }
