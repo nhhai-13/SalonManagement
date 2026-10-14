@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Diagnostics;
@@ -67,7 +68,10 @@ public sealed class ReceptionScheduleControllerTests
     [TestMethod]
     public async Task Index_loads_eight_stylists_and_sixty_appointments_within_two_seconds()
     {
-        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options, new HttpContextAccessor());
+        await db.Database.EnsureCreatedAsync();
         var date = new DateTime(2031, 2, 3);
         var service = new Service { ServiceName = "Cắt", DurationMinutes = 30, Price = 100000 };
         db.Services.Add(service);

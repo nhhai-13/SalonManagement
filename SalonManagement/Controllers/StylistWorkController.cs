@@ -19,10 +19,9 @@ public sealed class StylistWorkController(ApplicationDbContext db, TimeProvider 
         if (stylistId is null) return Conflict(new { message = "Tài khoản thợ chưa được liên kết với hồ sơ thợ." });
         var day = (date ?? clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime).Date;
         var now = clock.GetUtcNow();
-        var appointments = await db.Appointments.AsNoTracking()
+        var appointmentRows = await db.Appointments.AsNoTracking()
             .Where(item => item.StylistId == stylistId && item.AppointmentDate >= day && item.AppointmentDate < day.AddDays(1)
                 && item.Status != AppointmentStatuses.Cancelled && item.Status != AppointmentStatuses.NoShow && item.Status != "Rejected")
-            .OrderBy(item => item.StartTime)
             .Select(item => new StylistAppointmentResponse(
                 item.AppointmentId,
                 item.AppointmentDate,
@@ -39,6 +38,7 @@ public sealed class StylistWorkController(ApplicationDbContext db, TimeProvider 
                     ? (int)Math.Ceiling(((item.ServiceCompletedAt ?? now) - item.ServiceStartedAt.Value).TotalMinutes)
                     : (int?)null))
             .ToListAsync(cancellationToken);
+        var appointments = appointmentRows.OrderBy(item => item.StartTime).ToList();
         return Ok(appointments);
     }
 

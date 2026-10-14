@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Controllers;
 using SalonManagement.Data;
@@ -11,6 +12,26 @@ namespace SalonManagement.Tests;
 
 public sealed class StylistWorkWorkflowTests
 {
+    [Fact]
+    public async Task Stylist_daily_appointments_query_runs_against_sqlite()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var db = new ApplicationDbContext(
+            new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options,
+            new HttpContextAccessor());
+        await db.Database.EnsureCreatedAsync();
+        var clock = new TestClock(new DateTimeOffset(2026, 10, 14, 4, 0, 0, TimeSpan.Zero));
+        await SeedAsync(db);
+
+        var result = Assert.IsType<OkObjectResult>(await CreateController(db, clock)
+            .Appointments(new DateTime(2026, 10, 14), CancellationToken.None));
+
+        var appointments = Assert.IsType<List<StylistAppointmentResponse>>(result.Value);
+        Assert.Single(appointments);
+        Assert.Equal("090****678", appointments[0].CustomerPhone);
+    }
+
     [Fact]
     public async Task Stylist_can_only_see_own_appointments_and_start_then_complete_them()
     {

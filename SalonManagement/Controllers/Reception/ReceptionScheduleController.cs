@@ -41,7 +41,6 @@ public sealed class ReceptionScheduleController(ApplicationDbContext db) : Contr
             dayOffSet.Contains(stylist.StylistId))).ToList();
         var appointmentRows = await db.Appointments.AsNoTracking()
             .Where(item => item.AppointmentDate.Date == selectedDate && item.Status != "Cancelled" && item.Status != "Rejected" && item.Status != "NoShow")
-            .OrderBy(item => item.StartTime)
             .Select(item => new
             {
                 item.AppointmentId, item.StylistId, CustomerName = item.Customer.FullName,
@@ -50,6 +49,7 @@ public sealed class ReceptionScheduleController(ApplicationDbContext db) : Contr
             })
             .ToListAsync();
         var appointments = appointmentRows
+            .OrderBy(item => item.StartTime)
             .Select(item => new DailyScheduleAppointment(item.AppointmentId, item.StylistId, item.CustomerName, string.Join(", ", item.Services), item.StartTime, item.EndTime, item.Status))
             .ToList();
         return View(new DailyScheduleViewModel(selectedDate, opensAt, closesAt, stylists, appointments));
