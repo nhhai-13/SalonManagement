@@ -1,0 +1,35 @@
+@model SalonManagement.Models.ViewModels.Owner.OwnerRevenueViewModel
+@{
+    ViewData["Title"] = "Báo cáo doanh thu";
+    string Money(decimal value) => value.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + " đ";
+}
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+        <div><p class="text-uppercase text-secondary small mb-1">Báo cáo Owner</p><h1 class="h3 mb-0">Doanh thu thực tế</h1></div>
+        <a asp-action="ExportRevenueCsv" asp-route-from="@Model.From.ToString("yyyy-MM-dd")" asp-route-to="@Model.To.ToString("yyyy-MM-dd")" class="btn btn-outline-primary">Tải CSV UTF-8</a>
+    </div>
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-end mb-4">
+        <label class="form-label mb-0">Từ ngày<input class="form-control" type="date" name="from" value="@Model.From.ToString("yyyy-MM-dd")" /></label>
+        <label class="form-label mb-0">Đến ngày<input class="form-control" type="date" name="to" value="@Model.To.ToString("yyyy-MM-dd")" /></label>
+        <button class="btn btn-primary">Xem báo cáo</button>
+    </form>
+    @if (Model.To < Model.From || (Model.To - Model.From).TotalDays > 364)
+    {
+        <div class="alert alert-danger">Khoảng ngày phải hợp lệ và tối đa 365 ngày.</div>
+    }
+    else
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-6"><div class="card card-body"><span>Doanh thu từ phiếu đã đóng</span><strong class="fs-4">@Money(Model.ActualRevenue)</strong></div></div>
+            <div class="col-md-6"><div class="card card-body"><span>Số phiếu đã đóng</span><strong class="fs-4">@Model.ClosedInvoiceCount</strong></div></div>
+        </div>
+        <section class="card border-0 shadow-sm mb-4"><div class="card-body"><h2 class="h5">Theo nhân viên</h2><div class="table-responsive"><table class="table"><thead><tr><th>Nhân viên</th><th>Số lịch hoàn tất</th><th>Doanh thu thực tế</th><th>Giá trị trung bình</th></tr></thead><tbody>
+            @foreach (var row in Model.ByStylist) { <tr><td>@row.StylistName</td><td>@row.CompletedAppointments</td><td>@Money(row.ActualRevenue)</td><td>@Money(row.AverageTicket)</td></tr> }
+            @if (Model.ByStylist.Count == 0) { <tr><td colspan="4" class="text-secondary">Chưa có phiếu đã đóng trong khoảng này.</td></tr> }
+        </tbody></table></div></div></section>
+        <section class="card border-0 shadow-sm"><div class="card-body"><h2 class="h5">Theo dịch vụ</h2><div class="table-responsive"><table class="table"><thead><tr><th>Dịch vụ</th><th>Số lượt</th><th>Doanh thu thực tế</th></tr></thead><tbody>
+            @foreach (var row in Model.ByService) { <tr><td>@row.ServiceName</td><td>@row.Count</td><td>@Money(row.Amount)</td></tr> }
+            @if (Model.ByService.Count == 0) { <tr><td colspan="3" class="text-secondary">Chưa có dữ liệu dịch vụ.</td></tr> }
+        </tbody></table></div></div></section>
+    }
+</div>
