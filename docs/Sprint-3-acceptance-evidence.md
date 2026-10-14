@@ -27,19 +27,18 @@ This report distinguishes automated and local evidence from validation that stil
 - Local Staging-mode SQLite smoke checks: receptionist login succeeded, schedule page returned 200, booking and service-selection pages returned 200 after the SQLite fix, stylist API returned 200, and cross-role calls returned 403.
 - The fresh local seed has no stylist-to-service assignments. The booking page loads successfully, but selecting `Cắt tóc nam` shows no eligible stylist until staff/service mappings are configured. This is a local data-readiness limit, not evidence about the team's deployed database.
 - `README.md` identifies only local Staging at `http://localhost:5129` and says no public staging deployment exists. There is no deployed team URL available in the repository for live checks.
-- The repository has no `.github/workflows` CI definition, and PR #54's Checks tab has no workflow results.
+- The repository has no `.github/workflows` CI definition, and PR #55 has no workflow runs. Its local test suite passed 337/337.
 
 ## GitHub review state
 
-- On 2026-10-14, PR #54 targets `develop` from `feature/lookup-cancel` and is still open. Its Checks tab has no workflow results. The local SQLite booking fix is on `codex/sprint3-integration-review`, not on PR #54's head branch.
-- PR #53 has the same S3-05 title and source branch name, but targets `main` and contains 59 commits. Keep it separate from PR #54; merging both would not be a safe substitute for reviewing the intended `develop` PR.
+- On 2026-10-14, PR #54 remains open from `feature/lookup-cancel` to `develop`; it does not contain the full Sprint 3 integration.
+- PR #55 contains this full integration from `codex/sprint3-integration-review` to `develop`. GitHub reports it mergeable with no conflicts. The repository has no CI workflow, so it has no check runs; the local full suite passed 337/337 tests.
 
-## Evidence still required before merging the GitHub PR
+## Operational evidence not established by the local acceptance run
 
-1. The team needs to provide/deploy a shared staging service, then verify this candidate against its configured database.
-2. Capture and review the reception schedule, customer directory and stylist portal at 360px and 1366px on deployed staging.
-3. Measure the 8-stylist/60-appointment schedule and 5,000-customer search against the team's staging database.
-4. Confirm real email delivery for reschedule and absent-stylist transfer within five minutes.
-5. Complete the team's review and a live staging demo with seeded or approved test data.
+1. The repository identifies local Staging only; shared staging and its database were not available for this run.
+2. The 8-stylist/60-appointment schedule and 5,000-profile search limits were measured by automated SQLite tests locally, not against the team's deployed database.
+3. Real SMTP delivery for reschedule and absent-stylist transfer was not sent; queue behavior and the five-minute delivery window are covered with test senders.
+4. A live walkthrough against shared staging remains useful after deployment, but these deployment-only checks do not replace the automated coverage for the Sprint 3 acceptance criteria.
 
-The local SQLite Staging-mode run is a smoke test only. It does not establish any of the shared-staging or live-service evidence above.
+The local SQLite Staging-mode run is a smoke test. It does not establish behavior against a shared database or live mail service.
