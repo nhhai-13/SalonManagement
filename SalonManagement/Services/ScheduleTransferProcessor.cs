@@ -7,7 +7,7 @@ using SalonManagement.Models;
 
 namespace SalonManagement.Services;
 
-public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
+public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext, AppointmentNotificationBus? notifications = null)
 {
     private static readonly string[] TransferableStatuses = ["Pending", "Confirmed", "Arrived"];
     public async Task<ScheduleTransferBatchResponse> PreviewAsync(
@@ -294,6 +294,28 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
             appointmentEntry.Property(item => item.Status).IsModified = true;
             appointmentEntry.Property(item => item.UpdatedAt).IsModified = true;
 
+            var previousStylistId = appointment.StylistId;
+            var assignedNotification = new StylistNotification
+            {
+                StylistId = stylist.StylistId,
+                AppointmentId = appointment.AppointmentId,
+                Message = $"Lịch #{appointment.AppointmentId} đã được chuyển sang {start:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM/yyyy}.",
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            dbContext.StylistNotifications.Add(assignedNotification);
+            StylistNotification? previousStylistNotification = null;
+            if (previousStylistId != stylist.StylistId)
+            {
+                previousStylistNotification = new StylistNotification
+                {
+                    StylistId = previousStylistId,
+                    AppointmentId = appointment.AppointmentId,
+                    Message = $"Lịch #{appointment.AppointmentId} đã được chuyển sang thợ khác.",
+                    CreatedAt = DateTimeOffset.UtcNow
+                };
+                dbContext.StylistNotifications.Add(previousStylistNotification);
+            }
+
             if (!string.IsNullOrWhiteSpace(appointment.Customer.Email))
             {
                 var previousVersion = await dbContext.ScheduleChangeNotifications
@@ -336,6 +358,8 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
             {
                 await transaction.CommitAsync(cancellationToken);
             }
+            notifications?.Publish(assignedNotification);
+            if (previousStylistNotification is not null) notifications?.Publish(previousStylistNotification);
 
             return new ScheduleTransferItemResult(selection.AppointmentId, "Succeeded",
                 "Đã chuyển lịch thành công.", stylist.StylistId, stylist.FullName, FormatTime(start), "Confirmed",
