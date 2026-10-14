@@ -35,5 +35,11 @@
 
         public ICollection<StylistService> Services { get; set; }
             = new List<StylistService>();
+
+        public ICollection<AppointmentService> AppointmentServices { get; set; }
+            = new List<AppointmentService>();
+
+        public ICollection<InvoiceAdjustment> InvoiceAdjustments { get; set; }
+            = new List<InvoiceAdjustment>();
     }
 }
