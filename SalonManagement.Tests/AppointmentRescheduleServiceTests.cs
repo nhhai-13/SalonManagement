@@ -954,7 +954,7 @@ public class AppointmentRescheduleServiceTests
         var service = new AppointmentRescheduleService(db);
 
         // Act: Kéo thả từ thợ 1 sang thợ 2 (giữ nguyên giờ 10:00)
-        var dragDropRequest = new RescheduleAppointmentRequest
+        var dragDropRequest = new CalendarRescheduleRequest
         {
             NewStylistId = 2,
             NewDate = date,
@@ -1016,7 +1016,7 @@ public class AppointmentRescheduleServiceTests
         var service = new AppointmentRescheduleService(db);
 
         // Act: Kéo thả sang thợ phụ thiếu kỹ năng
-        var invalidDragDrop = new RescheduleAppointmentRequest
+        var invalidDragDrop = new CalendarRescheduleRequest
         {
             NewStylistId = 2,
             NewDate = date,
