@@ -186,6 +186,7 @@ public sealed class ScheduleTransferProcessorTests
                 FullName = "Thợ thay thế",
                 Specialty = "Cắt tóc nam",
                 IsActive = true,
+                Services = [new StylistService { StylistId = 2, ServiceId = 1 }],
                 WorkSchedules =
                 [
                     new WorkSchedule

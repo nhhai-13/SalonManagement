@@ -270,6 +270,7 @@ public sealed class ScheduleChangeNotificationTests
                 FullName = "Thợ mới",
                 Specialty = "Cắt tóc nam",
                 IsActive = true,
+                Services = [new StylistService { StylistId = 2, ServiceId = 1 }],
                 WorkSchedules =
                 [
                     new WorkSchedule

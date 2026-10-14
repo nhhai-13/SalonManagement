@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using SalonManagement.Models;
 
 namespace SalonManagement.Services;
@@ -170,12 +169,8 @@ public static class ScheduleCoordinationPlanner
             return ["Lịch hẹn chưa có dịch vụ để đối chiếu kỹ năng."];
         }
 
-        var skills = (stylist.Specialty ?? string.Empty)
-            .Split([',', ';', '/', '|'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(Normalize)
-            .Where(skill => skill.Length > 0)
-            .ToArray();
-        if (skills.Length == 0)
+        var skills = stylist.Services.Select(item => item.ServiceId).ToHashSet();
+        if (skills.Count == 0)
         {
             return ["Thợ chưa được khai báo kỹ năng chuyên môn."];
         }
@@ -183,16 +178,8 @@ public static class ScheduleCoordinationPlanner
         var reasons = new List<string>();
         foreach (var item in requiredServices)
         {
-            var serviceName = Normalize(item.Service.ServiceName);
-            var groupName = Normalize(item.Service.ServiceGroup?.GroupName ?? string.Empty);
-            if (!skills.Any(skill =>
-                    (serviceName.Length > 0 && (serviceName.Contains(skill, StringComparison.Ordinal) ||
-                        skill.Contains(serviceName, StringComparison.Ordinal))) ||
-                    (groupName.Length > 0 && (groupName.Contains(skill, StringComparison.Ordinal) ||
-                        skill.Contains(groupName, StringComparison.Ordinal)))))
-            {
+            if (!skills.Contains(item.ServiceId))
                 reasons.Add($"Chưa xác nhận kỹ năng phù hợp với dịch vụ “{item.Service.ServiceName}”.");
-            }
         }
 
         return reasons;
@@ -208,25 +195,6 @@ public static class ScheduleCoordinationPlanner
         existing.StylistId == stylistId &&
         !NonBlockingStatuses.Contains(existing.Status) &&
         start < existing.EndTime && end > existing.StartTime);
-
-    private static string Normalize(string value)
-    {
-        var decomposed = value.Normalize(NormalizationForm.FormD);
-        var builder = new StringBuilder(decomposed.Length);
-        foreach (var character in decomposed)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark)
-            {
-                continue;
-            }
-
-            builder.Append(character is 'đ' or 'Đ' ? 'd' : char.ToLowerInvariant(character));
-        }
-
-        return string.Join(' ', builder.ToString().Split(
-            (char[]?)null,
-            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
-    }
 
     private static TimeSpan AlignToNextStep(TimeSpan value)
     {

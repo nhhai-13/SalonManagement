@@ -201,6 +201,7 @@ public sealed class ScheduleTransferProcessor(ApplicationDbContext dbContext)
             var stylist = await dbContext.Stylists
                 .AsNoTracking()
                 .Include(item => item.WorkSchedules)
+                .Include(item => item.Services)
                 .SingleOrDefaultAsync(item => item.StylistId == selection.StylistId, cancellationToken);
             if (stylist is null || !stylist.IsActive)
             {

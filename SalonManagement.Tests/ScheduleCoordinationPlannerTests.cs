@@ -161,6 +161,7 @@ public sealed class ScheduleCoordinationPlannerTests
         FullName = name,
         Specialty = specialty,
         IsActive = true,
+        Services = [new StylistService { StylistId = id, ServiceId = specialty == "Cắt tóc nam" ? 1 : 2 }],
         WorkSchedules =
         [
             new WorkSchedule
@@ -191,9 +192,11 @@ public sealed class ScheduleCoordinationPlannerTests
         [
             new AppointmentService
             {
+                ServiceId = 1,
                 DurationMinutes = duration,
                 Service = new Service
                 {
+                    ServiceId = 1,
                     ServiceName = "Cắt tóc nam",
                     DurationMinutes = duration,
                     ServiceGroup = new ServiceGroup { GroupName = "Cắt tóc" }

@@ -30,8 +30,13 @@ public ApplicationDbContext(
         public DbSet<ServiceGroup> ServiceGroups => Set<ServiceGroup>();
 
         public DbSet<WorkSchedule> WorkSchedules => Set<WorkSchedule>();
+        public DbSet<StylistBreak> StylistBreaks => Set<StylistBreak>();
+        public DbSet<StylistDayOff> StylistDaysOff => Set<StylistDayOff>();
 
         public DbSet<Appointment> Appointments => Set<Appointment>();
+
+        public DbSet<AppointmentChangeLog> AppointmentChangeLogs => Set<AppointmentChangeLog>();
+        public DbSet<AppointmentChangeEmail> AppointmentChangeEmails => Set<AppointmentChangeEmail>();
 
         public DbSet<AppointmentService> AppointmentServices => Set<AppointmentService>();
 
@@ -44,7 +49,11 @@ public ApplicationDbContext(
         public DbSet<Payment> Payments => Set<Payment>();
 
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
+
+        public DbSet<ShopHoliday> ShopHolidays => Set<ShopHoliday>();
         
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
+
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
         public DbSet<RescheduleChangeLog> RescheduleChangeLogs => Set<RescheduleChangeLog>();
@@ -69,6 +78,7 @@ public override async Task<int> SaveChangesAsync(
     CancellationToken cancellationToken = default)
 {
     ChangeTracker.DetectChanges();
+    await AssignMissingBookingReferencesAsync(cancellationToken);
     if (ChangeTracker.Entries<AuditLog>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
         throw new InvalidOperationException("Nhật ký hệ thống chỉ đọc, không được sửa hoặc xoá.");
     var auditEntries = CreateAuditEntries();
@@ -105,6 +115,7 @@ public override async Task<int> SaveChangesAsync(
 private List<AuditEntry> CreateAuditEntries()
 {
     ChangeTracker.DetectChanges();
+
 
     var entries = new List<AuditEntry>();
 
@@ -230,6 +241,29 @@ private class AuditEntry
                 entity.Property(hours => hours.TimeZoneId).HasMaxLength(64);
                 entity.HasIndex(hours => hours.DayOfWeek).IsUnique();
             });
+            builder.Entity<ShopHoliday>(entity =>
+            {
+                entity.HasKey(holiday => holiday.ShopHolidayId);
+                entity.Property(holiday => holiday.Reason).HasMaxLength(250);
+                entity.HasIndex(holiday => holiday.HolidayDate).IsUnique();
+            });
+            
+            builder.Entity<StylistTimeOff>(entity =>
+           {
+                entity.HasKey(timeOff => timeOff.StylistTimeOffId);
+                entity.Property(timeOff => timeOff.Reason)
+                    .HasMaxLength(250);
+                entity.HasOne(timeOff => timeOff.Stylist)
+                    .WithMany()
+                    .HasForeignKey(timeOff => timeOff.StylistId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(timeOff => new
+           {
+                timeOff.StylistId,
+                timeOff.OffDate
+          });
+        });
 
             builder.Entity<Customer>(entity =>
             {
@@ -239,7 +273,10 @@ private class AuditEntry
                 entity.Property(customer => customer.Email).HasMaxLength(256);
                 entity.Property(customer => customer.Gender).HasMaxLength(20);
                 entity.HasIndex(customer => customer.Phone);
+                entity.HasIndex(customer => customer.FullName);
             });
+
+            builder.Entity<Appointment>().Property(appointment => appointment.Version).IsConcurrencyToken();
 
             builder.Entity<Stylist>(entity =>
             {
@@ -298,6 +335,19 @@ private class AuditEntry
                 entity.HasIndex(schedule => new { schedule.StylistId, schedule.WorkDate });
             });
 
+            builder.Entity<StylistBreak>(entity =>
+            {
+                entity.HasKey(item => item.StylistBreakId);
+                entity.HasIndex(item => new { item.StylistId, item.BreakDate });
+                entity.HasOne(item => item.Stylist).WithMany(stylist => stylist.Breaks).HasForeignKey(item => item.StylistId).OnDelete(DeleteBehavior.Cascade);
+            });
+            builder.Entity<StylistDayOff>(entity =>
+            {
+                entity.HasKey(item => item.StylistDayOffId);
+                entity.HasIndex(item => new { item.StylistId, item.OffDate }).IsUnique();
+                entity.HasOne(item => item.Stylist).WithMany(stylist => stylist.DaysOff).HasForeignKey(item => item.StylistId).OnDelete(DeleteBehavior.Cascade);
+            });
+
             builder.Entity<Appointment>(entity =>
             {
                 entity.HasKey(appointment => appointment.AppointmentId);
@@ -320,6 +370,24 @@ private class AuditEntry
                         appointment.AppointmentDate,
                         appointment.StartTime
                     });
+            });
+
+            builder.Entity<AppointmentChangeLog>(entity =>
+            {
+                entity.HasKey(log => log.AppointmentChangeLogId);
+                entity.Property(log => log.ActorId).HasMaxLength(450).IsRequired();
+                entity.Property(log => log.ActorName).HasMaxLength(256).IsRequired();
+                entity.HasIndex(log => new { log.AppointmentId, log.ChangedAt });
+            });
+
+            builder.Entity<AppointmentChangeEmail>(entity =>
+            {
+                entity.HasKey(email => email.AppointmentChangeEmailId);
+                entity.Property(email => email.RecipientEmail).HasMaxLength(256).IsRequired();
+                entity.Property(email => email.StylistName).HasMaxLength(150).IsRequired();
+                entity.Property(email => email.Status).HasMaxLength(20).IsRequired();
+                entity.Property(email => email.LastError).HasMaxLength(1000);
+                entity.HasIndex(email => new { email.Status, email.NextAttemptAt });
             });
 
             builder.Entity<AppointmentService>(entity =>

@@ -65,6 +65,7 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
             .AsNoTracking()
             .Where(stylist => stylist.IsActive && stylist.StylistId != stylistId)
             .Include(stylist => stylist.WorkSchedules)
+            .Include(stylist => stylist.Services)
             .ToListAsync();
 
         var dayAppointments = await dbContext.Appointments
@@ -155,6 +156,7 @@ public sealed class ScheduleCoordinationController(ApplicationDbContext dbContex
             .AsNoTracking()
             .Where(item => item.IsActive && item.StylistId != request.StylistId)
             .Include(item => item.WorkSchedules)
+            .Include(item => item.Services)
             .ToListAsync(cancellationToken);
         var dayAppointments = await dbContext.Appointments.AsNoTracking()
             .Where(item => item.AppointmentDate >= dayStart && item.AppointmentDate < nextDay)
