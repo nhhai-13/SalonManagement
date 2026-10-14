@@ -100,6 +100,9 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         appointment.CancelReason = reason;
         appointment.UpdatedAt = now.UtcDateTime;
         appointment.Version = Guid.NewGuid();
+        var reminder = await db.AppointmentEmailDeliveries.FirstOrDefaultAsync(item => item.AppointmentId == appointment.AppointmentId && item.Kind == AppointmentEmailKinds.Reminder);
+        if (reminder is not null && reminder.Status is AppointmentEmailStatuses.Queued or AppointmentEmailStatuses.Retrying)
+            reminder.Status = AppointmentEmailStatuses.Cancelled;
         var notification = new StylistNotification { StylistId = appointment.StylistId, AppointmentId = appointment.AppointmentId,
             Message = $"Lịch #{appointment.AppointmentId} đã bị khách hủy.", CreatedAt = now };
         db.StylistNotifications.Add(notification);

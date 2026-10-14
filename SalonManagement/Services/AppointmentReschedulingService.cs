@@ -115,6 +115,16 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
                 NextAttemptAt = changedAt
             });
         }
+        var reminder = await db.AppointmentEmailDeliveries.FirstOrDefaultAsync(item =>
+            item.AppointmentId == appointment.AppointmentId && item.Kind == AppointmentEmailKinds.Reminder);
+        if (reminder is not null && reminder.Status is not AppointmentEmailStatuses.Sent and not AppointmentEmailStatuses.Failed)
+        {
+            var newStart = CheckInService.StartsAt(appointment);
+            reminder.AppointmentStartAt = newStart;
+            var reminderTime = newStart.AddHours(-24);
+            reminder.NextAttemptAt = reminderTime > timeProvider.GetUtcNow() ? reminderTime : timeProvider.GetUtcNow();
+            if (reminder.Status != AppointmentEmailStatuses.NoEmail) reminder.Status = AppointmentEmailStatuses.Queued;
+        }
         try
         {
             await db.SaveChangesAsync();
