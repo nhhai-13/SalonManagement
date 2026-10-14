@@ -154,6 +154,7 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         "Arrived" => "Đã đến",
         "InProgress" => "Đang thực hiện",
         "Completed" => "Đã hoàn thành",
+        "Closed" => "Đã đóng",
         "Cancelled" => "Đã huỷ",
         "NoShow" => "Không đến",
         _ => status

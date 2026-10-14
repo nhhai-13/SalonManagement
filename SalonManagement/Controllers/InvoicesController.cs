@@ -303,8 +303,7 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
         invoice.Appointment.Status = "Closed";
         invoice.Appointment.UpdatedAt = now;
         await db.SaveChangesAsync();
-        if (!string.IsNullOrWhiteSpace(invoice.Appointment.Customer.Email) &&
-            !await db.StylistReviews.AnyAsync(review => review.AppointmentId == invoice.AppointmentId))
+        if (!await db.StylistReviews.AnyAsync(review => review.AppointmentId == invoice.AppointmentId))
         {
             var token = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
             var review = new StylistReview
@@ -312,21 +311,24 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
                 AppointmentId = invoice.AppointmentId, CustomerId = invoice.Appointment.CustomerId,
                 StylistId = invoice.Appointment.StylistId,
                 ReviewTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))),
-                RequestedAt = now, ExpiresAt = now.AddDays(14)
+                RequestedAt = now, ExpiresAt = now.AddDays(7)
             };
             db.StylistReviews.Add(review);
             await db.SaveChangesAsync();
-            var reviewUrl = Url.Action("Create", "Reviews", new { token }, Request.Scheme);
-            if (!string.IsNullOrWhiteSpace(reviewUrl))
+            if (!string.IsNullOrWhiteSpace(invoice.Appointment.Customer.Email))
             {
-                try
+                var reviewUrl = Url.Action("Create", "Reviews", new { token }, Request.Scheme);
+                if (!string.IsNullOrWhiteSpace(reviewUrl))
                 {
-                    await emailService.SendReviewRequestEmailAsync(invoice.Appointment.Customer.Email,
-                        invoice.Appointment.Customer.FullName, invoice.Appointment.Stylist.FullName, reviewUrl);
-                }
-                catch (Exception exception)
-                {
-                    logger.LogError(exception, "Unable to send review request for appointment {AppointmentId}.", invoice.AppointmentId);
+                    try
+                    {
+                        await emailService.SendReviewRequestEmailAsync(invoice.Appointment.Customer.Email,
+                            invoice.Appointment.Customer.FullName, invoice.Appointment.Stylist.FullName, reviewUrl);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogError(exception, "Unable to send review request for appointment {AppointmentId}.", invoice.AppointmentId);
+                    }
                 }
             }
         }
