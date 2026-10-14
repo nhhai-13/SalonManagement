@@ -369,12 +369,18 @@ using (var scope = app.Services.CreateScope())
 
     await SeedData.SeedAsync(
         dbContext,
-        userManager);
-    if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
+        userManager,
+        app.Environment.IsDevelopment() || app.Environment.IsStaging());
+    if ((app.Environment.IsDevelopment() || app.Environment.IsStaging()) && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
     {
         var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;
         await StylistBookingDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
         await StylistAssignmentDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
+    }
+    if (app.Environment.IsStaging() && builder.Configuration.GetValue<bool>("Seed:Sprint4Demo"))
+    {
+        var today = services.GetRequiredService<StylistAvailabilityService>().SalonNow.Date;
+        await Sprint4DemoSeed.SeedAsync(dbContext, today);
     }
 }
 
