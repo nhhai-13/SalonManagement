@@ -1,0 +1,24 @@
+@model SalonManagement.Models.ViewModels.Owner.OwnerTodayDashboardViewModel
+@{
+    ViewData["Title"] = "Tổng quan hôm nay";
+    var labels = new Dictionary<string, string> { ["Pending"] = "Chờ xác nhận", ["Confirmed"] = "Đã xác nhận", ["Arrived"] = "Đã đến", ["Completed"] = "Hoàn tất", ["Cancelled"] = "Đã hủy", ["NoShow"] = "Không đến" };
+    string Money(decimal value) => value.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + " đ";
+}
+<meta http-equiv="refresh" content="60" />
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+        <div><p class="text-uppercase text-secondary small mb-1">Báo cáo Owner</p><h1 class="h3 mb-0">Tổng quan hôm nay · @Model.Date.ToString("dd/MM/yyyy")</h1></div>
+        <a class="btn btn-outline-primary" asp-action="Today">Làm mới</a>
+    </div>
+    <div class="row g-3 mb-4">
+        @foreach (var item in Model.StatusCounts)
+        {
+            <div class="col-6 col-lg-4"><a class="card card-body h-100 text-decoration-none" asp-controller="Appointments" asp-action="Index" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")" asp-route-status="@item.Key"><span class="text-secondary">@labels[item.Key]</span><strong class="fs-3">@item.Value</strong><span class="small">Xem lịch hẹn →</span></a></div>
+        }
+        <div class="col-6 col-lg-4"><div class="card card-body h-100"><span class="text-secondary">Doanh thu đã thu hôm nay</span><strong class="fs-4">@Money(Model.CollectedRevenue)</strong></div></div>
+    </div>
+    <section class="card border-0 shadow-sm"><div class="card-body"><h2 class="h5">Nhân viên đang làm theo ca</h2>
+        @if (Model.WorkingStylists.Count == 0) { <p class="text-secondary mb-0">Chưa có ca làm được xếp hôm nay.</p> }
+        else { <div class="table-responsive"><table class="table mb-0"><thead><tr><th>Nhân viên</th><th>Ca làm</th></tr></thead><tbody>@foreach (var stylist in Model.WorkingStylists) { <tr><td>@stylist.Name</td><td>@stylist.Start.ToString(@"hh\:mm")–@stylist.End.ToString(@"hh\:mm")</td></tr> }</tbody></table></div> }
+    </div></section>
+</div>

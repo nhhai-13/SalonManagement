@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.AspNetCore.Http;
 
 namespace SalonManagement.Data;
 
@@ -12,6 +13,6 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer(connectionString)
             .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, new HttpContextAccessor());
     }
 }
