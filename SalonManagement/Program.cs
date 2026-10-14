@@ -199,6 +199,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAttendanceModules();
+builder.Services.AddHostedService<StylistNotificationCleanupService>();
 builder.Services.AddScoped<StylistAvailabilityService>();
 
 builder.Services.AddScoped<
@@ -260,6 +261,7 @@ await using (var scope = app.Services.CreateAsyncScope())
     if (usesSqlite)
     {
         await dbContext.Database.EnsureCreatedAsync();
+        await SqliteSprint4SchemaUpgrade.EnsureAsync(dbContext);
     }
     else
     {

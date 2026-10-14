@@ -1,0 +1,29 @@
+@model IReadOnlyList<SalonManagement.Controllers.Owner.StylistReviewSummary>
+@{
+    ViewData["Title"] = "Đánh giá thợ";
+}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h2 mb-1">Đánh giá của khách</h1>
+            <p class="text-muted mb-0">Điểm trung bình chỉ hiển thị khi thợ có ít nhất 5 lượt đánh giá.</p>
+        </div>
+        <a class="btn btn-outline-secondary" asp-controller="StylistManagement" asp-action="Index">Quay lại hồ sơ thợ</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead><tr><th>Thợ</th><th>Số lượt đánh giá</th><th>Điểm trung bình</th></tr></thead>
+            <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.FullName</td>
+                    <td>@item.ReviewCount</td>
+                    <td>@(item.AverageRating.HasValue ? $"{item.AverageRating.Value:N1} / 5" : "Chưa đủ dữ liệu")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

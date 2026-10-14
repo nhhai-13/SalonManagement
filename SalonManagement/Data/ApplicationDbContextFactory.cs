@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.AspNetCore.Http;
 
 namespace SalonManagement.Data;
 
@@ -9,6 +10,7 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
             ?? "Server=(localdb)\\MSSQLLocalDB;Database=SalonManagementDB;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
+
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
         if (string.Equals(Environment.GetEnvironmentVariable("DatabaseProvider"), "SQLite", StringComparison.OrdinalIgnoreCase))
         {
@@ -18,7 +20,7 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
         {
             optionsBuilder.UseSqlServer(connectionString);
         }
-        var options = optionsBuilder.Options;
-        return new ApplicationDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
+
+        return new ApplicationDbContext(optionsBuilder.Options, new HttpContextAccessor());
     }
 }

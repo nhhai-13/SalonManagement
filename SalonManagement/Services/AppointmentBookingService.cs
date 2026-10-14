@@ -13,7 +13,7 @@ public sealed record BookingCreationResult(BookingConfirmation? Confirmation, st
     public static BookingCreationResult Invalid(IReadOnlyDictionary<string, string> errors) => new(null, "invalid_details", "Vui lòng kiểm tra lại thông tin đã nhập.", errors);
 }
 
-public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvider timeProvider)
+public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvider timeProvider, AppointmentNotificationBus? notifications = null)
 {
     private const string ReferenceAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static readonly SemaphoreSlim ConfirmationLock = new(1, 1);
@@ -81,6 +81,11 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
             });
             db.Appointments.Add(appointment);
             try { await db.SaveChangesAsync(); } catch (DbUpdateException) { return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác."); }
+            var notification = new StylistNotification { StylistId = stylist.StylistId, AppointmentId = appointment.AppointmentId,
+                Message = $"Lịch mới #{appointment.AppointmentId} được phân công cho bạn.", CreatedAt = timeProvider.GetUtcNow() };
+            db.StylistNotifications.Add(notification);
+            await db.SaveChangesAsync();
+            notifications?.Publish(notification);
             return new(new(reference, stylist.FullName, services.Select(item => item.ServiceName).ToList(), request.Date.Date, request.StartTime, endTime), null, null);
         }
         finally { ConfirmationLock.Release(); }

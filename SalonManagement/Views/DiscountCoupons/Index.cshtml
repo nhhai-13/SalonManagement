@@ -1,0 +1,31 @@
+@model IReadOnlyList<SalonManagement.Controllers.Owner.DiscountCouponListItem>
+@{
+    ViewData["Title"] = "Mã giảm giá";
+    string Money(decimal value) => string.Concat(value.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")), " đ");
+}
+<div class="container py-4">
+    <h1 class="h3 mb-4">Mã giảm giá</h1>
+    @if (TempData["Success"] is string success) { <div class="alert alert-success">@success</div> }
+    @if (TempData["Error"] is string errorMessage) { <div class="alert alert-danger">@errorMessage</div> }
+    @if (ViewBag.Error is string error) { <div class="alert alert-danger">@error</div> }
+    <div class="row g-4">
+        <div class="col-lg-8"><div class="table-responsive bg-white border rounded-3"><table class="table align-middle mb-0">
+            <thead><tr><th>Mã</th><th>Kiểu giảm</th><th>Hiệu lực</th><th>Số phiếu</th><th>Tổng đã giảm</th><th>Thao tác</th></tr></thead><tbody>
+            @foreach (var coupon in Model) { <tr><td><strong>@coupon.Code</strong></td><td>@(coupon.DiscountType == "Percent" ? $"{coupon.Value:N0}%" : Money(coupon.Value))</td><td>@coupon.StartsOn.ToString("dd/MM/yyyy") – @coupon.EndsOn.ToString("dd/MM/yyyy")</td><td>@coupon.UseCount</td><td>@Money(coupon.TotalDiscount)</td><td>
+                @if (coupon.UseCount == 0) { <details><summary class="small text-primary">Sửa</summary><form asp-action="Update" method="post" class="vstack gap-1 mt-2">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@coupon.Id" /><input class="form-control form-control-sm" name="Code" value="@coupon.Code" maxlength="32" required /><select class="form-select form-select-sm" name="DiscountType"><option value="Percent" selected="@(coupon.DiscountType == "Percent")">Phần trăm</option><option value="Fixed" selected="@(coupon.DiscountType == "Fixed")">Số tiền</option></select><input class="form-control form-control-sm" type="number" name="Value" value="@coupon.Value" min="1" step="0.01" required /><input class="form-control form-control-sm" type="date" name="StartsOn" value="@coupon.StartsOn.ToString("yyyy-MM-dd")" required /><input class="form-control form-control-sm" type="date" name="EndsOn" value="@coupon.EndsOn.ToString("yyyy-MM-dd")" required /><button class="btn btn-sm btn-outline-primary" type="submit">Lưu sửa đổi</button></form><form asp-action="Delete" method="post" class="mt-2" onsubmit="return confirm('Xóa mã giảm giá này?')">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@coupon.Id" /><button class="btn btn-sm btn-outline-danger" type="submit">Xóa</button></form></details> }
+                else { <span class="small text-secondary">Đã khóa</span> }
+            </td></tr> }
+            @if (Model.Count == 0) { <tr><td colspan="6" class="text-center text-secondary py-4">Chưa có mã giảm giá.</td></tr> }
+            </tbody></table></div><p class="small text-secondary mt-2">Mã không phân biệt hoa thường; ngày kết thúc có hiệu lực hết ngày đó. Mã đã dùng không thể sửa hoặc xóa.</p></div>
+        <div class="col-lg-4"><section class="card border-0 shadow-sm"><div class="card-body p-4"><h2 class="h5">Tạo mã</h2>
+            <form asp-action="Create" method="post" class="vstack gap-2">@Html.AntiForgeryToken()
+                <label class="form-label mb-0" for="coupon-code">Mã</label><input class="form-control" id="coupon-code" name="Code" maxlength="32" required />
+                <label class="form-label mb-0" for="coupon-type">Kiểu giảm</label><select class="form-select" id="coupon-type" name="DiscountType"><option value="Percent">Phần trăm</option><option value="Fixed">Số tiền cố định</option></select>
+                <label class="form-label mb-0" for="coupon-value">Giá trị (phần trăm từ 1 đến 100)</label><input class="form-control" id="coupon-value" name="Value" type="number" min="1" step="0.01" required />
+                <label class="form-label mb-0" for="coupon-start">Ngày bắt đầu</label><input class="form-control" id="coupon-start" name="StartsOn" type="date" required />
+                <label class="form-label mb-0" for="coupon-end">Ngày kết thúc</label><input class="form-control" id="coupon-end" name="EndsOn" type="date" required />
+                <button class="btn btn-primary mt-2" type="submit">Tạo mã giảm giá</button>
+            </form>
+        </div></section></div>
+    </div>
+</div>

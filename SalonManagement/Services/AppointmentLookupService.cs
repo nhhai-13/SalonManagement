@@ -22,7 +22,7 @@ public sealed record AppointmentLookupResult(
 
 public sealed record CancelResult(bool Success, string? Error);
 
-public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvider clock)
+public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvider clock, AppointmentNotificationBus? notifications = null)
 {
     public async Task<AppointmentLookupResult> SearchAsync(string? input)
     {
@@ -103,6 +103,9 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         var reminder = await db.AppointmentEmailDeliveries.FirstOrDefaultAsync(item => item.AppointmentId == appointment.AppointmentId && item.Kind == AppointmentEmailKinds.Reminder);
         if (reminder is not null && reminder.Status is AppointmentEmailStatuses.Queued or AppointmentEmailStatuses.Retrying)
             reminder.Status = AppointmentEmailStatuses.Cancelled;
+        var notification = new StylistNotification { StylistId = appointment.StylistId, AppointmentId = appointment.AppointmentId,
+            Message = $"Lịch #{appointment.AppointmentId} đã bị khách hủy.", CreatedAt = now };
+        db.StylistNotifications.Add(notification);
 
         db.AppointmentAudits.Add(new AppointmentAudit
         {
@@ -115,6 +118,7 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         });
 
         await db.SaveChangesAsync();
+        notifications?.Publish(notification);
         return new(true, null);
     }
 

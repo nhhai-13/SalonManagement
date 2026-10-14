@@ -10,6 +10,8 @@ public interface IEmailService
     Task SendAppointmentReminderEmailAsync(string toEmail, string customerName, string bookingReference,
         string servicesSummary, string stylistName, DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime,
         string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh") => Task.CompletedTask;
+    Task SendReviewRequestEmailAsync(string toEmail, string customerName, string stylistName, string reviewUrl)
+        => Task.CompletedTask;
     Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
         => throw new NotSupportedException("Appointment change email sender is not registered.");
     Task SendRescheduleNotificationEmailAsync(string toEmail, string customerName, string stylistName,
