@@ -4,6 +4,8 @@ public interface IEmailService
     Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword);
     Task SendPasswordResetEmailAsync(string toEmail, string resetLink);
     Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode);
+    Task SendReviewRequestEmailAsync(string toEmail, string customerName, string stylistName, string reviewUrl)
+        => Task.CompletedTask;
     Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
         => throw new NotSupportedException("Appointment change email sender is not registered.");
     Task SendRescheduleNotificationEmailAsync(string toEmail, string customerName, string stylistName,

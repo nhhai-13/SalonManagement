@@ -40,6 +40,38 @@ public sealed class EmailService(
         await client.SendMailAsync(message);
     }
 
+    public async Task SendReviewRequestEmailAsync(string toEmail, string customerName, string stylistName, string reviewUrl)
+    {
+        var smtp = configuration.GetSection("SmtpSettings");
+        var server = smtp["Server"];
+        var sender = smtp["SenderEmail"];
+        var username = smtp["Username"];
+        var password = smtp["Password"];
+        if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(sender) ||
+            string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            if (env.IsDevelopment() || env.IsStaging())
+            {
+                logger.LogInformation("[FALLBACK REVIEW EMAIL] Review link for {Recipient}: {ReviewUrl}", toEmail, reviewUrl);
+                return;
+            }
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi lời mời đánh giá.");
+        }
+        using var client = new SmtpClient(server, smtp.GetValue<int>("Port", 587))
+        {
+            EnableSsl = true, UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(username, password), Timeout = 15000
+        };
+        using var message = new MailMessage
+        {
+            From = new MailAddress(sender, smtp["SenderName"] ?? "Luminol Salon"),
+            Subject = "Mời bạn đánh giá trải nghiệm tại Luminol Salon", IsBodyHtml = true,
+            Body = $"<p>Chào {WebUtility.HtmlEncode(customerName)}, cảm ơn bạn đã trải nghiệm dịch vụ với {WebUtility.HtmlEncode(stylistName)}.</p><p><a href=\"{WebUtility.HtmlEncode(reviewUrl)}\">Gửi đánh giá của bạn</a></p><p>Liên kết có hiệu lực trong 14 ngày và chỉ dùng một lần.</p>"
+        };
+        message.To.Add(toEmail);
+        await client.SendMailAsync(message);
+    }
+
     public async Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword)
     {
         var smtp = configuration.GetSection("SmtpSettings");

@@ -47,6 +47,7 @@ public ApplicationDbContext(
 
         public DbSet<Invoice> Invoices => Set<Invoice>();
         public DbSet<DiscountCoupon> DiscountCoupons => Set<DiscountCoupon>();
+        public DbSet<StylistReview> StylistReviews => Set<StylistReview>();
 
         public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
 
@@ -495,6 +496,18 @@ private class AuditEntry
                 entity.Property(coupon => coupon.Code).HasMaxLength(32).IsRequired();
                 entity.Property(coupon => coupon.DiscountType).HasMaxLength(16).IsRequired();
                 entity.Property(coupon => coupon.Value).HasPrecision(18, 2);
+            });
+
+            builder.Entity<StylistReview>(entity =>
+            {
+                entity.HasKey(review => review.StylistReviewId);
+                entity.HasIndex(review => review.AppointmentId).IsUnique();
+                entity.HasIndex(review => review.ReviewTokenHash).IsUnique();
+                entity.Property(review => review.ReviewTokenHash).HasMaxLength(64).IsRequired();
+                entity.Property(review => review.Comment).HasMaxLength(1000);
+                entity.HasOne(review => review.Appointment).WithOne().HasForeignKey<StylistReview>(review => review.AppointmentId).OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(review => review.Customer).WithMany().HasForeignKey(review => review.CustomerId).OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(review => review.Stylist).WithMany().HasForeignKey(review => review.StylistId).OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<InvoiceLine>(entity =>
