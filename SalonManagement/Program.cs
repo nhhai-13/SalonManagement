@@ -189,6 +189,13 @@ builder.Services.AddScoped<
     IEmailService,
     EmailService>();
 
+builder.Services.Configure<ScheduleEmailOptions>(
+    builder.Configuration.GetSection("ScheduleChangeEmail:Smtp"));
+builder.Services.Configure<ScheduleNotificationOptions>(
+    builder.Configuration.GetSection("ScheduleChangeEmail:Delivery"));
+builder.Services.AddSingleton<IScheduleChangeEmailSender, SmtpScheduleChangeEmailSender>();
+builder.Services.AddScoped<ScheduleNotificationDispatcher>();
+builder.Services.AddHostedService<ScheduleNotificationBackgroundService>();
 builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
 
 builder.Services.AddSingleton<
