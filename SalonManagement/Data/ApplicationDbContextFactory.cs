@@ -12,6 +12,6 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer(connectionString)
             .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
     }
 }

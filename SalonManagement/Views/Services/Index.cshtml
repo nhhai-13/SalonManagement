@@ -1,19 +1,32 @@
-﻿@model IEnumerable<SalonManagement.Models.Service>
+@model IEnumerable<SalonManagement.Models.Service>
 @{
     ViewData["Title"] = "Danh sách dịch vụ";
 }
 
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>Quản lý dịch vụ</h1>
-        <a asp-action="Create" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> + Thêm dịch vụ
-        </a>
+<div class="container mt-4 sl-body">
+    @if (User.IsInRole(UserRoles.Owner))
+    {
+        <div class="mb-3">
+            <a href="/owner" class="text-decoration-none sl-btn sl-btn-ghost sl-btn-sm">← Về khu vực chủ tiệm</a>
+        </div>
+    }
+    
+    <div class="sl-page-header d-flex justify-content-between align-items-center mb-3">
+        <h1 class="sl-page-title">Quản lý dịch vụ</h1>
+        @if (User.IsInRole(UserRoles.Owner))
+        {
+            <div class="d-flex gap-2">
+                <a asp-controller="ServiceGroups" asp-action="Index" class="btn btn-outline-primary sl-btn sl-btn-outline">Quản lý nhóm</a>
+                <a asp-action="Create" class="btn btn-primary sl-btn sl-btn-primary">
+                    <i class="bi bi-plus-circle"></i> + Thêm dịch vụ
+                </a>
+            </div>
+        }
     </div>
 
     @if (TempData["Success"] != null)
     {
-        <div class="alert alert-success alert-dismissible fade show">
+        <div class="alert alert-success alert-dismissible fade show sl-alert sl-alert-success">
             @TempData["Success"]
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
@@ -21,15 +34,15 @@
 
     @if (TempData["Error"] != null)
     {
-        <div class="alert alert-danger alert-dismissible fade show">
+        <div class="alert alert-danger alert-dismissible fade show sl-alert sl-alert-danger">
             @TempData["Error"]
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
 
-    <div class="card shadow-sm">
+    <div class="card shadow-sm sl-card">
         <div class="card-body p-0">
-            <table class="table table-striped table-hover mb-0">
+            <table class="table mb-0 sl-table">
                 <thead class="table-dark">
                     <tr>
                         <th>Tên dịch vụ</th>
@@ -44,7 +57,7 @@
                     @if (!Model.Any())
                     {
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
+                            <td colspan="6" class="text-center text-muted py-4 sl-table-empty">
                                 Chưa có dịch vụ nào. Bấm "+ Thêm dịch vụ" để bắt đầu.
                             </td>
                         </tr>
@@ -54,36 +67,49 @@
                         @foreach (var item in Model)
                         {
                             <tr>
-                                <td><strong>@item.ServiceName</strong></td>
+                                <td>
+                                    <strong>@item.ServiceName</strong>
+                                    @if (!item.Stylists.Any(s => s.Stylist.IsActive)) 
+                                    { 
+                                        <small class="d-block text-warning">Chưa có thợ đang làm việc đảm nhận</small> 
+                                    }
+                                </td>
                                 <td>@(item.ServiceGroup?.GroupName ?? "—")</td>
                                 <td>@item.DurationMinutes phút</td>
-                                <td>@item.Price.ToString("N0") đ</td>
+                                <td>@item.Price.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) đ</td>
                                 <td>
                                     @if (item.IsActive)
                                     {
-                                        <span class="badge bg-success">Đang bán</span>
+                                        <span class="sl-badge sl-badge-success">Đang bán</span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-secondary">Ngừng bán</span>
+                                        <span class="sl-badge sl-badge-gray">Ngừng bán</span>
                                     }
                                 </td>
                                 <td>
-                                    <a asp-action="Edit" asp-route-id="@item.ServiceId"
-                                       class="btn btn-sm btn-warning">Sửa</a>
+                                    @if (User.IsInRole(UserRoles.Owner))
+                                    {
+                                        <a asp-action="Edit" asp-route-id="@item.ServiceId"
+                                           class="btn btn-sm btn-warning sl-btn sl-btn-outline sl-btn-sm">Sửa</a>
 
-                                    <form asp-action="ToggleStatus" asp-route-id="@item.ServiceId"
-                                          method="post" style="display:inline">
-                                        <button type="submit" class="btn btn-sm btn-info">
-                                            @(item.IsActive ? "Ngừng bán" : "Mở bán")
-                                        </button>
-                                    </form>
+                                        <form asp-action="ToggleStatus" asp-route-id="@item.ServiceId"
+                                              method="post" style="display:inline">
+                                            <button type="submit" class="btn btn-sm btn-info sl-btn sl-btn-sm sl-btn-ghost">
+                                                @(item.IsActive ? "Ngừng bán" : "Mở bán")
+                                            </button>
+                                        </form>
 
-                                    <form asp-action="Delete" asp-route-id="@item.ServiceId"
-                                          method="post" style="display:inline"
-                                          onsubmit="return confirm('Bạn chắc chắn muốn xoá dịch vụ này?');">
-                                        <button type="submit" class="btn btn-sm btn-danger">Xoá</button>
-                                    </form>
+                                        <form asp-action="Delete" asp-route-id="@item.ServiceId"
+                                              method="post" style="display:inline"
+                                              onsubmit="return confirm('Bạn chắc chắn muốn xoá dịch vụ này?');">
+                                            <button type="submit" class="btn btn-sm btn-danger sl-btn sl-btn-danger sl-btn-sm">Xoá</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Chỉ xem</span>
+                                    }
                                 </td>
                             </tr>
                         }

@@ -647,6 +647,84 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID(N'[ScheduleContactFollowUps]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [ScheduleContactFollowUps] (
+        [ScheduleContactFollowUpId] int NOT NULL IDENTITY,
+        [AppointmentId] int NOT NULL,
+        [Category] nvarchar(30) NOT NULL,
+        [Reason] nvarchar(500) NOT NULL,
+        [OriginalAppointmentDate] datetime2 NOT NULL,
+        [OriginalStartTime] time NOT NULL,
+        [ContactStatus] nvarchar(30) NOT NULL,
+        [ContactNote] nvarchar(1000) NULL,
+        [ContactedAt] datetime2 NULL,
+        [CreatedAt] datetime2 NOT NULL,
+        [UpdatedAt] datetime2 NULL,
+        CONSTRAINT [PK_ScheduleContactFollowUps] PRIMARY KEY ([ScheduleContactFollowUpId]),
+        CONSTRAINT [FK_ScheduleContactFollowUps_Appointments_AppointmentId]
+            FOREIGN KEY ([AppointmentId]) REFERENCES [Appointments] ([AppointmentId]) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX [IX_ScheduleContactFollowUps_AppointmentId]
+        ON [ScheduleContactFollowUps] ([AppointmentId]);
+    CREATE INDEX [IX_ScheduleContactFollowUps_OriginalAppointmentDate_ContactStatus_Category]
+        ON [ScheduleContactFollowUps] ([OriginalAppointmentDate], [ContactStatus], [Category]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261011000000_AddScheduleContactFollowUps'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261011000000_AddScheduleContactFollowUps', N'8.0.30');
+END;
+GO
+
+IF OBJECT_ID(N'[ScheduleChangeNotifications]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [ScheduleChangeNotifications] (
+        [ScheduleChangeNotificationId] int NOT NULL IDENTITY,
+        [AppointmentId] int NOT NULL,
+        [Version] int NOT NULL,
+        [RecipientEmail] nvarchar(256) NOT NULL,
+        [CustomerName] nvarchar(150) NOT NULL,
+        [ServiceNames] nvarchar(1000) NOT NULL,
+        [AppointmentDate] datetime2 NOT NULL,
+        [OldStylistName] nvarchar(150) NOT NULL,
+        [NewStylistName] nvarchar(150) NOT NULL,
+        [OldStartTime] time NOT NULL,
+        [NewStartTime] time NOT NULL,
+        [TransferredAt] datetime2 NOT NULL,
+        [Status] nvarchar(30) NOT NULL,
+        [AttemptCount] int NOT NULL,
+        [LastAttemptAt] datetime2 NULL,
+        [NextAttemptAt] datetime2 NULL,
+        [SentAt] datetime2 NULL,
+        [LastError] nvarchar(1000) NULL,
+        [CreatedAt] datetime2 NOT NULL,
+        CONSTRAINT [PK_ScheduleChangeNotifications] PRIMARY KEY ([ScheduleChangeNotificationId]),
+        CONSTRAINT [FK_ScheduleChangeNotifications_Appointments_AppointmentId]
+            FOREIGN KEY ([AppointmentId]) REFERENCES [Appointments] ([AppointmentId]) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX [IX_ScheduleChangeNotifications_AppointmentId_Version]
+        ON [ScheduleChangeNotifications] ([AppointmentId], [Version]);
+    CREATE INDEX [IX_ScheduleChangeNotifications_Status_NextAttemptAt]
+        ON [ScheduleChangeNotifications] ([Status], [NextAttemptAt]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261011010000_AddScheduleChangeNotificationOutbox'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261011010000_AddScheduleChangeNotificationOutbox', N'8.0.30');
+END;
+GO
+
 COMMIT;
 GO
 

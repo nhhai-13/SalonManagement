@@ -3,14 +3,14 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Lumière Salon &amp; Spa</title>
-    <meta name="description" content="Lumière Salon & Spa - Không gian chăm sóc tóc cao cấp, đặt lịch nhanh chóng và thuận tiện." />
+    <title>@ViewData["Title"] - Luminol Salon &amp; Spa</title>
+    <meta name="description" content="Luminol Salon & Spa - Không gian chăm sóc tóc cao cấp, đặt lịch nhanh chóng và thuận tiện." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/salon-design.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/SalonManagement.styles.css" asp-append-version="true" />
 </head>
 <body>
@@ -21,7 +21,7 @@
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
                 <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
-                    SalonManagement
+                    Luminol
                 </a>
 
                 <button class="navbar-toggler"
@@ -55,6 +55,9 @@
                             </a>
                         </li>
 
+                        @await Html.PartialAsync("_S303Nav")
+                        @await Html.PartialAsync("_S306Nav")
+                        @await Html.PartialAsync("_S305Nav")
                         <!-- Menu Dịch vụ -->
                         <li class="nav-item">
                             <a class="nav-link text-dark"
@@ -74,6 +77,14 @@
                         {
                             <li class="nav-item"><a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Phiếu tính tiền</a></li>
                         }
+`r`n                                                <!-- Menu Đặt lịch -->
+                        <li class="nav-item">
+                            <a class="nav-link text-primary fw-semibold"
+                               asp-controller="Booking"
+                               asp-action="Index">
+                                <i class="bi bi-calendar-check me-1"></i>Đặt lịch
+                            </a>
+                        </li>
 
                     </ul>
 
@@ -94,7 +105,7 @@
     {
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; 2026 - SalonManagement -
+            &copy; 2026 - Luminol Salon &amp; Spa -
             <a asp-area="" asp-controller="Home" asp-action="Privacy">
                 Privacy
             </a>
@@ -109,3 +120,4 @@
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
+

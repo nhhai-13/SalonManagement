@@ -1,0 +1,111 @@
+@{
+    ViewData["Title"] = "Không gian thợ";
+}
+
+<div id="stylist-content" class="container d-none py-4">
+    <div class="sl-page-header d-flex flex-wrap align-items-center justify-content-between gap-3 mb-5 border-bottom pb-4">
+        <div>
+            <span class="sl-eyebrow text-uppercase text-muted small fw-semibold">Không gian làm việc</span>
+            <h1 class="sl-page-title h2 mb-1 mt-1 text-primary-dark">Thợ làm tóc</h1>
+            <p class="text-muted mb-0">Xin chào <strong data-session-email class="text-dark"></strong></p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm sl-card border-0 hover-lift">
+                <div class="card-body p-4 text-center">
+                    <div class="mb-3">
+                        <i class="bi bi-calendar3 fs-1 text-primary"></i>
+                    </div>
+                    <h2 class="h5 mt-3 text-dark fw-bold">Lịch làm việc</h2>
+                    <p class="text-muted mb-0">Xem ca làm và lịch phục vụ được phân công.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm sl-card border-0 hover-lift">
+                <div class="card-body p-4 text-center">
+                    <div class="mb-3">
+                        <i class="bi bi-scissors fs-1 text-primary"></i>
+                    </div>
+                    <h2 class="h5 mt-3 text-dark fw-bold">Lịch hẹn của tôi</h2>
+                    <p class="text-muted mb-0">Theo dõi các khách hàng cần phục vụ trong ngày.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm sl-card border-0 hover-lift">
+                <div class="card-body p-4 text-center">
+                    <div class="mb-3">
+                        <i class="bi bi-clock-history fs-1 text-primary"></i>
+                    </div>
+                    <h2 class="h5 mt-3 text-dark fw-bold">Lịch sử phục vụ</h2>
+                    <p class="text-muted mb-0">Xem lại các dịch vụ đã hoàn thành.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section class="card sl-card border-0 shadow-sm mt-4" aria-labelledby="my-appointments-heading">
+        <div class="card-body p-4">
+            <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                <h2 id="my-appointments-heading" class="h4 mb-0">Lịch hẹn của tôi</h2>
+                <label for="stylist-date" class="visually-hidden">Ngày xem lịch</label>
+                <input id="stylist-date" type="date" class="form-control w-auto" />
+                <button id="stylist-refresh" class="btn btn-outline-primary" type="button">Tải lịch</button>
+            </div>
+            <div id="stylist-alert" class="alert d-none" role="status"></div>
+            <div id="stylist-appointments" class="d-grid gap-3"></div>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script>
+    SalonAuth.requireSession({ endpoint: "/api/portal/stylist/session", contentId: "stylist-content" }).then(loadStylistAppointments);
+    const dateInput = document.getElementById('stylist-date');
+    dateInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    document.getElementById('stylist-refresh').addEventListener('click', loadStylistAppointments);
+    dateInput.addEventListener('change', loadStylistAppointments);
+    async function loadStylistAppointments() {
+        const response = await SalonAuth.authenticatedFetch(`/api/stylist/work/appointments?date=${encodeURIComponent(dateInput.value)}`);
+        const output = document.getElementById('stylist-appointments');
+        const alert = document.getElementById('stylist-alert');
+        output.replaceChildren();
+        if (!response.ok) { alert.textContent = 'Không tải được lịch hẹn. Vui lòng thử lại.'; alert.className = 'alert alert-danger'; return; }
+        const appointments = await response.json();
+        alert.textContent = appointments.length ? '' : 'Ngày này chưa có lịch hẹn.';
+        alert.className = appointments.length ? 'alert d-none' : 'alert alert-info';
+        for (const item of appointments) {
+            const card = document.createElement('article'); card.className = 'border rounded p-3';
+            const title = document.createElement('h3'); title.className = 'h6'; title.textContent = `${item.startTime.slice(0,5)}–${item.endTime.slice(0,5)} · ${item.customerPhone}`;
+            const services = document.createElement('p'); services.className = 'mb-1'; services.textContent = `${item.services.join(', ')} · ${item.expectedDurationMinutes} phút`;
+            const note = document.createElement('p'); note.className = 'text-muted mb-2'; note.textContent = item.customerNote || 'Khách không để lại ghi chú.';
+            const state = document.createElement('p'); state.className = 'mb-2'; state.textContent = `Trạng thái: ${item.status}`;
+            card.append(title, services, note, state);
+            if (item.status === 'Arrived') card.append(actionButton('Bắt đầu', `/api/stylist/work/appointments/${item.appointmentId}/start`));
+            if (item.status === 'InProgress') card.append(actionButton('Hoàn tất', `/api/stylist/work/appointments/${item.appointmentId}/complete`));
+            if (item.actualDurationMinutes != null) {
+                const duration = document.createElement('p'); duration.className = item.actualDurationMinutes > item.expectedDurationMinutes + 20 ? 'text-danger fw-bold' : 'text-success';
+                duration.textContent = `Thời gian thực tế: ${item.actualDurationMinutes} phút (dự kiến ${item.expectedDurationMinutes} phút)`;
+                card.append(duration);
+            }
+            output.append(card);
+        }
+    }
+    function actionButton(label, url) {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-primary'; button.textContent = label;
+        button.addEventListener('click', async () => {
+            button.disabled = true;
+            const response = await SalonAuth.authenticatedFetch(url, { method: 'POST' });
+            if (!response.ok) { button.disabled = false; document.getElementById('stylist-alert').textContent = (await response.json().catch(() => ({}))).message || 'Không thể cập nhật lịch.'; document.getElementById('stylist-alert').className = 'alert alert-danger'; return; }
+            const result = await response.json();
+            if (result.alertReception) { document.getElementById('stylist-alert').textContent = 'Cảnh báo: thời gian phục vụ vượt quá dự kiến hơn 20 phút; lễ tân cần kiểm tra các lịch tiếp theo.'; document.getElementById('stylist-alert').className = 'alert alert-warning'; }
+            await loadStylistAppointments();
+        });
+        return button;
+    }
+    </script>
+}

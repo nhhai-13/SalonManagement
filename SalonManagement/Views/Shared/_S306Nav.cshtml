@@ -1,0 +1,4 @@
+@if (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)) {
+<li class="nav-item"><a class="nav-link" asp-controller="NoShows" asp-action="Index">Khách không đến</a></li>
+<li class="nav-item"><a class="nav-link" asp-controller="NoShows" asp-action="Create">Đặt lịch tại quầy</a></li>
+}

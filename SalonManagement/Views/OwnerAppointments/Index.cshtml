@@ -1,0 +1,12 @@
+@model IReadOnlyList<SalonManagement.Models.Appointment>
+@{ ViewData["Title"] = "Lịch hẹn mới"; }
+
+<div class="container py-4">
+    <div class="sl-page-header mb-4"><div><h1 class="sl-page-title h2 mb-1">Lịch hẹn mới</h1><p class="text-muted mb-0">Kiểm tra các lịch khách vừa đặt và thông tin phục vụ.</p></div></div>
+    <div class="sl-card overflow-hidden"><div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>STT</th><th>Khách hàng</th><th>Dịch vụ</th><th>Thời gian hẹn</th><th>Thợ</th><th>Trạng thái</th></tr></thead><tbody>
+    @if (Model.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-4">Chưa có lịch hẹn mới.</td></tr> }
+    @for (var i = 0; i < Model.Count; i++) { var appointment = Model[i]; <tr><td>@(i + 1)</td><td><strong>@appointment.Customer.FullName</strong><br /><small class="text-muted">@appointment.Customer.Phone</small></td><td>@string.Join(", ", appointment.AppointmentServices.Select(item => item.Service.ServiceName))</td><td>@appointment.AppointmentDate.ToString("dd/MM/yyyy")<br /><small class="text-muted">@appointment.StartTime.ToString(@"hh\:mm") – @appointment.EndTime.ToString(@"hh\:mm")</small></td><td>@appointment.Stylist.FullName</td><td><span class="badge text-bg-success">@appointment.Status</span></td></tr> }
+    </tbody></table></div></div>
+</div>
+
+@section Scripts { <script src="~/js/auth.js" asp-append-version="true"></script><script>SalonAuth.requireSession({ endpoint: "/api/owner/session" });</script> }

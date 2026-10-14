@@ -1,0 +1,46 @@
+@{
+    var email = ViewData["Email"]?.ToString() ?? string.Empty;
+    var portal = ViewData["Portal"]?.ToString() ?? "reception";
+    ViewData["Title"] = "Xác minh email";
+    Layout = "_AuthLayout";
+}
+
+<main class="auth-shell">
+    <section class="auth-showcase" aria-label="Giới thiệu Luminol Salon">
+        <a class="brand" asp-controller="Home" asp-action="Index"><span class="brand-mark">L</span><span><strong>Luminol</strong><small>Salon &amp; Spa</small></span></a>
+        <div class="showcase-copy">
+            <span class="eyebrow">Bảo vệ tài khoản</span>
+            <h1>Xác nhận email để hoàn tất đăng ký.</h1>
+            <p>Mã xác minh giúp đảm bảo địa chỉ email thực sự thuộc về bạn.</p>
+        </div>
+        <div class="showcase-footer"><span>Mã dùng một lần</span><span class="divider"></span><span>Hiệu lực 10 phút</span></div>
+    </section>
+
+    <section class="auth-panel">
+        <div class="mobile-brand"><span class="brand-mark">L</span><span><strong>Luminol</strong><small>Salon &amp; Spa</small></span></div>
+        <div class="login-card">
+            <div class="login-heading">
+                <span class="eyebrow">Xác minh email</span>
+                <h2>Nhập mã xác nhận</h2>
+                <p>Mã gồm 6 chữ số đã được gửi đến <strong>@email</strong>.</p>
+            </div>
+            <form id="verify-email-form" data-email="@email" data-login="/@portal/login" novalidate>
+                <div id="verify-email-message" class="login-alert d-none" role="alert" aria-live="polite"><span></span></div>
+                <div class="field-group">
+                    <label for="verification-code">Mã xác minh</label>
+                    <div class="input-wrap verification-code-wrap">
+                        <input id="verification-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required />
+                    </div>
+                    <span class="field-error">Vui lòng nhập đúng 6 chữ số.</span>
+                </div>
+                <button id="verify-email-submit" class="login-button" type="submit"><span class="button-label">Xác nhận email</span><span class="button-spinner"></span></button>
+            </form>
+            <div class="auth-help">
+                <p class="register-note">Chưa nhận được mã? <button id="resend-verification" class="auth-link-button" type="button">Gửi lại mã</button></p>
+                <p class="support-note"><a href="/@portal/login">Quay lại đăng nhập</a></p>
+            </div>
+        </div>
+    </section>
+</main>
+
+@section Scripts { <script>SalonAuth.bindEmailVerificationForm();</script> }
