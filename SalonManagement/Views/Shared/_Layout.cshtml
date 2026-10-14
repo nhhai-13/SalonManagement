@@ -85,6 +85,11 @@
                         {
                             <li class="nav-item"><a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Phiếu tính tiền</a></li>
                         }
+                        @if (User.Identity?.IsAuthenticated == true &&
+                             (User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="DiscountCoupons" asp-action="Index">Mã giảm giá</a></li>
+                        }
 
                     </ul>
 

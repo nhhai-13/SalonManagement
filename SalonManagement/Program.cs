@@ -258,6 +258,7 @@ await using (var scope = app.Services.CreateAsyncScope())
     if (usesSqlite)
     {
         await dbContext.Database.EnsureCreatedAsync();
+        await SqliteSprint4SchemaUpgrade.EnsureAsync(dbContext);
     }
     else
     {

@@ -17,6 +17,27 @@ public class AddInvoiceServiceViewModel
     public int ServiceId { get; set; }
 }
 
+public class ApplyDiscountViewModel
+{
+    public int InvoiceId { get; set; }
+    [StringLength(32)]
+    public string? Code { get; set; }
+}
+
+public class DiscountCouponViewModel
+{
+    [Required, StringLength(32)]
+    public string Code { get; set; } = string.Empty;
+    [Required]
+    public string DiscountType { get; set; } = "Percent";
+    [Range(typeof(decimal), "0.01", "100000000")]
+    public decimal Value { get; set; }
+    [DataType(DataType.Date)]
+    public DateTime StartsOn { get; set; }
+    [DataType(DataType.Date)]
+    public DateTime EndsOn { get; set; }
+}
+
 public class PaymentViewModel
 {
     [Required]
