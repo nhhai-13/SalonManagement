@@ -1,0 +1,69 @@
+@{
+    ViewData["Title"] = "Khách cần liên hệ";
+}
+
+<main id="schedule-follow-ups-page" class="py-4 d-none" aria-labelledby="follow-ups-title">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <span class="text-uppercase text-muted small fw-semibold">Điều phối lịch nghỉ</span>
+            <h1 id="follow-ups-title" class="h2 mb-1">Khách cần liên hệ</h1>
+            <p class="text-muted mb-0">Lịch chưa tìm được phương án và lịch chuyển thất bại được theo dõi riêng.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-primary" href="/reception/schedule-coordination">Quay lại điều phối lịch</a>
+            <button class="btn btn-outline-danger" id="follow-ups-logout" type="button">Đăng xuất</button>
+        </div>
+    </div>
+
+    <section class="card shadow-sm mb-4" aria-label="Bộ lọc liên hệ">
+        <div class="card-body">
+            <form id="follow-ups-filter" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label" for="follow-ups-date">Ngày hẹn cũ</label>
+                    <input class="form-control" id="follow-ups-date" type="date" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="follow-ups-status">Trạng thái liên hệ</label>
+                    <select class="form-select" id="follow-ups-status">
+                        <option value="">Tất cả</option>
+                        <option value="Pending">Chưa liên hệ</option>
+                        <option value="Contacted">Đã liên hệ</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="follow-ups-category">Lý do cần xử lý</label>
+                    <select class="form-select" id="follow-ups-category">
+                        <option value="">Tất cả</option>
+                        <option value="NoAlternative">Chưa tìm được phương án</option>
+                        <option value="TransferFailed">Chuyển lịch thất bại</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <div id="follow-ups-error" class="alert alert-danger d-none" role="alert"></div>
+    <div id="follow-ups-loading" class="alert alert-info d-none" role="status">Đang tải danh sách...</div>
+    <div id="follow-ups-empty" class="alert alert-light border d-none" role="status">Không có lịch cần liên hệ phù hợp bộ lọc.</div>
+    <section id="follow-ups-results" class="card shadow-sm d-none" aria-label="Danh sách khách cần liên hệ">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h2 class="h5 mb-0">Lịch cần liên hệ</h2>
+            <span id="follow-ups-count" class="badge text-bg-primary">0 lịch</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light"><tr>
+                    <th>Khách hàng</th><th>Điện thoại</th><th>Dịch vụ</th><th>Giờ hẹn cũ</th>
+                    <th>Phân loại và lý do</th><th>Liên hệ</th><th>Ghi chú kết quả</th><th></th>
+                </tr></thead>
+                <tbody id="follow-ups-rows"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script src="~/js/schedule-follow-ups.js" asp-append-version="true"></script>
+    <script>ScheduleFollowUpsPage.initialize();</script>
+}

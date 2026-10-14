@@ -20,6 +20,12 @@
 <input class="form-control" id="phone" name="phone" type="tel" maxlength="20" required placeholder="Số điện thoại" />
 <button class="btn btn-outline-primary">Kiểm tra</button><p id="warning-result" role="status"></p>
 </form>
+<section class="card card-body my-3" aria-labelledby="customer-search-heading">
+<h2 id="customer-search-heading" class="h5">Hồ sơ khách hàng</h2>
+<label for="customer-search">Tìm theo tên hoặc số điện thoại</label>
+<input id="customer-search" class="form-control" type="search" minlength="2" autocomplete="off" />
+<div id="customer-search-results" class="mt-2" aria-live="polite"></div>
+</section>
 
 @if (Model.Count == 0) { <div class="attendance-empty"><h2>Chưa có lịch hẹn</h2><p>Chọn ngày khác để xem lịch của khách.</p></div> }
 @foreach (var a in Model) {
@@ -38,6 +44,7 @@
 }
 </div>
 @section Scripts {
+<script src="~/js/auth.js" asp-append-version="true"></script>
 <script>
 document.getElementById('customer-warning').addEventListener('submit', async e => {
     e.preventDefault();
@@ -48,6 +55,29 @@ document.getElementById('customer-warning').addEventListener('submit', async e =
         output.textContent = data.message || 'Không thể kiểm tra khách.';
     } catch { output.textContent = 'Không thể kết nối. Vui lòng thử lại.'; }
 });
+let customerSearchTimer;
+document.getElementById('customer-search').addEventListener('input', event => {
+    clearTimeout(customerSearchTimer);
+    customerSearchTimer = setTimeout(() => searchCustomers(event.target.value), 250);
+});
+async function searchCustomers(query) {
+    const results = document.getElementById('customer-search-results');
+    results.replaceChildren();
+    if (query.trim().length < 2) return;
+    try {
+        const response = await SalonAuth.authenticatedFetch('/api/reception/customers?query=' + encodeURIComponent(query));
+        if (!response.ok) throw new Error();
+        const customers = await response.json();
+        if (!customers.length) { results.textContent = 'Không tìm thấy hồ sơ phù hợp.'; return; }
+        for (const customer of customers) {
+            const row = document.createElement('article'); row.className = 'border rounded p-2 mb-2';
+            const title = document.createElement('strong'); title.textContent = `${customer.fullName} · ${customer.phone}`;
+            const counts = document.createElement('p'); counts.className = 'mb-1'; counts.textContent = `${customer.totalVisits} lần hoàn tất · ${customer.noShowCount} lần không đến${customer.email ? ` · ${customer.email}` : ''}`;
+            const notes = document.createElement('p'); notes.className = 'mb-0'; notes.textContent = customer.notes || 'Chưa có ghi chú riêng.';
+            row.append(title, counts, notes); results.append(row);
+        }
+    } catch { results.textContent = 'Không thể tìm hồ sơ lúc này. Vui lòng thử lại.'; }
+}
 setTimeout(() => { if (!document.querySelector('input:focus')) location.reload(); }, 30000);
 </script>
 }

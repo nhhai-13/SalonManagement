@@ -54,6 +54,22 @@ public class AnyStylistAvailabilityTests
     }
 
     [Fact]
+    public async Task RejectingOnlineAppointmentImmediatelyReleasesItsSlot()
+    {
+        await using var db = Db(); var x = await Seed(db);
+        var service = new StylistAvailabilityService(db, new Clock());
+        var appointment = await db.Appointments.SingleAsync(item => item.StylistId == x.a &&
+            item.AppointmentDate == Date.ToDateTime(TimeOnly.MinValue));
+        var slot = new StylistSlot("09:00", "10:00");
+
+        Assert.DoesNotContain(slot, await service.GetSlotsAsync(x.services, x.a, Date));
+        appointment.Status = "Rejected";
+        await db.SaveChangesAsync();
+
+        Assert.Contains(slot, await service.GetSlotsAsync(x.services, x.a, Date));
+    }
+
+    [Fact]
     public async Task UnqualifiedOrInactiveFreeStylistsCannotSupplySlots_AndNoQualifiedStylistMeansEmpty()
     {
         await using var db = Db(); var x = await Seed(db); var service = new StylistAvailabilityService(db, new Clock());

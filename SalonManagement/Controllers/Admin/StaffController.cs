@@ -23,6 +23,13 @@ public sealed class StaffController(IStaffAccountService staffService) : Control
         return result.Success ? Ok(new { message = result.Message }) : BadRequest(new { message = result.Message });
     }
 
+    [HttpPatch("{id}/role")]
+    public async Task<IActionResult> ChangeRole(string id, ChangeStaffRoleRequest request)
+    {
+        var result = await staffService.ChangeRoleAsync(id, request);
+        return result.Success ? Ok(new { message = result.Message }) : BadRequest(new { message = result.Message });
+    }
+
     [HttpPatch("{id}/status")]
     public async Task<IActionResult> ChangeStatus(string id, ChangeStaffStatusRequest request)
     {

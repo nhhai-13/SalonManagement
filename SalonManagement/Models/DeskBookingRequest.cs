@@ -12,4 +12,5 @@ public class DeskBookingRequest
     public int ServiceId { get; set; }
     public DateTime StartsAt { get; set; }
     public bool AcknowledgeNoShow { get; set; }
+    public bool ConfirmExistingName { get; set; }
 }
