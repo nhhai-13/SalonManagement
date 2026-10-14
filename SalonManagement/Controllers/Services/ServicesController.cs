@@ -69,6 +69,18 @@ namespace SalonManagement.Controllers
             return View("Public", new SalonManagement.Models.ViewModels.PublicServiceCatalog { Groups = groups, Search = search });
         }
 
+        [AllowAnonymous]
+        [HttpGet("Services/Details/{id:int}")]
+        public async Task<IActionResult> Details(int id)
+        {
+            var service = await _context.Services.AsNoTracking()
+                .Include(item => item.ServiceGroup)
+                .FirstOrDefaultAsync(item => item.ServiceId == id && item.IsActive &&
+                    item.Stylists.Any(link => link.Stylist.IsActive));
+
+            return service is null ? NotFound() : View(service);
+        }
+
         // Normalize both sides in memory so Vietnamese matching is independent of database collation.
         private static string NormalizeSearch(string value)
         {

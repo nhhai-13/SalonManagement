@@ -52,12 +52,19 @@ public class AdminController : Controller
         return View(VerifyEmailView);
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpGet("admin")]
     public IActionResult Index() => View();
 
+    [Authorize(Roles = UserRoles.Admin)]
+    [HttpGet("admin/roles")]
+    public IActionResult Roles() => View();
+
+    [Authorize(Roles = UserRoles.Owner)]
     [HttpGet("owner")]
     public IActionResult Owner() => View();
 
+    [Authorize(Roles = UserRoles.Owner)]
     [HttpGet("owner/business-hours")]
     public IActionResult BusinessHours() => View();
 }

@@ -81,6 +81,7 @@ public sealed class EmailVerificationTests
         public Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword) => Task.CompletedTask;
         public string? VerificationCode { get; private set; }
         public Task SendPasswordResetEmailAsync(string toEmail, string resetLink) => Task.CompletedTask;
+        public Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime) => Task.CompletedTask;
         public Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode)
         {
             VerificationCode = verificationCode;

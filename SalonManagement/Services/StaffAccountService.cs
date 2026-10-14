@@ -75,6 +75,26 @@ public sealed class StaffAccountService(
         return (true, "Đã cập nhật tài khoản.");
     }
 
+    public async Task<(bool Success, string Message)> ChangeRoleAsync(string id, ChangeStaffRoleRequest request)
+    {
+        var user = await userManager.FindByIdAsync(id);
+        if (user is null) return (false, "Không tìm thấy tài khoản.");
+        var role = NormalizeRole(request.Role);
+        if (role is null) return (false, "Vai trò không hợp lệ.");
+
+        var currentRoles = await userManager.GetRolesAsync(user);
+        if (currentRoles.Contains(role)) return (true, "Vai trò không thay đổi.");
+        if (currentRoles.Contains(UserRoles.Admin) && await IsLastActiveAdminAsync(user.Id))
+            return (false, "Không thể thay đổi vai trò của tài khoản Admin cuối cùng còn hoạt động.");
+
+        if (currentRoles.Count > 0)
+            await userManager.RemoveFromRolesAsync(user, currentRoles);
+        var result = await userManager.AddToRoleAsync(user, role);
+        return result.Succeeded
+            ? (true, "Đã cập nhật vai trò.")
+            : (false, "Không thể cập nhật vai trò.");
+    }
+
     public async Task<(bool Success, string Message)> ChangeStatusAsync(string id, bool isActive)
     {
         var user = await userManager.FindByIdAsync(id);

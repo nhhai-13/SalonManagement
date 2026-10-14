@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Controllers.Booking;
 using SalonManagement.Data;
@@ -520,6 +521,31 @@ public class BookingServiceTests
 
         // Assert
         Assert.Equal(330, maxShift);
+    }
+
+    [Fact]
+    public async Task GetMaxShiftDurationMinutesAsync_WithSqlite_ReturnsLongestShift()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var context = new ApplicationDbContext(
+            new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options,
+            new HttpContextAccessor());
+        await context.Database.EnsureCreatedAsync();
+        var stylists = Enumerable.Range(1, 3)
+            .Select(index => new Stylist { FullName = $"Stylist {index}", IsActive = true })
+            .ToList();
+        context.Stylists.AddRange(stylists);
+        await context.SaveChangesAsync();
+        context.WorkSchedules.AddRange(
+            new WorkSchedule { StylistId = stylists[0].StylistId, WorkDate = DateTime.Today, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12), Status = "Working" },
+            new WorkSchedule { StylistId = stylists[1].StylistId, WorkDate = DateTime.Today, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(17), Status = "Working" },
+            new WorkSchedule { StylistId = stylists[2].StylistId, WorkDate = DateTime.Today, StartTime = TimeSpan.FromHours(20), EndTime = TimeSpan.FromHours(8), Status = "Working" });
+        await context.SaveChangesAsync();
+
+        var maxShift = await new BookingService(context).GetMaxShiftDurationMinutesAsync();
+
+        Assert.Equal(480, maxShift);
     }
 
     [Fact]
