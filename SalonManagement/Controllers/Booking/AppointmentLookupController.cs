@@ -30,6 +30,8 @@ public sealed class AppointmentLookupController(
                 item.Services,
                 item.StylistName,
                 item.DurationMinutes,
+                item.CancelledAt,
+                item.CancelledBy,
                 item.Status
             })
         });

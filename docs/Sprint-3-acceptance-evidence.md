@@ -10,7 +10,7 @@ This report distinguishes automated and local evidence from validation that stil
 | S3-02 Online confirmation and rejection | `PendingOnlineAppointmentsTests` covers pending online appointments, confirmation/rejection and customer profile preservation. | Automated suite passed. Email delivery and overdue handling were not exercised against a deployed worker/SMTP service. |
 | S3-03 Check-in | `CheckInTests` covers the -60/+60 minute boundary, late calculation, stylist notification, audit, duplicate requests and a SQLite concurrency write. | Automated tests passed. |
 | S3-04 Reschedule and reassign | `AppointmentReschedulingServiceTests` and schedule notification tests cover skills, shift/conflict checks, audit/notification state and the five-minute simulated delivery window. | Automated tests passed. The five-minute test uses a test sender, not the team's SMTP service. |
-| S3-05 Customer cancellation | `AppointmentLookupServiceTests` covers cancellation at and inside the 120-minute limit, release/audit behavior and repeat requests. The successful-cancellation test re-queries the cancelled appointment and verifies 10:00–11:00 remains 60 minutes even when the service snapshot says 30 minutes. | Lookup and cancellation cards now use the scheduled appointment interval as the displayed duration, keeping the 60-minute value synchronized with the appointment. |
+| S3-05 Customer cancellation | `AppointmentLookupServiceTests` covers cancellation at and inside the 120-minute limit, release/audit behavior and repeat requests. It verifies that exactly 120 minutes is allowed, the freed 10:00–11:00 slot is immediately listed again, and a cancelled card retains its 60-minute scheduled duration even if its service snapshot says 30 minutes. | Cancelled appointments now show the cancellation time in Asia/Ho_Chi_Minh and identify the actor as the customer or salon staff. |
 | S3-06 No-show | `NoShowTests` covers the 30-minute threshold, slot release, phone-based counts, audit and the 15-minute undo window. | Automated tests passed. |
 | S3-07 Desk booking | `DeskBookingServiceTests` runs on SQLite and verifies profile-name confirmation/preservation, `Confirmed` status, `Source=Desk`, audit attribution and rejection when the stylist lacks the selected service. | Automated tests passed. |
 | Booking flow regression | `BookingServiceTests.GetMaxShiftDurationMinutesAsync_WithSqlite_ReturnsLongestShift` covers SQLite shift-duration lookup, including an overnight row. Staging-mode smoke checks for `/booking` and `/booking/select-services` return HTTP 200. | Fixed an EF Core/SQLite `TimeSpan` comparison that previously caused HTTP 500 while loading booking services. |
@@ -21,7 +21,7 @@ This report distinguishes automated and local evidence from validation that stil
 
 ## Executed checks
 
-- `dotnet test SalonManagement.Tests/SalonManagement.Tests.csproj --no-restore`: passed, 326/326 tests.
+- `dotnet test SalonManagement.Tests/SalonManagement.Tests.csproj --no-restore`: passed, 327/327 tests.
 - `dotnet build SalonManagement/SalonManagement.csproj --no-restore`: passed, 0 errors.
 - `dotnet ef migrations has-pending-model-changes --project SalonManagement` with Production environment: no pending model changes.
 - Local Staging-mode SQLite smoke checks: receptionist login succeeded, schedule page returned 200, booking and service-selection pages returned 200 after the SQLite fix, stylist API returned 200, and cross-role calls returned 403.

@@ -208,6 +208,29 @@
                                     </div>
                                 </div>
 
+                                ${a.status === 'Đã huỷ' ? `
+                                    <div class="row g-3 mb-3 border-top pt-3">
+                                        <div class="col-sm-6">
+                                            <div class="info-row">
+                                                <i class="bi bi-calendar-x"></i>
+                                                <div>
+                                                    <div class="info-label">Thời điểm huỷ</div>
+                                                    <div class="info-value">${escapeHtml(formatCancelledAt(a.cancelledAt) || 'Không ghi nhận')}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <div class="info-row">
+                                                <i class="bi bi-person-x"></i>
+                                                <div>
+                                                    <div class="info-label">Người huỷ</div>
+                                                    <div class="info-value">${escapeHtml(a.cancelledBy || 'Không ghi nhận')}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ` : ''}
+
                                 ${canCancel ? `
                                     <div class="text-end border-top pt-3">
                                         <button class="btn btn-outline-danger btn-sm btn-cancel"
@@ -257,6 +280,17 @@
                     case 'Không đến': return 'status-noshow';
                     default: return 'status-default';
                 }
+            }
+
+            function formatCancelledAt(value) {
+                if (!value) return '';
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '';
+                return new Intl.DateTimeFormat('vi-VN', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                    timeZone: 'Asia/Ho_Chi_Minh'
+                }).format(date);
             }
 
             function escapeHtml(text) {

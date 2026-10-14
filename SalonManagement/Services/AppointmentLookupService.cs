@@ -12,7 +12,9 @@ public sealed record AppointmentLookupItem(
     IReadOnlyList<string> Services,
     string StylistName,
     int DurationMinutes,
-    string Status);
+    string Status,
+    DateTimeOffset? CancelledAt,
+    string? CancelledBy);
 
 public sealed record AppointmentLookupResult(
     IReadOnlyList<AppointmentLookupItem> Items,
@@ -126,6 +128,11 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         var serviceDuration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
         var scheduledDuration = (appointment.EndTime - appointment.StartTime).TotalMinutes;
         var duration = scheduledDuration > 0 ? (int)scheduledDuration : serviceDuration;
+        var cancelledBy = string.IsNullOrWhiteSpace(appointment.CancelledBy)
+            ? null
+            : appointment.CancelledBy.StartsWith("customer:", StringComparison.OrdinalIgnoreCase)
+                ? "Khách hàng"
+                : "Nhân viên tiệm";
 
         return new(
             appointment.BookingReference,
@@ -135,7 +142,9 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
             appointment.AppointmentServices.Select(item => item.Service.ServiceName).ToList(),
             appointment.Stylist?.FullName ?? "Chưa phân công",
             duration,
-            StatusLabel(appointment.Status));
+            StatusLabel(appointment.Status),
+            appointment.CancelledAt,
+            cancelledBy);
     }
 
     private static string StatusLabel(string status) => status switch
