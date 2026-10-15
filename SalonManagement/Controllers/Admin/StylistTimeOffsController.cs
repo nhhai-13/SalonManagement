@@ -29,7 +29,11 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
     public async Task<IActionResult> Create(
         [FromBody] StylistTimeOffRequest request)
     {
+ feature/s2-02-stylist-time-off-warning
+    feature/s2-02-stylist-time-off-warning
+
  feature/s2-02-stylist-time-off-booking
+ develop
 
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
@@ -99,7 +103,48 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         });
     }
 }
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+        // Kiểm tra các lịch hẹn bị ảnh hưởng bởi ngày/giờ nghỉ
+        var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
+        var nextDay = appointmentDay.AddDays(1);
+
+        var affectedAppointments = await dbContext.Appointments
+            .AsNoTracking()
+            .Where(a =>
+                a.StylistId == request.StylistId &&
+                a.AppointmentDate >= appointmentDay &&
+                a.AppointmentDate < nextDay &&
+                a.Status != "Cancelled")
+            .Where(a =>
+                request.IsFullDay ||
+                (request.StartTime.HasValue &&
+                request.EndTime.HasValue &&
+                a.StartTime < request.EndTime.Value.ToTimeSpan() &&
+                a.EndTime > request.StartTime.Value.ToTimeSpan()))
+            .OrderBy(a => a.StartTime)
+            .Select(a => new
+            {
+                a.AppointmentId,
+                a.AppointmentDate,
+                a.StartTime,
+                a.EndTime,
+                a.Status
+           })
+            .ToListAsync();
+
+   if (affectedAppointments.Count > 0)
+   {
+    return Conflict(new
+    {
+        message = "Thời gian nghỉ trùng với lịch hẹn đã có.",
+        affectedAppointments
+    });
+}
+        var timeOff = new StylistTimeOff    
+
  feature/s2-02-stylist-time-off-booking
+ develop
 
         var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
         var nextDay = appointmentDay.AddDays(1);
@@ -147,6 +192,7 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
  develop
         var timeOff = new StylistTimeOff
+ develop
         {
             StylistId = request.StylistId,
             OffDate = request.OffDate,
@@ -160,7 +206,11 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
                 ? null
                 : request.EndTime,
 
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
  feature/s2-02-stylist-time-off-booking
+ develop
             Reason = request.Reason
 
             Reason = request.Reason.Trim()
@@ -170,7 +220,11 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         dbContext.StylistTimeOffs.Add(timeOff);
         await dbContext.SaveChangesAsync();
 
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
  feature/s2-02-stylist-time-off-booking
+ develop
         return Ok(timeOff);
 
         return Ok(new
@@ -201,7 +255,11 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
         return NoContent();
     }
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
  feature/s2-02-stylist-time-off-booking
+ develop
 
 
     private async Task<string?> ValidateReplacementAsync(int replacementStylistId, int absentStylistId,
@@ -267,7 +325,11 @@ public class StylistTimeOffRequest
     public TimeOnly? EndTime { get; set; }
 
     public string? Reason { get; set; }
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
  feature/s2-02-stylist-time-off-booking
+ develop
 }
 
 

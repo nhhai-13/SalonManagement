@@ -612,7 +612,11 @@ private class AuditEntry
                     .WithMany(invoice => invoice.Payments)
                     .HasForeignKey(payment => payment.InvoiceId);
             });
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
  feature/s2-02-stylist-time-off-booking
+ develop
                // Cấu hình lịch nghỉ riêng của thợ
         builder.Entity<StylistTimeOff>(entity =>
             {
