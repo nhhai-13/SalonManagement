@@ -13,19 +13,22 @@ namespace SalonManagement.Controllers;
 public class AppointmentsController(ApplicationDbContext db, ILogger<AppointmentsController> logger) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(DateTime? date)
+    public async Task<IActionResult> Index(DateTime? date, string? status)
     {
         var selectedDate = (date ?? VietnamTime.Today).Date;
         ViewBag.SelectedDate = selectedDate.ToString("yyyy-MM-dd");
-        var appointments = await db.Appointments.AsNoTracking()
+        ViewBag.SelectedStatus = status;
+        IQueryable<Appointment> query = db.Appointments.AsNoTracking()
             .Include(item => item.Customer)
             .Include(item => item.Stylist)
             .Include(item => item.AppointmentServices)
                 .ThenInclude(item => item.Service)
             .Include(item => item.Invoice)
-            .Where(item => item.AppointmentDate.Date == selectedDate)
-            .OrderBy(item => item.StartTime)
-            .ToListAsync();
+            .Where(item => item.AppointmentDate.Date == selectedDate);
+        if (status == "Pending") query = query.Where(item => item.Status == "Pending" || item.Status == "PendingConfirmation");
+        else if (status == "Cancelled") query = query.Where(item => item.Status == "Cancelled" || item.Status == "Canceled");
+        else if (status is "Confirmed" or "Arrived" or "Completed" or "NoShow") query = query.Where(item => item.Status == status);
+        var appointments = await query.OrderBy(item => item.StartTime).ToListAsync();
 
         return View(appointments);
     }
