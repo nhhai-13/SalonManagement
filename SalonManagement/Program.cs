@@ -188,6 +188,8 @@ builder.Services.AddScoped<
     IEmailService,
     EmailService>();
 
+builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
+
 builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
 
 builder.Services.AddSingleton<
