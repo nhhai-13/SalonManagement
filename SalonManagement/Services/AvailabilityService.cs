@@ -7,9 +7,64 @@ namespace SalonManagement.Services;
 public sealed record AvailabilityResult(int TotalDurationMinutes, IReadOnlyList<TimeSpan> Slots);
 public sealed record SuggestedAvailability(DateTime Date, int SlotCount, TimeSpan EarliestSlot);
 
-public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider timeProvider)
+public sealed class AvailabilityService(
+    ApplicationDbContext db,
+    TimeProvider timeProvider,
+    StylistAvailabilityService stylistAvailability) : IAvailabilityService
 {
-    public AvailabilityService(ApplicationDbContext db) : this(db, TimeProvider.System) { }
+    public AvailabilityService(ApplicationDbContext db)
+        : this(db, TimeProvider.System, new StylistAvailabilityService(db, TimeProvider.System)) { }
+
+    public AvailabilityService(ApplicationDbContext db, TimeProvider timeProvider)
+        : this(db, timeProvider, new StylistAvailabilityService(db, timeProvider)) { }
+
+    public async Task<List<AvailabilitySlot>> GetAvailableSlotsAsync(
+        DateTime date,
+        List<int> serviceIds,
+        int? stylistId = null)
+    {
+        var stylists = await stylistAvailability.GetStylistsAsync(serviceIds);
+        if (stylistId.HasValue && stylistId.Value != StylistAvailabilityService.AnyStylist)
+            stylists = stylists.Where(stylist => stylist.Id == stylistId.Value).ToList();
+
+        var stylistSlots = await Task.WhenAll(stylists.Select(async stylist =>
+            (stylist.Id, Slots: await stylistAvailability.GetSlotsAsync(
+                serviceIds, stylist.Id, DateOnly.FromDateTime(date)))));
+
+        return stylistSlots
+            .SelectMany(result => result.Slots.Select(slot => new
+            {
+                result.Id,
+                Start = TimeSpan.ParseExact(slot.Start, @"hh\:mm", System.Globalization.CultureInfo.InvariantCulture),
+                End = TimeSpan.ParseExact(slot.End, @"hh\:mm", System.Globalization.CultureInfo.InvariantCulture)
+            }))
+            .GroupBy(slot => (slot.Start, slot.End))
+            .OrderBy(group => group.Key.Start)
+            .Select(group => new AvailabilitySlot
+            {
+                StartTime = group.Key.Start,
+                EndTime = group.Key.End,
+                AvailableStylistIds = group.Select(slot => slot.Id).Distinct().Order().ToList()
+            })
+            .ToList();
+    }
+
+    public async Task<List<DateTime>> FindNextAvailableDatesAsync(
+        DateTime fromDate,
+        int count,
+        List<int> serviceIds,
+        int? stylistId = null)
+    {
+        var dates = new List<DateTime>();
+        for (var offset = 1; offset <= 14 && dates.Count < count; offset++)
+        {
+            var date = fromDate.Date.AddDays(offset);
+            if ((await GetAvailableSlotsAsync(date, serviceIds, stylistId)).Count > 0)
+                dates.Add(date);
+        }
+
+        return dates;
+    }
 
     public async Task<AvailabilityResult> GetSlotsAsync(DateTime date, IReadOnlyCollection<int> serviceIds)
     {

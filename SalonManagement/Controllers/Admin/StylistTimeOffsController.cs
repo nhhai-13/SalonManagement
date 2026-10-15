@@ -29,13 +29,10 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
     public async Task<IActionResult> Create(
         [FromBody] StylistTimeOffRequest request)
     {
- feature/s2-02-stylist-time-off-booking
-
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
             return BadRequest(new { message = "Vui lòng nhập lý do nghỉ." });
         }
- develop
         // Kiểm tra thợ có tồn tại không
         var stylistExists = await dbContext.Stylists
             .AnyAsync(x => x.StylistId == request.StylistId);
@@ -99,8 +96,6 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         });
     }
 }
- feature/s2-02-stylist-time-off-booking
-
         var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
         var nextDay = appointmentDay.AddDays(1);
         var affectedAppointments = await dbContext.Appointments
@@ -145,7 +140,6 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
             }
         }
 
- develop
         var timeOff = new StylistTimeOff
         {
             StylistId = request.StylistId,
@@ -160,25 +154,17 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
                 ? null
                 : request.EndTime,
 
- feature/s2-02-stylist-time-off-booking
-            Reason = request.Reason
-
             Reason = request.Reason.Trim()
- develop
         };
 
         dbContext.StylistTimeOffs.Add(timeOff);
         await dbContext.SaveChangesAsync();
-
- feature/s2-02-stylist-time-off-booking
-        return Ok(timeOff);
 
         return Ok(new
         {
             timeOff,
             reassignedAppointmentIds = affectedAppointments.Select(appointment => appointment.AppointmentId)
         });
- develop
     }
 
     // Xóa lịch nghỉ
@@ -201,8 +187,6 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
         return NoContent();
     }
- feature/s2-02-stylist-time-off-booking
-
 
     private async Task<string?> ValidateReplacementAsync(int replacementStylistId, int absentStylistId,
         DateOnly offDate, List<Appointment> appointments)
@@ -251,7 +235,6 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
         return null;
     }
- develop
 }
 
 public class StylistTimeOffRequest
@@ -267,10 +250,6 @@ public class StylistTimeOffRequest
     public TimeOnly? EndTime { get; set; }
 
     public string? Reason { get; set; }
- feature/s2-02-stylist-time-off-booking
-}
-
 
     public int? ReplacementStylistId { get; set; }
 }
- develop
