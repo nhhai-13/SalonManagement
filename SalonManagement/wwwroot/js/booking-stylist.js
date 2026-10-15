@@ -8,6 +8,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const date = document.getElementById('booking-date');
     const selected = document.getElementById('selected-stylist');
     const selectedSlot = document.getElementById('selected-slot');
+    const confirm = document.getElementById('confirm-stylist-selection');
+    const confirmation = document.getElementById('assignment-confirmation');
+    const assignmentMessage = document.getElementById('assignment-message');
+    const assignmentDetail = document.getElementById('assignment-detail');
+    const checkout = document.getElementById('booking-checkout');
+    const fullName = document.getElementById('booking-full-name');
+    const phone = document.getElementById('booking-phone');
+    const email = document.getElementById('booking-email');
+    const emailCode = document.getElementById('booking-email-code');
+    const sendCode = document.getElementById('send-booking-email-code');
+    const verifyCode = document.getElementById('verify-booking-email-code');
+    const emailMessage = document.getElementById('booking-email-message');
+    const notes = document.getElementById('booking-notes');
+    const placeBooking = document.getElementById('place-booking');
+    const bookingResult = document.getElementById('booking-result');
+    let emailVerified = false;
+    let assignmentVersion = 0, assignmentRequest;
+    function clearAssignment() {
+        assignmentVersion++;
+        assignmentRequest?.abort();
+        confirmation.hidden = true;
+        checkout.hidden = true;
+        emailVerified = false;
+        if (placeBooking) placeBooking.disabled = true;
+        if (emailMessage) emailMessage.textContent = '';
+        if (bookingResult) bookingResult.textContent = '';
+        assignmentMessage.textContent = assignmentDetail.textContent = '';
+        confirm.disabled = true;
+    }
     const parts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
     const part = type => parts.find(p => p.type === type).value;
     date.value = date.min = `${part('year')}-${part('month')}-${part('day')}`;
@@ -17,15 +46,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const ids = () => [...document.querySelectorAll('.service-checkbox:checked')].map(e => e.value);
     const query = () => { const q = new URLSearchParams(); ids().forEach(id => q.append('serviceIds', id)); return q; };
     function clearSlots() {
+        clearAssignment();
         slotVersion++;
         slotRequest?.abort();
         selectedSlot.value = '';
         slots.replaceChildren();
         slotMessage.textContent = '';
     }
-    async function json(url, signal) {
-        const response = await fetch(url, { signal, cache: 'no-store' });
-        const data = await response.json();
+    async function json(url, signal, body) {
+        const response = await fetch(url, body === undefined
+            ? { signal, cache: 'no-store' }
+            : { method: 'POST', signal, cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const text = await response.text();
+        let data;
+        try { data = JSON.parse(text); }
+        catch { throw new Error('Máy chủ không thể tải dữ liệu đặt lịch. Vui lòng thử lại.'); }
         if (!response.ok) throw new Error(data.message || 'Không thể tải dữ liệu. Vui lòng thử lại.');
         return data;
     }
@@ -55,12 +90,20 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await json(`${panel.dataset.slotsUrl}?${q}`, slotRequest.signal);
             if (current !== slotVersion) return;
-            slotMessage.textContent = data.length ? 'Chọn giờ bắt đầu (giờ Việt Nam).' : selected.value === '0'
-                ? 'Không có thợ phù hợp nào còn khung giờ trống trong ngày này. Hãy đổi ngày hoặc dịch vụ.'
-                : 'Thợ đã chọn không còn khung giờ phù hợp trong ngày này. Hãy đổi ngày hoặc đổi thợ.';
+            if (data.length) {
+                slotMessage.textContent = 'Chọn giờ bắt đầu (giờ Việt Nam).';
+            } else {
+                const notice = await json(`${panel.dataset.dayNoticeUrl}?date=${encodeURIComponent(date.value)}`, slotRequest.signal);
+                if (current !== slotVersion) return;
+                slotMessage.textContent = notice.message || (selected.value === '0'
+                    ? 'Không có thợ phù hợp nào còn khung giờ trống trong ngày này. Hãy đổi ngày hoặc dịch vụ.'
+                    : 'Thợ đã chọn không còn khung giờ phù hợp trong ngày này. Hãy đổi ngày hoặc đổi thợ.');
+            }
             for (const slot of data) {
                 const b = button(`${slot.start} – ${slot.end}`);
-                b.addEventListener('click', () => { selectedSlot.value = slot.start; choose(slots, b); });
+                b.addEventListener('click', () => {
+                    clearAssignment(); selectedSlot.value = slot.start; choose(slots, b); confirm.disabled = false;
+                });
                 slots.append(b);
             }
         } catch (e) {
@@ -105,6 +148,81 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     date.addEventListener('change', loadSlots);
+    confirm.addEventListener('click', async () => {
+        if (!selected.value || !selectedSlot.value || !date.value) return;
+        clearAssignment();
+        const current = assignmentVersion;
+        assignmentRequest = new AbortController();
+        confirmation.hidden = false;
+        assignmentMessage.textContent = 'Đang kiểm tra và chọn thợ phù hợp…';
+        const q = query(); q.set('stylistId', selected.value); q.set('date', date.value); q.set('start', selectedSlot.value);
+        try {
+            const data = await json(`${panel.dataset.assignmentUrl}?${q}`, assignmentRequest.signal);
+            if (current !== assignmentVersion) return;
+            assignmentMessage.textContent = `Thợ được gán: ${data.name}`;
+            assignmentDetail.textContent = `Ngày ${data.date} · ${data.start} – ${data.end}`;
+            confirm.disabled = false;
+            checkout.hidden = false;
+        } catch (e) {
+            if (current !== assignmentVersion || e.name === 'AbortError') return;
+            selectedSlot.value = '';
+            choose(slots, null);
+            assignmentMessage.textContent = e.message;
+        }
+    });
+    sendCode?.addEventListener('click', async () => {
+        if (!email.value || !email.validity.valid) {
+            emailMessage.textContent = 'Vui lòng nhập email hợp lệ.';
+            email.focus();
+            return;
+        }
+        emailVerified = false;
+        placeBooking.disabled = true;
+        sendCode.disabled = true;
+        emailMessage.textContent = 'Đang gửi mã xác thực…';
+        try {
+            const data = await json('/booking/send-email-code', undefined, { email: email.value });
+            emailCode.disabled = verifyCode.disabled = false;
+            emailCode.value = '';
+            emailMessage.textContent = data.message;
+            emailCode.focus();
+        } catch (e) { emailMessage.textContent = e.message; }
+        finally { sendCode.disabled = false; }
+    });
+    verifyCode?.addEventListener('click', async () => {
+        emailMessage.textContent = 'Đang xác thực email…';
+        try {
+            const data = await json('/booking/verify-email-code', undefined, { email: email.value, code: emailCode.value });
+            emailVerified = true;
+            emailMessage.textContent = data.message;
+            placeBooking.disabled = false;
+        } catch (e) { emailMessage.textContent = e.message; }
+    });
+    email?.addEventListener('input', () => {
+        emailVerified = false;
+        if (placeBooking) placeBooking.disabled = true;
+        if (emailCode) { emailCode.value = ''; emailCode.disabled = true; }
+        if (verifyCode) verifyCode.disabled = true;
+    });
+    placeBooking?.addEventListener('click', async () => {
+        if (!fullName.value.trim() || !phone.validity.valid || !emailVerified) {
+            bookingResult.textContent = 'Vui lòng nhập họ tên, số điện thoại và xác thực email trước khi đặt lịch.';
+            return;
+        }
+        placeBooking.disabled = true;
+        bookingResult.textContent = 'Đang tạo lịch hẹn…';
+        try {
+            const data = await json('/booking/confirm', undefined, {
+                date: date.value, startTime: selectedSlot.value, serviceIds: ids().map(Number),
+                fullName: fullName.value.trim(), phone: phone.value.trim(), email: email.value.trim(),
+                notes: notes.value.trim() || null, website: null
+            });
+            bookingResult.textContent = `Đặt lịch thành công. Mã tra cứu: ${data.reference}. Thợ: ${data.stylistName}.`;
+        } catch (e) {
+            bookingResult.textContent = e.message;
+            placeBooking.disabled = false;
+        }
+    });
     document.getElementById('btn-submit-booking')?.addEventListener('click', () => {
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         (options.querySelector('button') || date).focus({ preventScroll: true });

@@ -3,6 +3,7 @@ window.BusinessHoursPage = (() => {
     const list = () => document.getElementById("hours-list");
 
     function time(value) { return value ? value.substring(0, 5) : ""; }
+    function apiTime(value) { return value && value.length === 5 ? `${value}:00` : value; }
 
     function row(day) {
         const disabled = day.isClosed ? "disabled" : "";
@@ -54,22 +55,25 @@ window.BusinessHoursPage = (() => {
                 const days = rows.map(item => ({
                     dayOfWeek: Number(item.dataset.day),
                     isClosed: item.querySelector(".closed").checked,
-                    opensAt: item.querySelector(".closed").checked ? null : item.querySelector(".opens").value,
-                    closesAt: item.querySelector(".closed").checked ? null : item.querySelector(".closes").value
+                    opensAt: item.querySelector(".closed").checked ? null : apiTime(item.querySelector(".opens").value),
+                    closesAt: item.querySelector(".closed").checked ? null : apiTime(item.querySelector(".closes").value)
                 }));
                 const response = await SalonAuth.authenticatedFetch("/api/business-hours", {
                     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days })
                 });
+                let problem = {};
                 if (!response.ok) {
-                    const problem = await response.json().catch(() => ({}));
+                    problem = await response.json().catch(() => ({}));
                     Object.entries(problem.errors || {}).forEach(([key, messages]) => {
-                        const match = /^Days\[(\d)\]$/.exec(key);
-                        if (match) rows.find(row => row.dataset.day === match[1])?.querySelector('.error')?.replaceChildren(document.createTextNode(messages.join(' ')));
+                        const match = /^Days\[(\d+)\]/.exec(key);
+                        if (match) rows[Number(match[1])]?.querySelector('.error')?.replaceChildren(document.createTextNode(messages.join(' ')));
                     });
                 }
                 const result = document.getElementById("hours-result");
                 result.className = `alert ${response.ok ? "alert-success" : "alert-danger"}`;
-                result.textContent = response.ok ? "Đã lưu giờ hoạt động." : "Không thể lưu. Vui lòng kiểm tra lại các khung giờ.";
+                result.textContent = response.ok
+                    ? "Đã lưu giờ hoạt động."
+                    : (problem?.detail || problem?.title || "Không thể lưu. Vui lòng kiểm tra lại các khung giờ.");
             });
         }
     };

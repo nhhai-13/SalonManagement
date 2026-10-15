@@ -1,0 +1,6 @@
+@model IReadOnlyList<SalonManagement.Controllers.Admin.PermissionAuditRow>
+@{ ViewData["Title"] = "Đối chiếu phân quyền"; var missing = Model.Count(row => row.MissingAuthorization); }
+<div class="container py-4"><h1 class="h3">Đối chiếu phân quyền</h1><p class="text-secondary">Tổng API/MVC action: <strong>@Model.Count</strong> · Không có khai báo quyền: <strong class="@(missing == 0 ? "text-success" : "text-danger")">@missing</strong> · Cập nhật lúc @DateTimeOffset.Now.ToString("dd/MM/yyyy HH:mm:ss")</p>
+<div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Đường dẫn</th><th>Action</th><th>Khách</th><th>Thợ</th><th>Lễ tân</th><th>Chủ tiệm</th><th>Quản trị</th><th>Khách vãng lai</th></tr></thead><tbody>
+@foreach (var row in Model) { <tr class="@(row.MissingAuthorization ? "table-warning" : "")"><td><code>@row.Path</code></td><td>@row.Controller.@row.Action</td><td>@row.Roles["Customer"]</td><td>@row.Roles["Stylist"]</td><td>@row.Roles["Receptionist"]</td><td>@row.Roles["Owner"]</td><td>@row.Roles["Admin"]</td><td>@row.Roles["Chưa đăng nhập"]</td></tr> }
+</tbody></table></div><p class="small text-secondary">Bảng phản ánh thuộc tính [Authorize]/[AllowAnonymous] trên controller/action. Dòng vàng cần người quản trị rà soát; đây chưa phải kết quả gọi API bằng từng tài khoản.</p></div>

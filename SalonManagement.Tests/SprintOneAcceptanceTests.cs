@@ -94,6 +94,21 @@ public sealed class SprintOneAcceptanceTests
     }
 
     [Fact]
+    public async Task RoleOnlyChange_DoesNotRequireACompleteProfile()
+    {
+        await using var f = new Fixture();
+        var user = await f.CreateUser(UserRoles.Stylist);
+        user.FullName = string.Empty;
+        await f.Users.UpdateAsync(user);
+
+        var result = await new StaffAccountService(f.Users, f.Db, TimeProvider.System)
+            .ChangeRoleAsync(user.Id, new ChangeStaffRoleRequest(UserRoles.Owner));
+
+        Assert.True(result.Success);
+        Assert.True(await f.Users.IsInRoleAsync(user, UserRoles.Owner));
+    }
+
+    [Fact]
     public async Task Deactivate_ImmediatelyRejectsPrincipalAndRevokesRefreshTokens()
     {
         await using var f = new Fixture();
@@ -231,6 +246,7 @@ public sealed class SprintOneAcceptanceTests
         public bool Fail { get; init; }
         public Task SendTemporaryPasswordEmailAsync(string email, string password) { if (Fail) throw new InvalidOperationException("Test delivery failure"); Password = password; return Task.CompletedTask; }
         public Task SendPasswordResetEmailAsync(string email, string link) => Task.CompletedTask;
+        public Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime) => Task.CompletedTask;
         public Task SendEmailVerificationCodeAsync(string email, string code) => Task.CompletedTask;
     }
     private sealed class TempProvider : ITempDataProvider

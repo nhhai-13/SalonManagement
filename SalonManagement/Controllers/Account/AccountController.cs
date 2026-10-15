@@ -29,10 +29,27 @@ public class AccountController(
     private const string ResetPasswordView = "~/Views/Account/ResetPassword/Index.cshtml";
     private const string ResetPasswordConfirmationView = "~/Views/Account/ResetPassword/Confirmation.cshtml";
 
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult Login()
     {
         return View(LoginView);
+    }
+
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Logout()
+    {
+        var user = await userManager.GetUserAsync(User);
+        if (user is not null)
+        {
+            await RevokeAllRefreshTokensAsync(user.Id);
+        }
+
+        Response.Cookies.Delete("salon.accessToken");
+        await signInManager.SignOutAsync();
+        return RedirectToAction("Index", "Home");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -106,12 +123,14 @@ public class AccountController(
     // AC2 + AC4: Quên mật khẩu
     // ═══════════════════════════════════════════════════════════════
 
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult ForgotPassword()
     {
         return View(ForgotPasswordView, new ForgotPasswordViewModel());
     }
 
+    [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
@@ -161,6 +180,7 @@ public class AccountController(
         return RedirectToAction(nameof(ForgotPasswordConfirmation));
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult ForgotPasswordConfirmation()
     {
@@ -171,6 +191,7 @@ public class AccountController(
     // AC2 + AC3: Đặt lại mật khẩu
     // ═══════════════════════════════════════════════════════════════
 
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult ResetPassword(string? email, string? token)
     {
@@ -187,6 +208,7 @@ public class AccountController(
         return View(ResetPasswordView, model);
     }
 
+    [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
@@ -237,6 +259,7 @@ public class AccountController(
         return RedirectToAction(nameof(ResetPasswordConfirmation));
     }
 
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult ResetPasswordConfirmation()
     {

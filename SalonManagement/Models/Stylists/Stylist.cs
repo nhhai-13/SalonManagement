@@ -27,10 +27,19 @@
         public ICollection<WorkSchedule> WorkSchedules { get; set; }
             = new List<WorkSchedule>();
 
+        public ICollection<StylistBreak> Breaks { get; set; } = new List<StylistBreak>();
+        public ICollection<StylistDayOff> DaysOff { get; set; } = new List<StylistDayOff>();
+
         public ICollection<Appointment> Appointments { get; set; }
             = new List<Appointment>();
 
         public ICollection<StylistService> Services { get; set; }
             = new List<StylistService>();
+
+        public ICollection<AppointmentService> AppointmentServices { get; set; }
+            = new List<AppointmentService>();
+
+        public ICollection<InvoiceAdjustment> InvoiceAdjustments { get; set; }
+            = new List<InvoiceAdjustment>();
     }
 }

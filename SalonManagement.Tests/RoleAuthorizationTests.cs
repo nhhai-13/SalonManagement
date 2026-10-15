@@ -8,10 +8,11 @@ namespace SalonManagement.Tests;
 public class RoleAuthorizationTests
 {
     [Theory]
-    [InlineData(nameof(AdminController.Index))]
-    [InlineData(nameof(AdminController.BusinessHours))]
-    [InlineData(nameof(AdminController.Owner))]
-    public void AdminPageShells_ShouldAllowJwtClientToLoad(string actionName)
+    [InlineData(nameof(AdminController.Index), UserRoles.Admin)]
+    [InlineData(nameof(AdminController.Roles), UserRoles.Admin)]
+    [InlineData(nameof(AdminController.BusinessHours), UserRoles.Owner)]
+    [InlineData(nameof(AdminController.Owner), UserRoles.Owner)]
+    public void PortalPages_ShouldRequireTheirAssignedRole(string actionName, string role)
     {
         var action = typeof(AdminController).GetMethod(actionName);
         var attribute = action!
@@ -19,7 +20,8 @@ public class RoleAuthorizationTests
             .Cast<AuthorizeAttribute>()
             .FirstOrDefault();
 
-        Assert.Null(attribute);
+        Assert.NotNull(attribute);
+        Assert.Equal(role, attribute!.Roles);
     }
 
     [Theory]
