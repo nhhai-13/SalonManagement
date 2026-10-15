@@ -73,8 +73,6 @@ public override int SaveChanges()
     return SaveChangesAsync().GetAwaiter().GetResult();
 }
 
-        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
-
 public override int SaveChanges(bool acceptAllChangesOnSuccess)
 {
     if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
@@ -612,6 +610,11 @@ private class AuditEntry
                     .WithMany(invoice => invoice.Payments)
                     .HasForeignKey(payment => payment.InvoiceId);
             });
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+
+            // Cấu hình lịch nghỉ riêng của thợ
+            builder.Entity<StylistTimeOff>(entity =>
+
  feature/s2-02-stylist-time-off-warning
  feature/s2-02-stylist-time-off-warning
 
@@ -619,6 +622,7 @@ private class AuditEntry
  develop
                // Cấu hình lịch nghỉ riêng của thợ
         builder.Entity<StylistTimeOff>(entity =>
+ develop
             {
                 entity.HasKey(timeOff => timeOff.StylistTimeOffId);
 
@@ -626,8 +630,7 @@ private class AuditEntry
                     .WithMany()
                     .HasForeignKey(timeOff => timeOff.StylistId)
                     .OnDelete(DeleteBehavior.Cascade);
-           });
-
+            });
 
             builder.Entity<RescheduleChangeLog>(entity =>
             {
@@ -646,7 +649,6 @@ private class AuditEntry
                 entity.HasIndex(log => log.AppointmentId);
                 entity.HasIndex(log => log.ChangedAtUtc);
             });
- develop
         }
     }
 }

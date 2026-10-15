@@ -29,17 +29,20 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
     public async Task<IActionResult> Create(
         [FromBody] StylistTimeOffRequest request)
     {
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+
  feature/s2-02-stylist-time-off-warning
     feature/s2-02-stylist-time-off-warning
 
  feature/s2-02-stylist-time-off-booking
  develop
 
+ develop
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
             return BadRequest(new { message = "Vui lòng nhập lý do nghỉ." });
         }
- develop
+
         // Kiểm tra thợ có tồn tại không
         var stylistExists = await dbContext.Stylists
             .AnyAsync(x => x.StylistId == request.StylistId);
@@ -95,6 +98,16 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
               (x.StartTime < request.EndTime &&
                x.EndTime > request.StartTime));
 
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+            if (isOverlap)
+            {
+                return BadRequest(new
+                {
+                    message = "Khoảng giờ nghỉ bị trùng với lịch nghỉ đã có."
+                });
+            }
+        }
+
     if (isOverlap)
     {
         return BadRequest(new
@@ -145,66 +158,72 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
  feature/s2-02-stylist-time-off-booking
  develop
+ develop
 
         var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
-        var nextDay = appointmentDay.AddDays(1);
-        var affectedAppointments = await dbContext.Appointments
-            .Include(appointment => appointment.AppointmentServices)
-            .Where(appointment => appointment.StylistId == request.StylistId &&
-                appointment.AppointmentDate >= appointmentDay && appointment.AppointmentDate < nextDay &&
-                appointment.Status != "Cancelled")
-            .Where(appointment => request.IsFullDay ||
-                (request.StartTime.HasValue && request.EndTime.HasValue &&
-                 appointment.StartTime < request.EndTime.Value.ToTimeSpan() &&
-                 appointment.EndTime > request.StartTime.Value.ToTimeSpan()))
-            .OrderBy(appointment => appointment.StartTime)
-            .ToListAsync();
+    var nextDay = appointmentDay.AddDays(1);
+    var affectedAppointments = await dbContext.Appointments
+        .Include(appointment => appointment.AppointmentServices)
+        .Where(appointment => appointment.StylistId == request.StylistId &&
+            appointment.AppointmentDate >= appointmentDay && appointment.AppointmentDate < nextDay &&
+            appointment.Status != "Cancelled")
+        .Where(appointment => request.IsFullDay ||
+            (request.StartTime.HasValue && request.EndTime.HasValue &&
+             appointment.StartTime < request.EndTime.Value.ToTimeSpan() &&
+             appointment.EndTime > request.StartTime.Value.ToTimeSpan()))
+        .OrderBy(appointment => appointment.StartTime)
+        .ToListAsync();
 
-        if (affectedAppointments.Count > 0)
+    if (affectedAppointments.Count > 0)
+    {
+        if (!request.ReplacementStylistId.HasValue)
         {
-            if (!request.ReplacementStylistId.HasValue)
-            {
             return Conflict(new
             {
-                    message = "Thời gian nghỉ trùng với lịch hẹn đã có. Vui lòng chọn người thay thế để chuyển lịch.",
-                    affectedAppointments = affectedAppointments.Select(appointment => new
-                    {
-                        appointment.AppointmentId,
-                        appointment.AppointmentDate,
-                        appointment.StartTime,
-                        appointment.EndTime,
-                        appointment.Status
-                    })
+                message = "Thời gian nghỉ trùng với lịch hẹn đã có. Vui lòng chọn người thay thế để chuyển lịch.",
+                affectedAppointments = affectedAppointments.Select(appointment => new
+                {
+                    appointment.AppointmentId,
+                    appointment.AppointmentDate,
+                    appointment.StartTime,
+                    appointment.EndTime,
+                    appointment.Status
+                })
             });
-            }
-
-            var replacementError = await ValidateReplacementAsync(request.ReplacementStylistId.Value, request.StylistId,
-                request.OffDate, affectedAppointments);
-            if (replacementError is not null)
-                return BadRequest(new { message = replacementError });
-
-            foreach (var appointment in affectedAppointments)
-            {
-                appointment.StylistId = request.ReplacementStylistId.Value;
-                appointment.UpdatedAt = DateTime.Now;
-            }
         }
+
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+        var replacementError = await ValidateReplacementAsync(request.ReplacementStylistId.Value, request.StylistId,
+            request.OffDate, affectedAppointments);
+        if (replacementError is not null)
+            return BadRequest(new { message = replacementError });
+
+        foreach (var appointment in affectedAppointments)
 
  develop
         var timeOff = new StylistTimeOff
  develop
+ develop
         {
-            StylistId = request.StylistId,
-            OffDate = request.OffDate,
-            IsFullDay = request.IsFullDay,
+            appointment.StylistId = request.ReplacementStylistId.Value;
+            appointment.UpdatedAt = DateTime.Now;
+        }
+    }
 
-            StartTime = request.IsFullDay
-                ? null
-                : request.StartTime,
+    var timeOff = new StylistTimeOff
+    {
+        StylistId = request.StylistId,
+        OffDate = request.OffDate,
+        IsFullDay = request.IsFullDay,
 
-            EndTime = request.IsFullDay
-                ? null
-                : request.EndTime,
+        StartTime = request.IsFullDay
+            ? null
+            : request.StartTime,
+
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+        EndTime = request.IsFullDay
+            ? null
+            : request.EndTime,
 
  feature/s2-02-stylist-time-off-warning
  feature/s2-02-stylist-time-off-warning
@@ -212,13 +231,21 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
  feature/s2-02-stylist-time-off-booking
  develop
             Reason = request.Reason
-
-            Reason = request.Reason.Trim()
  develop
-        };
 
-        dbContext.StylistTimeOffs.Add(timeOff);
-        await dbContext.SaveChangesAsync();
+        Reason = request.Reason.Trim()
+    };
+
+    dbContext.StylistTimeOffs.Add(timeOff);
+    await dbContext.SaveChangesAsync();
+
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+    return Ok(new
+    {
+        timeOff,
+        reassignedAppointmentIds = affectedAppointments.Select(appointment => appointment.AppointmentId)
+    });
+}
 
  feature/s2-02-stylist-time-off-warning
  feature/s2-02-stylist-time-off-warning
@@ -234,6 +261,7 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         });
  develop
     }
+ develop
 
     // Xóa lịch nghỉ
     [HttpDelete("{id:int}")]
@@ -255,12 +283,15 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
         return NoContent();
     }
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+
  feature/s2-02-stylist-time-off-warning
  feature/s2-02-stylist-time-off-warning
 
  feature/s2-02-stylist-time-off-booking
  develop
 
+ develop
 
     private async Task<string?> ValidateReplacementAsync(int replacementStylistId, int absentStylistId,
         DateOnly offDate, List<Appointment> appointments)
@@ -309,7 +340,6 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
         return null;
     }
- develop
 }
 
 public class StylistTimeOffRequest
@@ -325,6 +355,8 @@ public class StylistTimeOffRequest
     public TimeOnly? EndTime { get; set; }
 
     public string? Reason { get; set; }
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+
  feature/s2-02-stylist-time-off-warning
  feature/s2-02-stylist-time-off-warning
 
@@ -332,7 +364,7 @@ public class StylistTimeOffRequest
  develop
 }
 
+ develop
 
     public int? ReplacementStylistId { get; set; }
 }
- develop

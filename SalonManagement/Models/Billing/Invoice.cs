@@ -1,4 +1,6 @@
-﻿namespace SalonManagement.Models
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace SalonManagement.Models
 {
     public class Invoice
     {
@@ -8,19 +10,61 @@
 
         public decimal Subtotal { get; set; }
 
+        [NotMapped]
+        public decimal OriginalAmount
+        {
+            get => Subtotal;
+            set => Subtotal = value;
+        }
+
         public decimal DiscountAmount { get; set; }
 
         public int? DiscountCouponId { get; set; }
 
+        [NotMapped]
+        public int? DiscountCodeId
+        {
+            get => DiscountCouponId;
+            set => DiscountCouponId = value;
+        }
+
         public string? DiscountCodeSnapshot { get; set; }
+
+        [NotMapped]
+        public string? AppliedDiscountCode
+        {
+            get => DiscountCodeSnapshot;
+            set => DiscountCodeSnapshot = value;
+        }
 
         public string? DiscountTypeSnapshot { get; set; }
 
+        [NotMapped]
+        public string? AppliedDiscountType
+        {
+            get => DiscountTypeSnapshot;
+            set => DiscountTypeSnapshot = value;
+        }
+
         public decimal? DiscountValueSnapshot { get; set; }
+
+        [NotMapped]
+        public decimal? AppliedDiscountValue
+        {
+            get => DiscountValueSnapshot;
+            set => DiscountValueSnapshot = value;
+        }
 
         public DiscountCoupon? DiscountCoupon { get; set; }
 
         public decimal TotalAmount { get; set; }
+
+        [NotMapped]
+        public decimal FinalAmount
+        {
+            get => TotalAmount;
+            set => TotalAmount = value;
+        }
 
         public string Status { get; set; } = "Unpaid";
 
