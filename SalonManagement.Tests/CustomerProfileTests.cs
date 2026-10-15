@@ -118,6 +118,27 @@ public sealed class CustomerProfileTests
     }
 
     [TestMethod]
+    public async Task Online_booking_accepts_a_verified_email_contact_without_a_phone_number()
+    {
+        await using var db = CreateDb();
+        var date = new DateTime(2031, 2, 3);
+        var service = new Service { ServiceName = "Gội", DurationMinutes = 30, Price = 100000, IsActive = true };
+        var stylist = new Stylist { FullName = "Thợ", Phone = "0900000010", IsActive = true };
+        db.AddRange(service, stylist); await db.SaveChangesAsync();
+        db.StylistServices.Add(new StylistService { StylistId = stylist.StylistId, ServiceId = service.ServiceId });
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(17), Status = "Working" });
+        await db.SaveChangesAsync();
+
+        var result = await new AppointmentBookingService(db, TimeProvider.System)
+            .CreateAsync(new BookingRequest(date, TimeSpan.FromHours(9), [service.ServiceId], "Khách email", null, "customer@example.test"));
+
+        Assert.IsNotNull(result.Confirmation);
+        var customer = await db.Customers.SingleAsync();
+        Assert.AreEqual("customer@example.test", customer.Email);
+        Assert.AreEqual(10, customer.Phone.Length);
+    }
+
+    [TestMethod]
     public async Task Summary_counts_arrived_in_progress_or_completed_visits_and_no_show()
     {
         await using var db = CreateDb();

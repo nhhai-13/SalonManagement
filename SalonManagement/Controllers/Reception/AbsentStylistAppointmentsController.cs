@@ -67,7 +67,11 @@ public sealed class ReceptionAbsenceAppointmentsPageController : Controller
 {
     [Authorize(Roles = UserRoles.Receptionist)]
     [HttpGet("reception/absence-appointments")]
-    public IActionResult Index() => View();
+    public IActionResult Index(DateTime? date)
+    {
+        ViewData["SelectedDate"] = date?.Date ?? DateTime.Today;
+        return View();
+    }
 }
 
 public sealed record AbsentStylistOption(int StylistId, string FullName);

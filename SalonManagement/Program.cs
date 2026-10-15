@@ -131,6 +131,7 @@ builder.Services.AddAuthentication(options =>
                     Encoding.UTF8.GetBytes(jwt["Key"]!)),
 
             RoleClaimType = ClaimTypes.Role,
+            NameClaimType = ClaimTypes.Name,
             ClockSkew = TimeSpan.Zero
         };
     options.Events = new JwtBearerEvents
@@ -269,9 +270,16 @@ await using (var scope = app.Services.CreateAsyncScope())
         await EnsureSqliteColumnAsync(dbContext, "Appointments", "BookingSource", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "Appointments", "CustomerNameOverride", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "Appointments", "NameConflictResolution", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Appointments", "TechnicalNotes", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "Customers", "NormalizedSearchName", "TEXT NOT NULL DEFAULT ''");
+        await EnsureSqliteColumnAsync(dbContext, "AspNetUsers", "RequestedRole", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "AspNetUsers", "AccessRequestedAtUtc", "DATETIME");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS StaffWorkSchedules (StaffWorkScheduleId INTEGER PRIMARY KEY AUTOINCREMENT, UserId TEXT NOT NULL, WorkDate DATETIME NOT NULL, StartTime TEXT NOT NULL, EndTime TEXT NOT NULL, Status TEXT NOT NULL, Notes TEXT NULL, CreatedAtUtc DATETIME NOT NULL, FOREIGN KEY (UserId) REFERENCES AspNetUsers(Id) ON DELETE CASCADE)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_StaffWorkSchedules_UserId_WorkDate ON StaffWorkSchedules (UserId, WorkDate)");
         await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS StaffNotifications (StaffNotificationId INTEGER PRIMARY KEY AUTOINCREMENT, RecipientEmail TEXT NOT NULL, AppointmentId INTEGER NOT NULL, Type TEXT NOT NULL, Message TEXT NOT NULL, CreatedAt DATETIME NOT NULL, ReadAt DATETIME NULL)");
         await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_StaffNotifications_RecipientEmail_ReadAt_CreatedAt ON StaffNotifications (RecipientEmail, ReadAt, CreatedAt)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS StylistLeaveRequests (StylistLeaveRequestId INTEGER PRIMARY KEY AUTOINCREMENT, StylistId INTEGER NOT NULL, OffDate TEXT NOT NULL, IsFullDay INTEGER NOT NULL, StartTime TEXT NULL, EndTime TEXT NULL, Reason TEXT NOT NULL, Status TEXT NOT NULL, CreatedAt DATETIME NOT NULL, FOREIGN KEY (StylistId) REFERENCES Stylists(StylistId) ON DELETE CASCADE)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_StylistLeaveRequests_StylistId_OffDate_Status ON StylistLeaveRequests (StylistId, OffDate, Status)");
     }
     else
     {
@@ -382,17 +390,20 @@ using (var scope = app.Services.CreateScope())
     // 2. Nạp dữ liệu mẫu
     //
     // - 3 nhóm dịch vụ
-    // - 5 stylist
+    // - 10 thợ
     // - 12 dịch vụ
-    // - 4 tài khoản mẫu
+    // - 15 tài khoản mẫu (3 lễ tân, 10 thợ)
     //
     // SeedData có kiểm tra dữ liệu tồn tại
     // nên có thể chạy nhiều lần.
     // ---------------------------------
 
+    await StylistBookingDemoCleanup.RemoveAsync(dbContext);
+
     await SeedData.SeedAsync(
         dbContext,
         userManager);
+    await StylistProfileSynchronizer.EnsureForActiveStylistAccountsAsync(dbContext);
     if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
     {
         var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;

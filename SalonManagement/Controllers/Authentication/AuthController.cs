@@ -44,11 +44,32 @@ public class AuthController(
         var existingUser = await userManager.FindByEmailAsync(email);
         if (existingUser?.EmailConfirmed == true)
         {
+            if (!existingUser.IsActive && IsSelfRegistrationRole(existingUser.RequestedRole))
+            {
+                return Conflict(new
+                {
+                    message = "Email này đã xác minh và đang chờ Admin hoặc Chủ tiệm cấp quyền truy cập.",
+                    pendingApproval = true
+                });
+            }
+
             return Conflict(new { message = "Email này đã được sử dụng." });
         }
 
         if (existingUser is not null)
         {
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            if (existingUser.EmailVerificationCodeSentAtUtc is not null &&
+                existingUser.EmailVerificationCodeSentAtUtc.Value.AddMinutes(1) > now)
+            {
+                return StatusCode(StatusCodes.Status429TooManyRequests, new
+                {
+                    message = "Vui lòng chờ 60 giây trước khi yêu cầu mã xác minh mới.",
+                    requiresEmailVerification = true,
+                    email
+                });
+            }
+
             var deleteResult = await userManager.DeleteAsync(existingUser);
             if (!deleteResult.Succeeded)
             {
@@ -61,20 +82,16 @@ public class AuthController(
         {
             UserName = email,
             Email = email,
+            FullName = request.FullName.Trim(),
             EmailConfirmed = false,
-            IsActive = true
+            IsActive = false,
+            RequestedRole = role,
+            AccessRequestedAtUtc = timeProvider.GetUtcNow().UtcDateTime
         };
         var result = await userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
         {
             return BadRequest(new { message = FormatIdentityErrors(result) });
-        }
-
-        var roleResult = await userManager.AddToRoleAsync(user, role);
-        if (!roleResult.Succeeded)
-        {
-            await userManager.DeleteAsync(user);
-            return BadRequest(new { message = "Không thể gán vai trò cho tài khoản. Vui lòng thử lại." });
         }
 
         try
@@ -94,7 +111,7 @@ public class AuthController(
 
         return Accepted(new
         {
-            message = "Mã xác minh đã được gửi đến email của bạn.",
+            message = "Mã xác minh đã được gửi đến email của bạn. Sau khi xác minh, tài khoản sẽ chờ Admin hoặc Chủ tiệm cấp quyền.",
             requiresEmailVerification = true,
             email,
             role,
@@ -152,7 +169,13 @@ public class AuthController(
                 new { message = "Không thể xác nhận email. Vui lòng thử lại." });
         }
 
-        return Ok(new { message = "Xác minh email thành công. Bạn có thể đăng nhập ngay." });
+        return Ok(new
+        {
+            message = IsSelfRegistrationRole(user.RequestedRole)
+                ? "Xác minh email thành công. Yêu cầu cấp quyền đã được gửi đến Admin và Chủ tiệm. Bạn sẽ đăng nhập được sau khi được phê duyệt."
+                : "Xác minh email thành công. Bạn có thể đăng nhập ngay.",
+            pendingApproval = IsSelfRegistrationRole(user.RequestedRole)
+        });
     }
 
     [HttpPost("resend-email-verification")]
@@ -230,22 +253,32 @@ public class AuthController(
             return await CreateLockedAccountResponseAsync(user);
         }
 
-        if (!user.IsActive)
-        {
-            return Unauthorized(new { message = "Tài khoản đã ngưng hoạt động. Vui lòng liên hệ quản trị viên." });
-        }
-
+        var role = await GetSingleActorRole(user);
         if (!user.EmailConfirmed)
         {
             return Unauthorized(new
             {
                 message = "Email chưa được xác minh. Vui lòng nhập mã đã gửi đến email của bạn.",
                 requiresEmailVerification = true,
-                email = user.Email
+                email = user.Email,
+                portal = user.RequestedRole == UserRoles.Stylist || role == UserRoles.Stylist ? "stylist" : "reception"
             });
         }
 
-        var role = await GetSingleActorRole(user);
+        if (!user.IsActive)
+        {
+            if (IsSelfRegistrationRole(user.RequestedRole))
+            {
+                return Unauthorized(new
+                {
+                    message = "Tài khoản đã xác minh email và đang chờ Admin hoặc Chủ tiệm cấp quyền truy cập.",
+                    pendingApproval = true
+                });
+            }
+
+            return Unauthorized(new { message = "Tài khoản đã ngưng hoạt động. Vui lòng liên hệ quản trị viên." });
+        }
+
         if (role is null)
         {
             return Unauthorized(new { message = "Tài khoản phải được gán đúng một vai trò để đăng nhập." });
@@ -376,6 +409,8 @@ public class AuthController(
         "stylist" => "Stylist",
         _ => null
     };
+
+    public static bool IsSelfRegistrationRole(string? role) => role is UserRoles.Receptionist or UserRoles.Stylist;
 
     public static string GetInvalidCredentialsMessage(int remainingAttempts) =>
         $"{InvalidCredentialsMessage} Bạn còn {remainingAttempts} lần nhập mật khẩu trước khi tài khoản bị khóa.";

@@ -25,6 +25,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const bookingResult = document.getElementById('booking-result');
     let emailVerified = false;
     let assignmentVersion = 0, assignmentRequest;
+    function hasPhone() {
+        return Boolean(phone?.value.trim()) && phone.validity.valid;
+    }
+    function hasEmail() {
+        return Boolean(email?.value.trim()) && email.validity.valid;
+    }
+    function syncPlaceBookingState() {
+        if (!placeBooking) return;
+        placeBooking.disabled = !fullName?.value.trim() || (!hasPhone() && !hasEmail()) || (hasEmail() && !emailVerified);
+    }
     function clearAssignment() {
         assignmentVersion++;
         assignmentRequest?.abort();
@@ -177,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         emailVerified = false;
-        placeBooking.disabled = true;
+        syncPlaceBookingState();
         sendCode.disabled = true;
         emailMessage.textContent = 'Đang gửi mã xác thực…';
         try {
@@ -195,18 +205,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await json('/booking/verify-email-code', undefined, { email: email.value, code: emailCode.value });
             emailVerified = true;
             emailMessage.textContent = data.message;
-            placeBooking.disabled = false;
+            syncPlaceBookingState();
         } catch (e) { emailMessage.textContent = e.message; }
     });
     email?.addEventListener('input', () => {
         emailVerified = false;
-        if (placeBooking) placeBooking.disabled = true;
+        syncPlaceBookingState();
         if (emailCode) { emailCode.value = ''; emailCode.disabled = true; }
         if (verifyCode) verifyCode.disabled = true;
     });
+    [fullName, phone].forEach(input => input?.addEventListener('input', syncPlaceBookingState));
     placeBooking?.addEventListener('click', async () => {
-        if (!fullName.value.trim() || !phone.validity.valid || !emailVerified) {
-            bookingResult.textContent = 'Vui lòng nhập họ tên, số điện thoại và xác thực email trước khi đặt lịch.';
+        if (!fullName.value.trim() || (!hasPhone() && !hasEmail()) || (hasEmail() && !emailVerified)) {
+            bookingResult.textContent = hasEmail() && !emailVerified
+                ? 'Vui lòng xác thực email trước khi đặt lịch.'
+                : 'Vui lòng nhập họ tên và ít nhất một cách liên hệ hợp lệ (số điện thoại hoặc email).';
             return;
         }
         placeBooking.disabled = true;
@@ -214,13 +227,20 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const data = await json('/booking/confirm', undefined, {
                 date: date.value, startTime: selectedSlot.value, serviceIds: ids().map(Number),
+                stylistId: Number(selected.value) || null,
                 fullName: fullName.value.trim(), phone: phone.value.trim(), email: email.value.trim(),
                 notes: notes.value.trim() || null, website: null
             });
-            bookingResult.textContent = `Đặt lịch thành công. Mã tra cứu: ${data.reference}. Thợ: ${data.stylistName}.` + (data.noShowWarning ? ` Lưu ý: hồ sơ này từng có ${data.noShowCount} lần không đến.` : '');
+            const lookup = document.createElement('a');
+            lookup.href = `/appointments/lookup?reference=${encodeURIComponent(data.reference)}`;
+            lookup.className = 'ms-2 fw-semibold';
+            lookup.textContent = 'Tra cứu hoặc hủy lịch';
+            bookingResult.replaceChildren(
+                document.createTextNode(`Đặt lịch thành công. Mã tra cứu: ${data.reference}. Thợ: ${data.stylistName}.` + (data.noShowWarning ? ` Lưu ý: hồ sơ này từng có ${data.noShowCount} lần không đến.` : ' ')),
+                lookup);
         } catch (e) {
             bookingResult.textContent = e.message;
-            placeBooking.disabled = false;
+            syncPlaceBookingState();
         }
     });
     document.getElementById('btn-submit-booking')?.addEventListener('click', () => {

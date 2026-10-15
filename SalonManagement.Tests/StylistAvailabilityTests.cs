@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Controllers;
 using SalonManagement.Controllers.Booking;
@@ -106,6 +107,23 @@ public class StylistAvailabilityTests
         foreach (var shift in await db.WorkSchedules.Where(s => s.StylistId == x.c).ToListAsync()) shift.Status = "Off";
         await db.SaveChangesAsync();
         Assert.Empty(await service.GetSlotsAsync([x.cut], x.c, date));
+    }
+
+    [Fact]
+    public async Task SlotsLoadSuccessfullyWithSqliteWhenShiftsNeedTimeOrdering()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options, new HttpContextAccessor());
+        await db.Database.EnsureCreatedAsync();
+        var x = await Seed(db);
+
+        var slots = await Service(db).GetSlotsAsync([x.cut], x.a, DateOnly.FromDateTime(Day));
+
+        Assert.NotEmpty(slots);
+        Assert.Equal(slots.OrderBy(slot => slot.Start, StringComparer.Ordinal).Select(slot => slot.Start),
+            slots.Select(slot => slot.Start));
     }
 
     [Fact]

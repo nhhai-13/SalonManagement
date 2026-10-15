@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -10,7 +11,7 @@ namespace SalonManagement.Controllers.Reception;
 
 [Authorize(Roles = UserRoles.Receptionist + "," + UserRoles.Owner)]
 [Route("reception/daily-schedule")]
-public sealed class ReceptionDailyScheduleController(ApplicationDbContext db, AppointmentLifecycleService lifecycle) : Controller
+public sealed class ReceptionDailyScheduleController(ApplicationDbContext db, AppointmentLifecycleService lifecycle, TimeProvider timeProvider) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(DateTime? date)
@@ -23,12 +24,18 @@ public sealed class ReceptionDailyScheduleController(ApplicationDbContext db, Ap
         var schedules = await db.WorkSchedules.AsNoTracking()
             .Where(item => item.WorkDate == selected && item.Status == "Working")
             .ToListAsync();
-        var appointments = await db.Appointments.AsNoTracking()
+        // SQLite does not translate ORDER BY for TimeSpan. Load the appointments for
+        // the selected day first, then order the small in-memory list by start time.
+        var appointments = (await db.Appointments.AsNoTracking()
             .Include(item => item.Customer)
             .Include(item => item.AppointmentServices).ThenInclude(item => item.Service)
             .Where(item => item.AppointmentDate == selected && item.Status != "Cancelled" && item.Status != "Rejected")
+            .ToListAsync())
             .OrderBy(item => item.StartTime)
-            .ToListAsync();
+            .ThenBy(item => item.EndTime)
+            .ThenBy(item => item.AppointmentId)
+            .ToList();
+        var now = SalonClock.GetLocalNow(timeProvider);
 
         return View(new ReceptionDailyScheduleViewModel
         {
@@ -45,13 +52,20 @@ public sealed class ReceptionDailyScheduleController(ApplicationDbContext db, Ap
                     .Select(item => new ReceptionScheduleAppointment
                     {
                         AppointmentId = item.AppointmentId,
+                        CustomerId = item.CustomerId,
                         CustomerName = item.CustomerNameOverride ?? item.Customer.FullName,
                         Services = string.Join(", ", item.AppointmentServices.Select(service => service.Service.ServiceName)),
                         Status = item.Status,
                         StartTime = item.StartTime,
                         EndTime = item.EndTime,
                         IsLate = item.IsLate,
-                        LateMinutes = item.LateMinutes
+                        LateMinutes = item.LateMinutes,
+                        NoShowAt = item.NoShowAt,
+                        NoShowByUserId = item.NoShowByUserId,
+                        NoShowAvailableAt = item.AppointmentDate.Date.Add(item.StartTime).AddMinutes(30),
+                        CanMarkNoShow = item.Status == "Confirmed" && now >= item.AppointmentDate.Date.Add(item.StartTime).AddMinutes(30),
+                        UndoNoShowDeadline = item.NoShowAt?.AddMinutes(15),
+                        CanUndoNoShow = item.Status == "NoShow" && item.NoShowAt.HasValue && now <= item.NoShowAt.Value.AddMinutes(15)
                     }).ToList()
             }).ToList()
         });
@@ -65,12 +79,15 @@ public sealed class ReceptionDailyScheduleController(ApplicationDbContext db, Ap
     [HttpPost("{appointmentId:int}/no-show")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> MarkNoShow(int appointmentId, DateTime date)
-        => await ExecuteAndReturn(appointmentId, date, lifecycle.MarkNoShowAsync(appointmentId, User.FindFirstValue(ClaimTypes.NameIdentifier)), "Đã đánh dấu khách không đến.");
+        => await ExecuteAndReturn(appointmentId, date, lifecycle.MarkNoShowAsync(appointmentId, CurrentUserId()), "Đã đánh dấu khách không đến. Khung giờ còn lại đã được mở lại.");
 
     [HttpPost("{appointmentId:int}/undo-no-show")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UndoNoShow(int appointmentId, DateTime date)
         => await ExecuteAndReturn(appointmentId, date, lifecycle.UndoNoShowAsync(appointmentId), "Đã hoàn tác trạng thái không đến.");
+
+    private string? CurrentUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
 
     private async Task<IActionResult> ExecuteAndReturn(int appointmentId, DateTime date, Task<AppointmentLifecycleResult> operation, string success)
     {

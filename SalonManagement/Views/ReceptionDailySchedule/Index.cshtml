@@ -4,29 +4,81 @@
     var rows = Enumerable.Range(0, Math.Max(0, (int)((Model.ClosingTime - Model.OpeningTime).TotalMinutes / 15) + 1))
         .Select(index => Model.OpeningTime.Add(TimeSpan.FromMinutes(index * 15))).ToList();
 }
-<div class="container-fluid py-4">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-        <div><h1 class="h3 mb-1">Lịch hẹn trong ngày</h1><p class="text-muted mb-0">Theo dõi lịch của từng thợ và xử lý khách đến tại quầy.</p></div>
-        <form method="get" class="d-flex gap-2"><input class="form-control" type="date" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-outline-primary">Xem lịch</button></form>
+<div class="container-fluid py-3 reception-day-schedule">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+        <div><h1 class="h4 mb-0">Lịch hẹn trong ngày</h1><p class="text-muted small mb-0">Theo dõi lịch từng thợ, dời giờ hoặc đổi thợ ngay tại chỗ.</p></div>
+        <div class="d-flex flex-wrap align-items-center justify-content-end gap-1">
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-reception-drawer-url="/reception/customer-search" data-reception-drawer-title="Hồ sơ khách hàng"><i class="bi bi-people"></i> Hồ sơ khách</button>
+            <button class="btn btn-outline-warning btn-sm" type="button" data-reception-drawer-url="/reception/absence-appointments?date=@Model.Date.ToString("yyyy-MM-dd")" data-reception-drawer-title="Xử lý ca nghỉ"><i class="bi bi-person-dash"></i> Xử lý thợ nghỉ</button>
+            <form method="get" class="d-flex gap-1"><input class="form-control form-control-sm" type="date" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-outline-primary btn-sm">Xem lịch</button></form>
+        </div>
     </div>
     @if (TempData["Success"] is string success) { <div class="alert alert-success">@success</div> }
     @if (TempData["Error"] is string error) { <div class="alert alert-danger">@error</div> }
-    <div class="table-responsive border rounded bg-white">
-        <table class="table table-bordered align-top mb-0">
-            <thead class="table-light"><tr><th style="min-width:85px">Giờ</th>@foreach (var stylist in Model.Stylists) { <th style="min-width:220px">@stylist.StylistName</th> }</tr></thead>
+    <div class="table-responsive border rounded bg-white reception-day-schedule-grid">
+        <table class="table table-bordered align-top mb-0 schedule-grid">
+            <colgroup><col class="schedule-time-col" />@foreach (var _ in Model.Stylists) { <col class="schedule-staff-col" /> }</colgroup>
+            <thead class="table-light"><tr><th class="schedule-time-column">Giờ</th>@foreach (var stylist in Model.Stylists) { var names = stylist.StylistName.Split(' ', StringSplitOptions.RemoveEmptyEntries); var initials = string.Concat(names.Take(2).Select(name => char.ToUpperInvariant(name[0]))); var shortName = string.Join(" ", names.Take(2)); <th class="schedule-stylist-column" title="@stylist.StylistName"><span class="schedule-stylist-avatar">@initials</span><span class="schedule-stylist-name">@shortName</span></th> }</tr></thead>
             <tbody>
             @foreach (var time in rows)
             {
-                <tr><th class="text-muted small">@time.ToString(@"hh\:mm")</th>
+                <tr><th class="text-muted schedule-time">@time.ToString(@"hh\:mm")</th>
                 @foreach (var stylist in Model.Stylists)
                 {
                     var starts = stylist.Appointments.Where(item => item.StartTime == time).ToList();
                     var worksAtTime = stylist.WorkingRanges.Any(range => range.StartTime <= time && time < range.EndTime);
-                    <td class="p-1 @(worksAtTime ? "" : "table-secondary")">@if (!worksAtTime) { <span class="visually-hidden">Ngoài ca làm việc</span> }@foreach (var appointment in starts) {
-                        <article class="border rounded p-2 mb-1 bg-light"><strong>@appointment.CustomerName</strong><div class="small">@appointment.Services</div><div class="small text-muted">@appointment.StartTime.ToString(@"hh\:mm")–@appointment.EndTime.ToString(@"hh\:mm") · @appointment.Status</div>
-                        @if (appointment.IsLate) { <div class="small text-danger">Đến muộn @appointment.LateMinutes phút</div> }
-                        @if (appointment.Status == "Confirmed") { <form method="post" action="/reception/daily-schedule/@appointment.AppointmentId/check-in" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-success btn-sm mt-1">Check-in</button></form><form method="post" action="/reception/daily-schedule/@appointment.AppointmentId/no-show" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-outline-danger btn-sm mt-1">Không đến</button></form> }
-                        @if (appointment.Status == "NoShow") { <form method="post" action="/reception/daily-schedule/@appointment.AppointmentId/undo-no-show" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-outline-secondary btn-sm mt-1">Hoàn tác</button></form> }
+                    <td class="schedule-cell @(worksAtTime ? "schedule-working" : "schedule-off")">@if (!worksAtTime) { <span class="visually-hidden">Ngoài ca làm việc</span> }@foreach (var appointment in starts) {
+                        var statusLabel = appointment.Status switch { "Confirmed" => "Đã xác nhận", "PendingConfirmation" or "Pending" => "Chờ xác nhận", "Arrived" => "Đã đến", "InProgress" => "Đang phục vụ", "Completed" => "Hoàn thành", "NoShow" => "Không đến", _ => appointment.Status };
+                        var statusClass = appointment.Status switch { "Confirmed" => "schedule-status-confirmed", "PendingConfirmation" or "Pending" => "schedule-status-pending", "Arrived" or "InProgress" => "schedule-status-active", "Completed" => "schedule-status-completed", "NoShow" => "schedule-status-no-show", _ => "schedule-status-default" };
+                        <article class="schedule-appointment"><div class="d-flex justify-content-between gap-1"><strong class="text-truncate" title="@appointment.CustomerName">@appointment.CustomerName</strong><span class="badge rounded-pill schedule-status @statusClass">@statusLabel</span></div><div class="schedule-service text-truncate" title="@appointment.Services">@appointment.Services</div><div class="schedule-hour">@appointment.StartTime.ToString(@"hh\:mm")–@appointment.EndTime.ToString(@"hh\:mm")</div>
+                        @if (appointment.IsLate) { <div class="small text-danger">Muộn @appointment.LateMinutes phút</div> }
+                        <div class="schedule-actions">
+                        <button class="btn btn-outline-secondary btn-sm schedule-action" type="button" data-reception-drawer-url="/reception/customers/@appointment.CustomerId" data-reception-drawer-title="Hồ sơ khách hàng: @appointment.CustomerName"><i class="bi bi-person-vcard"></i> Hồ sơ</button>
+                        @if (appointment.Status is "Confirmed" or "PendingConfirmation" or "Pending") { <button class="btn btn-outline-primary btn-sm schedule-action" type="button" data-reschedule-toggle="reschedule-@appointment.AppointmentId"><i class="bi bi-arrow-left-right"></i> Dời lịch</button> }
+                        @if (appointment.Status == "Confirmed")
+                        {
+                            <form method="post" action="/reception/daily-schedule/@appointment.AppointmentId/check-in">@Html.AntiForgeryToken()<input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-success btn-sm schedule-action"><i class="bi bi-check2-circle"></i> Check-in</button></form>
+                            @if (appointment.CanMarkNoShow)
+                            {
+                                <form method="post" action="/reception/daily-schedule/@appointment.AppointmentId/no-show" onsubmit="return confirm('Đánh dấu khách không đến? Khung giờ còn lại của thợ sẽ được mở lại.');">@Html.AntiForgeryToken()<input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-outline-danger btn-sm schedule-action"><i class="bi bi-person-x"></i> Không đến</button></form>
+                            }
+                            else
+                            {
+                                <span class="small text-muted align-self-center" title="Chỉ có thể đánh dấu sau 30 phút kể từ giờ hẹn.">Không đến từ @appointment.NoShowAvailableAt?.ToString("HH:mm")</span>
+                            }
+                        }
+                        @if (appointment.Status == "NoShow")
+                        {
+                            <span class="small text-danger align-self-center">Không đến · @appointment.NoShowAt?.ToString("HH:mm")</span>
+                            @if (appointment.CanUndoNoShow)
+                            {
+                                <form method="post" action="/reception/daily-schedule/@appointment.AppointmentId/undo-no-show" class="d-inline">@Html.AntiForgeryToken()<input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-outline-secondary btn-sm schedule-action" title="Hoàn tác đến @appointment.UndoNoShowDeadline?.ToString("HH:mm")">Hoàn tác</button></form>
+                            }
+                        }
+                        </div>
+                        @if (appointment.Status is "Confirmed" or "PendingConfirmation" or "Pending")
+                        {
+                            <div id="reschedule-@appointment.AppointmentId" class="border rounded bg-white p-2 mt-2 d-none" data-reschedule-form data-appointment-id="@appointment.AppointmentId" data-date="@Model.Date.ToString("yyyy-MM-dd")">
+                                <label class="form-label small mb-1" for="reschedule-stylist-@appointment.AppointmentId">Thợ mới</label>
+                                <select id="reschedule-stylist-@appointment.AppointmentId" class="form-select form-select-sm mb-2" data-reschedule-stylist>
+                                    @foreach (var option in Model.Stylists)
+                                    {
+                                        if (option.StylistId == stylist.StylistId)
+                                        {
+                                            <option value="@option.StylistId" selected>@option.StylistName</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="@option.StylistId">@option.StylistName</option>
+                                        }
+                                    }
+                                </select>
+                                <label class="form-label small mb-1" for="reschedule-time-@appointment.AppointmentId">Giờ bắt đầu mới</label>
+                                <input id="reschedule-time-@appointment.AppointmentId" class="form-control form-control-sm mb-2" type="time" step="900" value="@appointment.StartTime.ToString(@"hh\:mm")" data-reschedule-time />
+                                <button class="btn btn-primary btn-sm w-100" type="button" data-reschedule-save>Lưu thay đổi</button>
+                                <div class="small mt-2 d-none" role="status" data-reschedule-message></div>
+                            </div>
+                        }
                         </article>
                     }</td>
                 }
@@ -36,3 +88,80 @@
         </table>
     </div>
 </div>
+<div id="reception-work-drawer" class="reception-work-drawer" aria-hidden="true">
+    <button class="reception-work-drawer-backdrop" type="button" data-reception-drawer-close tabindex="-1" aria-label="Đóng bảng điều khiển"></button>
+    <aside class="reception-work-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="reception-work-drawer-title" tabindex="-1">
+        <header class="reception-work-drawer-header">
+            <div><span class="text-uppercase text-muted small fw-semibold">Lễ tân</span><h2 id="reception-work-drawer-title" class="h5 mb-0">Thông tin hỗ trợ</h2></div>
+            <button class="btn btn-light rounded-circle reception-work-drawer-close" type="button" data-reception-drawer-close aria-label="Đóng bảng điều khiển"><i class="bi bi-x-lg"></i></button>
+        </header>
+        <div class="reception-work-drawer-body"><iframe id="reception-work-drawer-frame" title="Thông tin hỗ trợ lễ tân"></iframe></div>
+    </aside>
+</div>
+@section Scripts {
+<script>
+    (() => {
+        const drawer = document.getElementById('reception-work-drawer');
+        const frame = document.getElementById('reception-work-drawer-frame');
+        const title = document.getElementById('reception-work-drawer-title');
+        const panel = drawer?.querySelector('.reception-work-drawer-panel');
+        let returnFocus;
+
+        const closeDrawer = () => {
+            if (!drawer?.classList.contains('is-open')) return;
+            drawer.classList.remove('is-open');
+            drawer.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('reception-drawer-open');
+            frame.src = 'about:blank';
+            returnFocus?.focus();
+        };
+
+        const openDrawer = (trigger) => {
+            returnFocus = trigger;
+            title.textContent = trigger.dataset.receptionDrawerTitle || 'Thông tin hỗ trợ';
+            frame.title = title.textContent;
+            frame.src = trigger.dataset.receptionDrawerUrl;
+            drawer.classList.add('is-open');
+            drawer.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('reception-drawer-open');
+            window.setTimeout(() => panel?.focus(), 0);
+        };
+
+        document.querySelectorAll('[data-reception-drawer-url]').forEach(trigger => trigger.addEventListener('click', () => openDrawer(trigger)));
+        drawer?.querySelectorAll('[data-reception-drawer-close]').forEach(button => button.addEventListener('click', closeDrawer));
+        document.addEventListener('keydown', event => { if (event.key === 'Escape') closeDrawer(); });
+    })();
+
+    document.querySelectorAll('[data-reschedule-toggle]').forEach(button => button.addEventListener('click', () => {
+        document.getElementById(button.dataset.rescheduleToggle)?.classList.toggle('d-none');
+    }));
+
+    document.querySelectorAll('[data-reschedule-save]').forEach(button => button.addEventListener('click', async () => {
+        const form = button.closest('[data-reschedule-form]');
+        const message = form.querySelector('[data-reschedule-message]');
+        const stylistId = Number(form.querySelector('[data-reschedule-stylist]').value);
+        const startTime = form.querySelector('[data-reschedule-time]').value;
+        const showMessage = (text, success) => {
+            message.textContent = text;
+            message.className = `small mt-2 ${success ? 'text-success' : 'text-danger'}`;
+        };
+
+        if (!stylistId || !startTime) return showMessage('Vui lòng chọn thợ và giờ bắt đầu mới.', false);
+        button.disabled = true;
+        try {
+            const response = await fetch(`/api/reception/appointments/${form.dataset.appointmentId}/reschedule`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stylistId, startTime: `${startTime}:00` })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'Không thể dời lịch hẹn. Vui lòng thử lại.');
+            showMessage('Đã dời lịch hẹn. Danh sách đang được cập nhật…', true);
+            window.setTimeout(() => location.href = `/reception/daily-schedule?date=${encodeURIComponent(form.dataset.date)}`, 500);
+        } catch (error) {
+            showMessage(error.message || 'Không thể dời lịch hẹn. Vui lòng thử lại.', false);
+            button.disabled = false;
+        }
+    }));
+</script>
+}

@@ -12,10 +12,11 @@ namespace SalonManagement.Controllers.Reception;
 public sealed class CounterAppointmentsController(ApplicationDbContext db, CustomerProfileService profiles) : Controller
 {
     [HttpGet("")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(bool embed = false)
     {
         ViewBag.Services = await db.Services.AsNoTracking().Where(item => item.IsActive).OrderBy(item => item.ServiceName).ToListAsync();
         ViewBag.Stylists = await db.Stylists.AsNoTracking().Where(item => item.IsActive).OrderBy(item => item.FullName).ToListAsync();
+        ViewData["Embed"] = embed;
         return View();
     }
 
@@ -47,9 +48,9 @@ public sealed class CounterAppointmentsController(ApplicationDbContext db, Custo
         var endTime = request.StartTime.Add(TimeSpan.FromMinutes(duration));
         var overlaps = await db.Appointments.AnyAsync(item => item.StylistId == request.StylistId && item.AppointmentDate == request.Date.Date && item.Status != "Cancelled" && item.Status != "Rejected" && item.Status != "NoShow" && item.StartTime < endTime && request.StartTime < item.EndTime);
         if (overlaps) return BadRequest(new { error = "Khung giờ đã chồng lấn với lịch khác của thợ." });
-        db.Appointments.Add(new Appointment { Customer = customer, StylistId = request.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "Confirmed", BookingReference = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(), BookingSource = "Counter", CustomerNameOverride = resolution == "UseForThisAppointment" ? name : null, NameConflictResolution = resolution, AppointmentServices = services.Select(item => new AppointmentService { ServiceId = item.ServiceId, Price = item.Price, DurationMinutes = item.DurationMinutes }).ToList() });
+        db.Appointments.Add(new Appointment { Customer = customer, StylistId = request.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "Confirmed", BookingReference = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(), BookingSource = request.InstantStart ? "CounterWalkIn" : "Counter", CustomerNameOverride = resolution == "UseForThisAppointment" ? name : null, NameConflictResolution = resolution, AppointmentServices = services.Select(item => new AppointmentService { ServiceId = item.ServiceId, Price = item.Price, DurationMinutes = item.DurationMinutes }).ToList() });
         await db.SaveChangesAsync();
-        return Ok(new { message = "Đã tạo lịch hẹn tại quầy.", redirect = "/reception/schedule?date=" + request.Date.ToString("yyyy-MM-dd") });
+        return Ok(new { message = "Đã tạo lịch hẹn tại quầy.", redirect = "/reception/daily-schedule?date=" + request.Date.ToString("yyyy-MM-dd") });
     }
 
     [HttpGet("customer")]
@@ -65,6 +66,26 @@ public sealed class CounterAppointmentsController(ApplicationDbContext db, Custo
             .Select(item => new { date = item.AppointmentDate.ToString("dd/MM/yyyy"), services = item.AppointmentServices.Select(service => service.Service.ServiceName), duration = item.AppointmentServices.Sum(service => service.DurationMinutes) });
         return Ok(new { found = true, customerId = customer.CustomerId, fullName = customer.FullName, email = customer.Email, profileUrl = "/reception/customers/" + customer.CustomerId, visitCount = summary?.VisitCount ?? 0, noShowCount = summary?.NoShowCount ?? 0, shopNotes = summary?.ShopNotes, history });
     }
+
+    [HttpGet("customers")]
+    public async Task<IActionResult> Customers(string? query)
+    {
+        var keyword = query?.Trim() ?? string.Empty;
+        if (keyword.Length < 2) return Ok(Array.Empty<object>());
+        var digits = new string(keyword.Where(char.IsDigit).ToArray());
+        var customers = db.Customers.AsNoTracking();
+        if (digits.Length >= 2)
+            customers = customers.Where(item => item.Phone.Contains(digits));
+        else
+        {
+            var normalized = CustomerProfileService.NormalizeSearchName(keyword);
+            customers = customers.Where(item => item.NormalizedSearchName.Contains(normalized));
+        }
+        var results = await customers.OrderByDescending(item => item.UpdatedAt ?? item.CreatedAt).ThenBy(item => item.FullName).Take(5)
+            .Select(item => new { item.CustomerId, item.FullName, item.Phone, item.Email, VisitCount = item.Appointments.Count(appointment => appointment.Status == "Arrived" || appointment.Status == "InProgress" || appointment.Status == "Completed"), NoShowCount = item.Appointments.Count(appointment => appointment.Status == "NoShow") })
+            .ToListAsync();
+        return Ok(results);
+    }
 }
 
-public sealed record CounterAppointmentRequest(string? FullName, string? Phone, string? Email, int[]? ServiceIds, int StylistId, DateTime Date, TimeSpan StartTime, string? NameConflictResolution = null);
+public sealed record CounterAppointmentRequest(string? FullName, string? Phone, string? Email, int[]? ServiceIds, int StylistId, DateTime Date, TimeSpan StartTime, string? NameConflictResolution = null, bool InstantStart = false);

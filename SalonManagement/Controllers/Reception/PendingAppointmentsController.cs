@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -20,11 +21,10 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
     public async Task<ActionResult<IReadOnlyList<PendingAppointmentResponse>>> Get()
     {
         var now = SalonClock.GetLocalNow(timeProvider);
-        var appointments = await db.Appointments.AsNoTracking()
+        // SQLite cannot translate ORDER BY for TimeSpan. Materialize the small pending
+        // queue first, then order it in memory to keep the reception dashboard available.
+        var appointments = (await db.Appointments.AsNoTracking()
             .Where(appointment => appointment.Status == "PendingConfirmation")
-            .OrderBy(appointment => appointment.AppointmentDate)
-            .ThenBy(appointment => appointment.StartTime)
-            .ThenBy(appointment => appointment.CreatedAt)
             .Select(appointment => new PendingAppointmentResponse(
                 appointment.AppointmentId,
                 appointment.BookingReference,
@@ -47,7 +47,11 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
                 appointment.ConfirmedByUserId,
                 appointment.ConfirmedAt,
                 appointment.CreatedAt <= now.Subtract(PendingOverdueAfter)))
-            .ToListAsync();
+            .ToListAsync())
+            .OrderBy(appointment => appointment.AppointmentDate)
+            .ThenBy(appointment => appointment.StartTime)
+            .ThenBy(appointment => appointment.CreatedAt)
+            .ToList();
 
         return Ok(appointments);
     }
@@ -61,7 +65,7 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         if (appointment.NameConflictResolution == "PendingReceptionReview")
             return Conflict(new { error = "Vui lòng chọn cách xử lý tên khác hồ sơ trước khi xác nhận lịch." });
 
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = CurrentUserId();
         if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
 
         appointment.Status = "Confirmed";
@@ -86,7 +90,7 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
         if (appointment.Status != "PendingConfirmation") return Conflict(new { error = "Lịch hẹn này đã được xử lý." });
 
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = CurrentUserId();
         if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
 
         appointment.Status = "Rejected";
@@ -126,6 +130,9 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         await db.SaveChangesAsync();
         return Ok(new { appointment.AppointmentId, appointment.NameConflictResolution, appointment.CustomerNameOverride, customerName = appointment.Customer.FullName });
     }
+
+    private string? CurrentUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
 }
 
 public sealed record RejectPendingAppointmentRequest(string? Reason);

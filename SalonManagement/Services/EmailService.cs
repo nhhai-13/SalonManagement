@@ -43,15 +43,22 @@ public sealed class EmailService(
     public async Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword)
     {
         var smtp = configuration.GetSection("SmtpSettings");
-        if (string.IsNullOrWhiteSpace(smtp["Server"]) || string.IsNullOrWhiteSpace(smtp["SenderEmail"]))
-            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi mật khẩu tạm.");
+        var server = smtp["Server"];
+        var senderEmail = smtp["SenderEmail"];
+        var username = smtp["Username"];
+        var password = smtp["Password"];
+        if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(senderEmail) ||
+            string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            throw new InvalidOperationException("Cấu hình Gmail chưa đầy đủ. Hãy thêm SenderEmail, Username và App Password vào User Secrets.");
         using var client = new SmtpClient(smtp["Server"], smtp.GetValue<int>("Port", 587))
         {
             EnableSsl = true,
-            Credentials = new NetworkCredential(smtp["Username"], smtp["Password"]),
+            UseDefaultCredentials = false,
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            Credentials = new NetworkCredential(username, password),
             Timeout = 15000
         };
-        using var message = new MailMessage(smtp["SenderEmail"]!, toEmail)
+        using var message = new MailMessage(senderEmail, toEmail)
         {
             Subject = "Tài khoản Salon Management của bạn",
             Body = $"Tài khoản: {toEmail}\nMật khẩu tạm: {temporaryPassword}\nĐăng nhập tại trang đăng nhập nội bộ của salon. Bạn phải đổi mật khẩu ngay lần đăng nhập đầu tiên."

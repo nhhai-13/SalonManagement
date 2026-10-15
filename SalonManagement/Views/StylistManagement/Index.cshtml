@@ -16,6 +16,10 @@
     {
         <div class="sl-alert sl-alert-success alert alert-success" role="status">@success</div>
     }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="sl-alert sl-alert-danger alert alert-danger" role="alert">@error</div>
+    }
 
     <div class="sl-card card shadow-sm">
         <div class="table-responsive">
@@ -73,6 +77,9 @@
                                             <button type="submit" class="sl-btn sl-btn-success sl-btn-sm btn btn-sm btn-outline-success">Cho làm việc lại</button>
                                         </form>
                                     }
+                                    <form asp-action="Delete" asp-route-id="@stylist.StylistId" method="post" onsubmit="return confirm('Xóa vĩnh viễn hồ sơ này? Thao tác không thể hoàn tác. Các ca làm việc và ngày nghỉ đi kèm sẽ được xóa. Hồ sơ có lịch hẹn sẽ được giữ lại để bảo toàn lịch sử khách hàng.');">
+                                        <button type="submit" class="sl-btn sl-btn-danger sl-btn-sm btn btn-sm btn-outline-danger">Xóa hồ sơ</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>

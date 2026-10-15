@@ -51,10 +51,13 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
             return RescheduleAppointmentResult.Rejected("outside_shift", $"Khung giờ mới phải nằm trọn trong ca làm của thợ ({shiftDescription}).");
         }
 
-        var conflict = await db.Appointments.AsNoTracking()
+        // SQLite cannot translate comparisons between TimeSpan values. Read the
+        // small schedule for that stylist and day, then detect the overlap in memory.
+        var appointmentsAtTarget = await db.Appointments.AsNoTracking()
             .Include(item => item.Customer)
-            .Where(item => item.AppointmentId != appointment.AppointmentId && item.StylistId == stylist.StylistId && item.AppointmentDate.Date == appointment.AppointmentDate.Date && !UnavailableStatuses.Contains(item.Status))
-            .FirstOrDefaultAsync(item => item.StartTime < endTime && request.StartTime < item.EndTime);
+            .Where(item => item.AppointmentId != appointment.AppointmentId && item.StylistId == stylist.StylistId && item.AppointmentDate == appointment.AppointmentDate.Date && !UnavailableStatuses.Contains(item.Status))
+            .ToListAsync();
+        var conflict = appointmentsAtTarget.FirstOrDefault(item => item.StartTime < endTime && request.StartTime < item.EndTime);
         if (conflict is not null)
             return RescheduleAppointmentResult.Rejected("overlap", $"Khung giờ bị chồng lấn với lịch của {conflict.Customer.FullName} lúc {conflict.StartTime:hh\\:mm}–{conflict.EndTime:hh\\:mm}.");
 
@@ -93,6 +96,22 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
                 StartTime = request.StartTime,
                 NextAttemptAt = changedAt
             });
+        }
+        if (!string.IsNullOrWhiteSpace(stylist.Email))
+        {
+            db.StaffNotifications.Add(new StaffNotification
+            {
+                RecipientEmail = stylist.Email,
+                AppointmentId = appointment.AppointmentId,
+                Type = "AppointmentRescheduled",
+                Message = $"Lịch của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã được điều chỉnh sang {request.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM}."
+            });
+        }
+        if (oldStylistId != stylist.StylistId)
+        {
+            var oldStylistEmail = await db.Stylists.Where(item => item.StylistId == oldStylistId).Select(item => item.Email).SingleOrDefaultAsync();
+            if (!string.IsNullOrWhiteSpace(oldStylistEmail))
+                db.StaffNotifications.Add(new StaffNotification { RecipientEmail = oldStylistEmail, AppointmentId = appointment.AppointmentId, Type = "AppointmentReassigned", Message = $"Lịch của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã được chuyển sang thợ khác." });
         }
         try
         {

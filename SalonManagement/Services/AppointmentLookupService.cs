@@ -21,10 +21,14 @@ public sealed class AppointmentLookupService(ApplicationDbContext db)
         }
         var phone = BookingService.NormalizePhone(value);
         if (phone is null) return new([], "Nhập mã 8 ký tự hoặc số điện thoại hợp lệ.");
-        var appointments = await DetailQuery()
+        // SQLite cannot sort TimeSpan values in SQL.  Read the customer's small
+        // set of active appointments first, then order by time in memory.
+        var appointments = (await DetailQuery()
             .Where(item => item.Customer.Phone == phone && item.Status != "Cancelled" && item.Status != "Completed" && item.Status != "NoShow")
-            .OrderBy(item => item.AppointmentDate).ThenBy(item => item.StartTime)
-            .ToListAsync();
+            .ToListAsync())
+            .OrderBy(item => item.AppointmentDate)
+            .ThenBy(item => item.StartTime)
+            .ToList();
         var items = appointments.Select(ToItem).ToList();
         return items.Count == 0 ? new([], "Không tìm thấy lịch hẹn.") : new(items, null);
     }
@@ -35,5 +39,5 @@ public sealed class AppointmentLookupService(ApplicationDbContext db)
         var duration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
         return new(appointment.BookingReference, appointment.AppointmentDate, appointment.StartTime, appointment.EndTime, appointment.AppointmentServices.Select(item => item.Service.ServiceName).ToList(), appointment.Stylist?.FullName ?? "Chưa phân công", duration, StatusLabel(appointment.Status), appointment.CancelledAt, appointment.CancelledBy);
     }
-    private static string StatusLabel(string status) => status switch { "Pending" => "Chờ xác nhận", "Confirmed" => "Đã xác nhận", "InProgress" => "Đang thực hiện", "Completed" => "Đã hoàn thành", "Cancelled" => "Đã huỷ", "NoShow" => "Không đến", _ => status };
+    private static string StatusLabel(string status) => status switch { "Pending" or "PendingConfirmation" => "Chờ xác nhận", "Confirmed" => "Đã xác nhận", "Rejected" => "Đã từ chối", "InProgress" => "Đang thực hiện", "Completed" => "Đã hoàn thành", "Cancelled" => "Đã huỷ", "NoShow" => "Không đến", _ => status };
 }

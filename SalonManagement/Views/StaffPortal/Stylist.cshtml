@@ -1,54 +1,30 @@
 @{
-    ViewData["Title"] = "Không gian thợ";
+    ViewData["Title"] = "Cổng làm việc thợ";
 }
 
-<div id="stylist-content" class="container d-none py-4">
-    <div class="sl-page-header d-flex flex-wrap align-items-center justify-content-between gap-3 mb-5 border-bottom pb-4">
-        <div>
-            <span class="sl-eyebrow text-uppercase text-muted small fw-semibold">Không gian làm việc</span>
-            <h1 class="sl-page-title h2 mb-1 mt-1 text-primary-dark">Thợ làm tóc</h1>
-            <p class="text-muted mb-0">Xin chào <strong data-session-email class="text-dark"></strong></p>
-        </div>
-    </div>
+<main id="stylist-command-content" class="container-fluid d-none py-3 stylist-command" aria-live="polite">
+    <header class="stylist-command-header">
+        <div><span class="stylist-command-eyebrow">Không gian thợ · <span data-stylist-date>Đang tải…</span></span><h1>Cổng làm việc Thợ làm tóc</h1><p>Xin chào <strong id="stylist-name" data-stylist-name>…</strong> · Theo dõi ca, phục vụ khách và ghi chú kỹ thuật.</p></div>
+        <div class="stylist-command-tools"><button id="stylist-notification-toggle" class="stylist-bell" type="button" aria-label="Thông báo"><i class="bi bi-bell"></i><span id="stylist-notification-count" class="d-none">0</span></button><a class="btn btn-outline-primary btn-sm" href="/stylist/week-schedule"><i class="bi bi-calendar-week"></i> Ca làm tuần</a></div>
+    </header>
+    <section class="stylist-kpis" aria-label="Chỉ số ca làm">
+        <article class="stylist-kpi shift"><span>Ca làm hôm nay</span><strong id="stylist-shift-time">—</strong><small id="stylist-break-note">Chưa có ca được phân công</small></article>
+        <article class="stylist-kpi service"><span>Đang phục vụ</span><strong id="stylist-kpi-service">0</strong><small>khách trên ghế</small></article>
+        <article class="stylist-kpi waiting"><span>Lịch sắp tới</span><strong id="stylist-kpi-waiting">0</strong><small>khách chờ lượt</small></article>
+        <article class="stylist-kpi completed"><span>Hoàn thành ca</span><strong id="stylist-kpi-completed">0</strong><small>lượt phục vụ</small></article>
+    </section>
+    <div id="stylist-command-error" class="alert alert-danger d-none" role="alert"></div>
+    <section class="stylist-command-grid">
+        <article class="stylist-current-panel"><header><div><span><i class="bi bi-person-workspace"></i> Khách đang trên ghế của bạn</span><h2>Phục vụ hiện tại</h2></div><strong id="stylist-current-timer">00:00:00</strong></header><div id="stylist-current-appointment" class="stylist-current-body"><div class="stylist-empty"><i class="bi bi-cup-hot"></i> Hiện chưa có khách đang phục vụ.</div></div></article>
+        <article class="stylist-upcoming-panel"><header><span><i class="bi bi-list-check"></i> Danh sách lượt hẹn sắp tới của tôi</span><a href="/stylist/schedule">Xem toàn bộ</a></header><div id="stylist-upcoming-list" class="stylist-upcoming-list"><div class="stylist-empty">Đang tải lịch hẹn…</div></div></article>
+    </section>
+</main>
 
-    <div class="row g-4">
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm sl-card border-0 hover-lift">
-                <div class="card-body p-4 text-center">
-                    <div class="mb-3">
-                        <i class="bi bi-calendar3 fs-1 text-primary"></i>
-                    </div>
-                    <h2 class="h5 mt-3 text-dark fw-bold">Lịch làm việc</h2>
-                    <p class="text-muted mb-0">Xem ca làm và lịch phục vụ được phân công.</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm sl-card border-0 hover-lift">
-                <div class="card-body p-4 text-center">
-                    <div class="mb-3">
-                        <i class="bi bi-scissors fs-1 text-primary"></i>
-                    </div>
-                    <h2 class="h5 mt-3 text-dark fw-bold">Lịch hẹn của tôi</h2>
-                    <p class="text-muted mb-0">Theo dõi các khách hàng cần phục vụ trong ngày.</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm sl-card border-0 hover-lift">
-                <div class="card-body p-4 text-center">
-                    <div class="mb-3">
-                        <i class="bi bi-clock-history fs-1 text-primary"></i>
-                    </div>
-                    <h2 class="h5 mt-3 text-dark fw-bold">Lịch sử phục vụ</h2>
-                    <p class="text-muted mb-0">Xem lại các dịch vụ đã hoàn thành.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<div id="stylist-technical-drawer" class="stylist-technical-drawer" aria-hidden="true"><button type="button" class="stylist-drawer-backdrop" data-stylist-drawer-close aria-label="Đóng"></button><aside class="stylist-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="stylist-technical-title"><header><div><span class="stylist-command-eyebrow">S4-03 · Nội bộ</span><h2 id="stylist-technical-title">Ghi chú kỹ thuật</h2></div><button type="button" class="btn-close" data-stylist-drawer-close aria-label="Đóng"></button></header><div class="stylist-drawer-body"><p class="stylist-internal-badge"><i class="bi bi-lock-fill"></i> Chỉ Thợ, Lễ tân và Chủ tiệm có thể xem ghi chú này.</p><label class="form-label" for="stylist-technical-notes">Ghi chú của lượt hiện tại</label><textarea id="stylist-technical-notes" class="form-control" maxlength="500" rows="5" placeholder="Ví dụ: Mã màu 5/77 + Oxy 6%, ủ 30 phút."></textarea><div class="d-flex justify-content-between align-items-center mt-1"><small id="stylist-technical-count" class="text-muted">0/500</small><button id="stylist-technical-save" class="btn btn-primary btn-sm" type="button">Lưu ghi chú</button></div><hr /><h3>Lịch sử kỹ thuật gần đây</h3><div id="stylist-technical-history" class="stylist-technical-history"><div class="text-muted small">Đang tải…</div></div></div></aside></div>
+<dialog id="stylist-notification-dialog" class="stylist-notification-dialog"><section><header><h2>Thông báo lịch hẹn</h2><button class="btn-close" type="button" data-stylist-notification-close aria-label="Đóng"></button></header><div id="stylist-notification-list"></div></section></dialog>
 
 @section Scripts {
     <script src="~/js/auth.js" asp-append-version="true"></script>
-    <script>SalonAuth.requireSession({ endpoint: "/api/portal/stylist/session", contentId: "stylist-content" });</script>
+    <script src="~/js/stylist-command.js" asp-append-version="true"></script>
+    <script>SalonAuth.requireSession({ endpoint: "/api/portal/stylist/session", contentId: "stylist-command-content" }).then(() => StylistCommand.start());</script>
 }

@@ -49,9 +49,11 @@ public ApplicationDbContext(
         public DbSet<ShopHoliday> ShopHolidays => Set<ShopHoliday>();
         
         public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
+        public DbSet<StylistLeaveRequest> StylistLeaveRequests => Set<StylistLeaveRequest>();
 
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
         public DbSet<StaffNotification> StaffNotifications => Set<StaffNotification>();
+        public DbSet<StaffWorkSchedule> StaffWorkSchedules => Set<StaffWorkSchedule>();
 public override int SaveChanges()
 {
     return SaveChangesAsync().GetAwaiter().GetResult();
@@ -216,6 +218,30 @@ private class AuditEntry
         {
             base.OnModelCreating(builder);
 
+            builder.Entity<ApplicationUser>(entity =>
+            {
+                entity.Property(user => user.RequestedRole).HasMaxLength(32);
+                entity.HasIndex(user => new { user.EmailConfirmed, user.IsActive, user.RequestedRole });
+            });
+
+            builder.Entity<StaffWorkSchedule>(entity =>
+            {
+                entity.HasKey(schedule => schedule.StaffWorkScheduleId);
+                entity.Property(schedule => schedule.UserId).IsRequired();
+                entity.Property(schedule => schedule.Status).HasMaxLength(30);
+                entity.Property(schedule => schedule.Notes).HasMaxLength(250);
+                entity.HasIndex(schedule => new { schedule.UserId, schedule.WorkDate });
+                entity.HasOne(schedule => schedule.User)
+                    .WithMany(user => user.StaffWorkSchedules)
+                    .HasForeignKey(schedule => schedule.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<Appointment>(entity =>
+            {
+                entity.Property(appointment => appointment.TechnicalNotes).HasMaxLength(500);
+            });
+
             builder.Entity<RefreshToken>(entity =>
             {
                 entity.HasKey(token => token.RefreshTokenId);
@@ -269,6 +295,15 @@ private class AuditEntry
                 entity.Property(customer => customer.Gender).HasMaxLength(20);
                 entity.HasIndex(customer => customer.Phone).IsUnique();
                 entity.HasIndex(customer => customer.NormalizedSearchName);
+            });
+
+            builder.Entity<StylistLeaveRequest>(entity =>
+            {
+                entity.HasKey(request => request.StylistLeaveRequestId);
+                entity.Property(request => request.Reason).HasMaxLength(500).IsRequired();
+                entity.Property(request => request.Status).HasMaxLength(32).IsRequired();
+                entity.HasIndex(request => new { request.StylistId, request.OffDate, request.Status });
+                entity.HasOne(request => request.Stylist).WithMany().HasForeignKey(request => request.StylistId).OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<Stylist>(entity =>

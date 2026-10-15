@@ -37,7 +37,7 @@ public static class SeedData
         await context.SaveChangesAsync();
 
         // =========================
-        // 2. 5 STYLISTS
+        // 2. 10 STYLISTS
         // =========================
 
         var stylists = new[]
@@ -89,6 +89,56 @@ public static class SeedData
                 Email = "quochuy@salon.local",
                 Specialty = "Chăm sóc tóc",
                 ExperienceYears = 7,
+                IsActive = true
+            },
+
+            new Stylist
+            {
+                FullName = "Võ Khánh Linh",
+                Phone = "0901000006",
+                Email = "khanhlinh@salon.local",
+                Specialty = "Cắt tạo kiểu nữ",
+                ExperienceYears = 4,
+                IsActive = true
+            },
+
+            new Stylist
+            {
+                FullName = "Bùi Đức Long",
+                Phone = "0901000007",
+                Email = "duclong@salon.local",
+                Specialty = "Cắt tóc nam",
+                ExperienceYears = 6,
+                IsActive = true
+            },
+
+            new Stylist
+            {
+                FullName = "Nguyễn Bảo Trâm",
+                Phone = "0901000008",
+                Email = "baotram@salon.local",
+                Specialty = "Phục hồi tóc",
+                ExperienceYears = 5,
+                IsActive = true
+            },
+
+            new Stylist
+            {
+                FullName = "Hoàng Gia Hân",
+                Phone = "0901000009",
+                Email = "giahan@salon.local",
+                Specialty = "Nhuộm thời trang",
+                ExperienceYears = 3,
+                IsActive = true
+            },
+
+            new Stylist
+            {
+                FullName = "Trương Anh Khoa",
+                Phone = "0901000010",
+                Email = "anhkhoa@salon.local",
+                Specialty = "Uốn và tạo kiểu",
+                ExperienceYears = 5,
                 IsActive = true
             }
         };
@@ -261,7 +311,9 @@ public static class SeedData
         {
             new
             {
-                Email = "admin@salon.local",
+                Email = "admin@gmai.com",
+                FullName = "Nguyễn Hữu Hải",
+                Phone = "0902000001",
                 Password = "Admin123!",
                 Role = "Admin"
             },
@@ -269,6 +321,8 @@ public static class SeedData
             new
             {
                 Email = "owner@salon.local",
+                FullName = "Chủ salon Nguyễn Hoàng",
+                Phone = "0902000002",
                 Password = "Owner123!",
                 Role = "Owner"
             },
@@ -276,6 +330,26 @@ public static class SeedData
             new
             {
                 Email = "receptionist@salon.local",
+                FullName = "Lê Ngọc Bích",
+                Phone = "0902000011",
+                Password = "Reception123!",
+                Role = "Receptionist"
+            },
+
+            new
+            {
+                Email = "thanhtruc.reception@salon.local",
+                FullName = "Vũ Thanh Trúc",
+                Phone = "0902000012",
+                Password = "Reception123!",
+                Role = "Receptionist"
+            },
+
+            new
+            {
+                Email = "minhchau.reception@salon.local",
+                FullName = "Nguyễn Minh Châu",
+                Phone = "0902000013",
                 Password = "Reception123!",
                 Role = "Receptionist"
             },
@@ -283,6 +357,89 @@ public static class SeedData
             new
             {
                 Email = "stylist@salon.local",
+                FullName = "Nguyễn Minh Anh",
+                Phone = "0901000001",
+                Password = "Stylist123!",
+                Role = "Stylist"
+            },
+
+            new
+            {
+                Email = "thuha@salon.local",
+                FullName = "Trần Thu Hà",
+                Phone = "0901000002",
+                Password = "Stylist123!",
+                Role = "Stylist"
+            },
+
+            new
+            {
+                Email = "hoangnam@salon.local",
+                FullName = "Lê Hoàng Nam",
+                Phone = "0901000003",
+                Password = "Stylist123!",
+                Role = "Stylist"
+            },
+
+            new
+            {
+                Email = "ngocmai@salon.local",
+                FullName = "Phạm Ngọc Mai",
+                Phone = "0901000004",
+                Password = "Stylist123!",
+                Role = "Stylist"
+            },
+
+            new
+            {
+                Email = "quochuy@salon.local",
+                FullName = "Đỗ Quốc Huy",
+                Phone = "0901000005",
+                Password = "Stylist123!",
+                Role = "Stylist"
+            },
+
+            new
+            {
+                Email = "khanhlinh@salon.local",
+                FullName = "Võ Khánh Linh",
+                Phone = "0901000006",
+                Password = "Stylist123!",
+                Role = "Stylist"
+            },
+
+            new
+            {
+                Email = "duclong@salon.local",
+                FullName = "Bùi Đức Long",
+                Phone = "0901000007",
+                Password = "Stylist123!",
+                Role = "Stylist"
+            },
+
+            new
+            {
+                Email = "baotram@salon.local",
+                FullName = "Nguyễn Bảo Trâm",
+                Phone = "0901000008",
+                Password = "Stylist123!",
+                Role = "Stylist"
+            },
+
+            new
+            {
+                Email = "giahan@salon.local",
+                FullName = "Hoàng Gia Hân",
+                Phone = "0901000009",
+                Password = "Stylist123!",
+                Role = "Stylist"
+            },
+
+            new
+            {
+                Email = "anhkhoa@salon.local",
+                FullName = "Trương Anh Khoa",
+                Phone = "0901000010",
                 Password = "Stylist123!",
                 Role = "Stylist"
             }
@@ -300,6 +457,8 @@ public static class SeedData
                     UserName = item.Email,
                     Email = item.Email,
                     EmailConfirmed = true,
+                    FullName = item.FullName,
+                    PhoneNumber = item.Phone,
                     IsActive = true
                 };
 
@@ -315,6 +474,18 @@ public static class SeedData
 
                     throw new InvalidOperationException(
                         $"Không thể tạo tài khoản {item.Email}: {errors}");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(user.FullName) || string.IsNullOrWhiteSpace(user.PhoneNumber))
+            {
+                user.FullName = item.FullName;
+                user.PhoneNumber = item.Phone;
+                var updateResult = await userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                {
+                    var errors = string.Join(", ", updateResult.Errors.Select(error => error.Description));
+                    throw new InvalidOperationException($"Không thể cập nhật hồ sơ {item.Email}: {errors}");
                 }
             }
 

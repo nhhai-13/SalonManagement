@@ -1,7 +1,7 @@
 @model SalonManagement.Models.CustomerProfileDetailsViewModel
 @{ ViewData["Title"] = "Hồ sơ khách hàng"; }
 <div class="container py-4" style="max-width:900px">
-    <a class="btn btn-outline-secondary btn-sm mb-3" href="/reception/counter-appointments">Tạo lịch tại quầy</a>
+    <a class="btn btn-outline-secondary btn-sm mb-3" href="/reception/customer-search">Quay lại danh sách hồ sơ</a>
     <h1 class="h3">@Model.Customer.FullName</h1>
     <dl class="row"><dt class="col-sm-3">Số điện thoại</dt><dd class="col-sm-9">@Model.Customer.Phone</dd><dt class="col-sm-3">Email</dt><dd class="col-sm-9">@(Model.Customer.Email ?? "Chưa có")</dd></dl>
     <div class="row g-3 mb-4"><div class="col-sm-6"><div class="border rounded p-3 bg-light"><div class="text-muted small">Số lần đã đến</div><strong class="fs-3">@Model.VisitCount</strong></div></div><div class="col-sm-6"><div class="border rounded p-3 bg-light"><div class="text-muted small">Số lần không đến</div><strong class="fs-3">@Model.NoShowCount</strong></div></div></div>

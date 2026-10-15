@@ -25,6 +25,7 @@ public sealed class ReceptionScheduleWorkingRange
 public sealed class ReceptionScheduleAppointment
 {
     public int AppointmentId { get; init; }
+    public int CustomerId { get; init; }
     public string CustomerName { get; init; } = string.Empty;
     public string Services { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
@@ -32,4 +33,10 @@ public sealed class ReceptionScheduleAppointment
     public TimeSpan EndTime { get; init; }
     public bool IsLate { get; init; }
     public int? LateMinutes { get; init; }
+    public DateTime? NoShowAt { get; init; }
+    public string? NoShowByUserId { get; init; }
+    public DateTime? NoShowAvailableAt { get; init; }
+    public bool CanMarkNoShow { get; init; }
+    public DateTime? UndoNoShowDeadline { get; init; }
+    public bool CanUndoNoShow { get; init; }
 }

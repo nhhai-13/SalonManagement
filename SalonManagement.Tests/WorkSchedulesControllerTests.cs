@@ -32,6 +32,28 @@ public sealed class WorkSchedulesControllerTests
     }
 
     [Fact]
+    public async Task Create_ValidShift_PersistsWithSqlite()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options, new HttpContextAccessor());
+        await db.Database.EnsureCreatedAsync();
+        var stylist = await AddStylistAsync(db, "SQLite ca làm");
+
+        var result = await CreateController(db).Create(new CreateWorkScheduleViewModel
+        {
+            StylistId = stylist.StylistId,
+            WorkDate = new DateTime(2026, 10, 12),
+            StartTime = TimeSpan.FromHours(9),
+            EndTime = TimeSpan.FromHours(12)
+        });
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Single(await db.WorkSchedules.ToListAsync());
+    }
+
+    [Fact]
     public async Task Create_MultipleShiftsOnSameDay_PersistsBoth()
     {
         await using var db = CreateDb(); var stylist = await AddStylistAsync(db, "Trần Bình"); var controller = CreateController(db); var date = new DateTime(2026, 10, 8);

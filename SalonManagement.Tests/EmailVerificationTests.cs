@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 using SalonManagement.Controllers;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -59,13 +60,28 @@ public sealed class EmailVerificationTests
         };
 
         var registerResult = await controller.Register(
-            new RegisterStaffRequest("employee@salon.local", "password1", "reception"));
+            new RegisterStaffRequest("employee@salon.local", "Nguyễn Minh Anh", "password1", "reception"));
 
         Assert.IsType<AcceptedResult>(registerResult);
         Assert.Matches("^\\d{6}$", emailService.VerificationCode);
         var pendingUser = await userManager.FindByEmailAsync("employee@salon.local");
         Assert.NotNull(pendingUser);
         Assert.False(pendingUser!.EmailConfirmed);
+        Assert.False(pendingUser.IsActive);
+        Assert.Equal(UserRoles.Receptionist, pendingUser.RequestedRole);
+        Assert.Equal("Nguyễn Minh Anh", pendingUser.FullName);
+        Assert.Empty(await userManager.GetRolesAsync(pendingUser));
+
+        var unverifiedLoginResponse = await controller.Login(
+            new LoginRequest("employee@salon.local", "password1"));
+        var unverifiedLogin = Assert.IsType<UnauthorizedObjectResult>(unverifiedLoginResponse.Result);
+        using var unverifiedPayload = JsonDocument.Parse(JsonSerializer.Serialize(unverifiedLogin.Value));
+        Assert.True(unverifiedPayload.RootElement.GetProperty("requiresEmailVerification").GetBoolean());
+        Assert.Equal("reception", unverifiedPayload.RootElement.GetProperty("portal").GetString());
+
+        var repeatedRegistration = Assert.IsType<ObjectResult>(await controller.Register(
+            new RegisterStaffRequest("employee@salon.local", "Nguyễn Minh Anh", "password1", "reception")));
+        Assert.Equal(StatusCodes.Status429TooManyRequests, repeatedRegistration.StatusCode);
 
         var confirmResult = await controller.ConfirmEmail(
             new ConfirmEmailRequest("employee@salon.local", emailService.VerificationCode!));
@@ -74,6 +90,14 @@ public sealed class EmailVerificationTests
         var confirmedUser = await userManager.FindByEmailAsync("employee@salon.local");
         Assert.True(confirmedUser!.EmailConfirmed);
         Assert.Null(confirmedUser.EmailVerificationCodeHash);
+        Assert.False(confirmedUser.IsActive);
+        Assert.Equal(UserRoles.Receptionist, confirmedUser.RequestedRole);
+
+        var pendingApprovalLoginResponse = await controller.Login(
+            new LoginRequest("employee@salon.local", "password1"));
+        var pendingApprovalLogin = Assert.IsType<UnauthorizedObjectResult>(pendingApprovalLoginResponse.Result);
+        using var pendingApprovalPayload = JsonDocument.Parse(JsonSerializer.Serialize(pendingApprovalLogin.Value));
+        Assert.True(pendingApprovalPayload.RootElement.GetProperty("pendingApproval").GetBoolean());
     }
 
     private sealed class CapturingEmailService : IEmailService

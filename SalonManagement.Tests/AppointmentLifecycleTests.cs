@@ -71,11 +71,15 @@ public sealed class AppointmentLifecycleTests
         var service = new AppointmentLifecycleService(db, clock);
 
         var mark = await service.MarkNoShowAsync(appointment.AppointmentId, "reception-1");
+        var marked = await db.Appointments.SingleAsync();
+        Assert.IsTrue(mark.Succeeded);
+        Assert.AreEqual("NoShow", marked.Status);
+        Assert.AreEqual("reception-1", marked.NoShowByUserId);
+
         clock.UtcNow = Local(2031, 2, 3, 9, 40);
         var undo = await service.UndoNoShowAsync(appointment.AppointmentId);
         var saved = await db.Appointments.SingleAsync();
 
-        Assert.IsTrue(mark.Succeeded);
         Assert.IsTrue(undo.Succeeded);
         Assert.AreEqual("Confirmed", saved.Status);
         Assert.IsNull(saved.NoShowAt);

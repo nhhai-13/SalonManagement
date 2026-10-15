@@ -116,9 +116,12 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var open = hours.OpensAt.Value.ToTimeSpan();
         var close = hours.ClosesAt.Value.ToTimeSpan();
         if (open >= close) return [];
-        var shifts = await db.WorkSchedules.AsNoTracking().Where(s => qualifiedIds.Contains(s.StylistId) &&
+        // SQLite cannot translate ORDER BY for TimeSpan. Load the small set of daily shifts
+        // first, then sort in memory before building the working windows below.
+        var shifts = (await db.WorkSchedules.AsNoTracking().Where(s => qualifiedIds.Contains(s.StylistId) &&
             s.WorkDate >= day && s.WorkDate < nextDay && s.Status == "Working")
-            .OrderBy(s => s.StartTime).Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync();
+            .Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync())
+            .OrderBy(s => s.StartTime).ToList();
         var busy = await db.Appointments.AsNoTracking().Where(a => qualifiedIds.Contains(a.StylistId) &&
             a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();

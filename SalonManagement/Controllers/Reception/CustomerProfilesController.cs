@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -22,7 +23,7 @@ public sealed class CustomerProfilesController(ApplicationDbContext db, Customer
         db.AuditLogs.Add(new AuditLog
         {
             Timestamp = DateTime.UtcNow,
-            UserId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+            UserId = CurrentUserId(),
             UserName = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name,
             Action = "VIEW",
             EntityType = nameof(Customer),
@@ -57,6 +58,9 @@ public sealed class CustomerProfilesController(ApplicationDbContext db, Customer
             return NotFound();
         }
     }
+
+    private string? CurrentUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
 }
 
 public sealed record CustomerShopNotesRequest(string? Notes);

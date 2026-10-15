@@ -107,10 +107,12 @@ public class BookingService : IBookingService
     public async Task<int> GetMaxShiftDurationMinutesAsync()
     {
         // 1. Kiểm tra WorkSchedules của Stylist
-        var scheduleTimes = await _context.WorkSchedules.AsNoTracking()
-            .Where(ws => ws.EndTime > ws.StartTime && (ws.Status == "Working" || string.IsNullOrEmpty(ws.Status)))
+        var scheduleTimes = (await _context.WorkSchedules.AsNoTracking()
+            .Where(ws => ws.Status == "Working" || ws.Status == null || ws.Status == "")
             .Select(ws => new { ws.StartTime, ws.EndTime })
-            .ToListAsync();
+            .ToListAsync())
+            .Where(ws => ws.EndTime > ws.StartTime)
+            .ToList();
 
         if (scheduleTimes.Count > 0)
         {

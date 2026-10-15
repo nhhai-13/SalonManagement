@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SalonManagement.Data;
@@ -105,6 +106,25 @@ public sealed class AppointmentReschedulingServiceTests
         Assert.IsTrue(result.Succeeded);
         Assert.AreEqual(0, await db.AppointmentChangeEmails.CountAsync());
         Assert.AreEqual("NotRequired", (await db.AppointmentChangeLogs.SingleAsync()).EmailStatus);
+    }
+
+    [TestMethod]
+    public async Task Reschedule_works_with_SQLite_TimeSpan_schedule_values()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options, new HttpContextAccessor());
+        await db.Database.EnsureCreatedAsync();
+        var fixture = await SeedAsync(db);
+
+        var result = await new AppointmentReschedulingService(db, TimeProvider.System)
+            .RescheduleAsync(fixture.AppointmentId, new RescheduleAppointmentRequest(fixture.AlternateStylistId, TimeSpan.FromHours(11)));
+
+        Assert.IsTrue(result.Succeeded);
+        var saved = await db.Appointments.FindAsync(fixture.AppointmentId);
+        Assert.AreEqual(fixture.AlternateStylistId, saved!.StylistId);
+        Assert.AreEqual(TimeSpan.FromHours(11), saved.StartTime);
     }
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());

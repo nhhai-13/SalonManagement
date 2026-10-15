@@ -173,12 +173,13 @@ public sealed class AvailabilityServiceTests
             new WorkSchedule { StylistId = stylist.StylistId, WorkDate = secondAvailable, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(10) });
         db.Appointments.Add(new Appointment { StylistId = stylist.StylistId, CustomerId = 1, AppointmentDate = bookedDate, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(9), Status = "Confirmed" }); await db.SaveChangesAsync();
 
-        var suggestions = await new AvailabilityService(db).GetSuggestedDatesAsync(selectedDate, [service.ServiceId]);
+        var availability = new AvailabilityService(db, new FixedTimeProvider(new DateTimeOffset(2026, 10, 10, 2, 0, 0, TimeSpan.Zero)));
+        var suggestions = await availability.GetSuggestedDatesAsync(selectedDate, [service.ServiceId]);
 
         Assert.Equal([firstAvailable, secondAvailable], suggestions.Select(item => item.Date));
         Assert.All(suggestions, item => Assert.True(item.SlotCount > 0));
-        Assert.Equal([firstAvailable], (await new AvailabilityService(db).GetSuggestedDatesAsync(selectedDate, [service.ServiceId], maximumDaysToSearch: 3)).Select(item => item.Date));
-        Assert.Empty(await new AvailabilityService(db).GetSuggestedDatesAsync(selectedDate, [service.ServiceId], maximumDaysToSearch: 2));
+        Assert.Equal([firstAvailable], (await availability.GetSuggestedDatesAsync(selectedDate, [service.ServiceId], maximumDaysToSearch: 3)).Select(item => item.Date));
+        Assert.Empty(await availability.GetSuggestedDatesAsync(selectedDate, [service.ServiceId], maximumDaysToSearch: 2));
     }
 
     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());

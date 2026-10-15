@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,9 +17,9 @@ public sealed class AppointmentReschedulingController(AppointmentReschedulingSer
     [HttpPut("{appointmentId:int}/reschedule")]
     public async Task<IActionResult> Reschedule(int appointmentId, [FromBody] RescheduleAppointmentRequest request)
     {
-        var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var actorId = CurrentUserId();
         if (string.IsNullOrWhiteSpace(actorId)) return Unauthorized();
-        var actorName = User.FindFirst("email")?.Value ?? User.Identity?.Name ?? actorId;
+        var actorName = User.FindFirstValue(JwtRegisteredClaimNames.Email) ?? User.Identity?.Name ?? actorId;
         var result = await service.RescheduleAsync(appointmentId, request, new AppointmentChangeActor(actorId, actorName));
         if (!result.Succeeded)
         {
@@ -35,9 +36,9 @@ public sealed class AppointmentReschedulingController(AppointmentReschedulingSer
     {
         if (request.Items is null || request.Items.Count == 0)
             return BadRequest(new { error = "Vui lòng chọn ít nhất một lịch hẹn để chuyển." });
-        var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var actorId = CurrentUserId();
         if (string.IsNullOrWhiteSpace(actorId)) return Unauthorized();
-        var actorName = User.FindFirst("email")?.Value ?? User.Identity?.Name ?? actorId;
+        var actorName = User.FindFirstValue(JwtRegisteredClaimNames.Email) ?? User.Identity?.Name ?? actorId;
         return Ok(await batchService.RescheduleAsync(request.Items, new AppointmentChangeActor(actorId, actorName)));
     }
 
@@ -51,6 +52,9 @@ public sealed class AppointmentReschedulingController(AppointmentReschedulingSer
             .ToListAsync();
         return Ok(items);
     }
+
+    private string? CurrentUserId() =>
+        User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
 }
 
 public sealed record BatchRescheduleRequest(IReadOnlyList<BatchRescheduleItem>? Items);

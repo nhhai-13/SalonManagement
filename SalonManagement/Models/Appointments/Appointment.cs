@@ -26,6 +26,9 @@
 
         public string? Notes { get; set; }
 
+        // Internal stylist note: never returned by the public booking or lookup flows.
+        public string? TechnicalNotes { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         public DateTime? UpdatedAt { get; set; }

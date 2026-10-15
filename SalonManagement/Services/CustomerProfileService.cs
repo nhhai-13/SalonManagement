@@ -18,6 +18,36 @@ public sealed class CustomerProfileService(ApplicationDbContext db)
             ? db.Customers.FirstOrDefaultAsync(customer => customer.Phone == normalized)
             : Task.FromResult<Customer?>(null);
 
+    public Task<Customer?> FindByEmailAsync(string email)
+    {
+        var normalized = email.Trim().ToLowerInvariant();
+        return db.Customers.FirstOrDefaultAsync(customer => customer.Email != null && customer.Email.ToLower() == normalized);
+    }
+
+    /// <summary>Creates a contact profile for an email-only online booking. The internal
+    /// placeholder keeps compatibility with legacy customer records where Phone is required.</summary>
+    public async Task<Customer> CreateEmailOnlyAsync(string fullName, string email)
+    {
+        var customer = await FindByEmailAsync(email);
+        if (customer is not null) return customer;
+
+        string placeholder;
+        do
+        {
+            placeholder = $"099{Random.Shared.Next(0, 10_000_000):D7}";
+        } while (await db.Customers.AnyAsync(item => item.Phone == placeholder));
+
+        customer = new Customer
+        {
+            FullName = fullName.Trim(),
+            NormalizedSearchName = NormalizeSearchName(fullName),
+            Phone = placeholder,
+            Email = email.Trim().ToLowerInvariant()
+        };
+        db.Customers.Add(customer);
+        return customer;
+    }
+
     public async Task<Customer> FindOrCreateAsync(string fullName, string phone, string? email, bool updateExistingName = true, bool overwriteExistingEmail = true)
     {
         var normalized = BookingService.NormalizePhone(phone) ?? throw new ArgumentException("Số điện thoại không hợp lệ.");

@@ -99,6 +99,12 @@ window.SalonAuth = (() => {
             const lockedAccounts = new Map();
             let lockoutTimer;
             const normalizeEmail = value => value.trim().toLowerCase();
+            const showLoginMessage = (text, success = false) => {
+                errorMessage.textContent = text;
+                error.classList.toggle("alert-success", success);
+                error.classList.toggle("alert-danger", !success);
+                error.classList.remove("d-none");
+            };
             const applyLockoutState = () => {
                 clearTimeout(lockoutTimer);
                 const lockedUntil = lockedAccounts.get(normalizeEmail(email.value));
@@ -121,8 +127,8 @@ window.SalonAuth = (() => {
             };
             const pageMessage = new URLSearchParams(location.search).get("message");
             if (pageMessage) {
-                errorMessage.textContent = pageMessage;
-                error.classList.remove("d-none");
+                const succeeded = new URLSearchParams(location.search).get("status") === "success";
+                showLoginMessage(pageMessage, succeeded);
                 history.replaceState({}, "", location.pathname);
             }
 
@@ -167,7 +173,8 @@ window.SalonAuth = (() => {
                     if (!response.ok) {
                         const result = await response.json().catch(() => ({}));
                         if (result.requiresEmailVerification && result.email) {
-                            location.replace(`/verify-email?email=${encodeURIComponent(result.email)}`);
+                            const portal = result.portal === "stylist" ? "stylist" : "reception";
+                            location.replace(`/verify-email?email=${encodeURIComponent(result.email)}&portal=${encodeURIComponent(portal)}`);
                             return;
                         }
                         if (result.lockedUntilUtc) {
@@ -177,8 +184,7 @@ window.SalonAuth = (() => {
                                 applyLockoutState();
                             }
                         }
-                        errorMessage.textContent = result.message || "Email hoặc mật khẩu không chính xác.";
-                        error.classList.remove("d-none");
+                        showLoginMessage(result.message || "Email hoặc mật khẩu không chính xác.");
                         return;
                     }
                     const result = await response.json();
@@ -189,8 +195,7 @@ window.SalonAuth = (() => {
                     );
                     location.replace(result.redirectUrl || "/admin/login");
                 } catch {
-                    errorMessage.textContent = "Không thể kết nối đến hệ thống. Vui lòng thử lại.";
-                    error.classList.remove("d-none");
+                    showLoginMessage("Không thể kết nối đến hệ thống. Vui lòng thử lại.");
                 } finally {
                     applyLockoutState();
                 }
@@ -198,6 +203,7 @@ window.SalonAuth = (() => {
         },
         bindRegisterForm() {
             const form = document.getElementById("register-form");
+            const fullName = document.getElementById("full-name");
             const email = document.getElementById("email");
             const password = document.getElementById("password");
             const confirmPassword = document.getElementById("confirm-password");
@@ -208,7 +214,7 @@ window.SalonAuth = (() => {
             form.addEventListener("submit", async event => {
                 event.preventDefault();
                 error.classList.add("d-none");
-                const fields = [email, password, confirmPassword];
+                const fields = [fullName, email, password, confirmPassword];
                 fields.forEach(input => input.closest(".field-group")?.classList.remove("invalid"));
                 let valid = fields.every(input => input.checkValidity());
                 if (password.value !== confirmPassword.value) {
@@ -225,7 +231,7 @@ window.SalonAuth = (() => {
                     const response = await fetch("/api/auth/register", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ email: email.value.trim(), password: password.value, role: form.dataset.role })
+                        body: JSON.stringify({ fullName: fullName.value.trim(), email: email.value.trim(), password: password.value, role: form.dataset.role })
                     });
                     const result = await response.json().catch(() => ({}));
                     if (!response.ok) {
@@ -237,14 +243,14 @@ window.SalonAuth = (() => {
                         location.replace(result.redirectUrl || `/verify-email?email=${encodeURIComponent(result.email || email.value.trim())}&portal=${encodeURIComponent(form.dataset.role)}`);
                         return;
                     }
-                    location.replace(`${form.dataset.login}?message=${encodeURIComponent(result.message)}`);
+                    location.replace(`${form.dataset.login}?status=success&message=${encodeURIComponent(result.message)}`);
                 } catch {
                     errorMessage.textContent = "Không thể kết nối đến hệ thống. Vui lòng thử lại.";
                     error.classList.remove("d-none");
                 } finally {
                     submit.disabled = false;
                     submit.classList.remove("loading");
-                    submit.querySelector(".button-label").textContent = "Tạo tài khoản";
+                    submit.querySelector(".button-label").textContent = "Gửi mã xác thực";
                 }
             });
         },
@@ -256,10 +262,28 @@ window.SalonAuth = (() => {
             const resend = document.getElementById("resend-verification");
             const message = document.getElementById("verify-email-message");
             const messageText = message.querySelector("span") || message;
+            let resendTimer;
             const showMessage = (text, success = false) => {
                 messageText.textContent = text;
                 message.classList.remove("d-none", "login-alert-success");
                 if (success) message.classList.add("login-alert-success");
+            };
+            const startResendCooldown = (seconds = 60) => {
+                clearInterval(resendTimer);
+                let remaining = seconds;
+                resend.disabled = true;
+                resend.textContent = `Gửi lại mã sau ${remaining}s`;
+                resendTimer = window.setInterval(() => {
+                    remaining -= 1;
+                    if (remaining <= 0) {
+                        clearInterval(resendTimer);
+                        resendTimer = undefined;
+                        resend.disabled = false;
+                        resend.textContent = "Gửi lại mã";
+                        return;
+                    }
+                    resend.textContent = `Gửi lại mã sau ${remaining}s`;
+                }, 1000);
             };
 
             code.addEventListener("input", () => {
@@ -283,7 +307,7 @@ window.SalonAuth = (() => {
                     });
                     const result = await response.json().catch(() => ({}));
                     if (!response.ok) return showMessage(result.message || "Không thể xác minh email.");
-                    location.replace(`${form.dataset.login}?message=${encodeURIComponent(result.message)}`);
+                    location.replace(`${form.dataset.login}?status=success&message=${encodeURIComponent(result.message)}`);
                 } catch {
                     showMessage("Không thể kết nối đến hệ thống. Vui lòng thử lại.");
                 } finally {
@@ -302,10 +326,11 @@ window.SalonAuth = (() => {
                     });
                     const result = await response.json().catch(() => ({}));
                     showMessage(result.message || "Không thể gửi lại mã.", response.ok);
+                    if (response.ok) startResendCooldown();
                 } catch {
                     showMessage("Không thể kết nối đến hệ thống. Vui lòng thử lại.");
                 } finally {
-                    resend.disabled = false;
+                    if (!resendTimer) resend.disabled = false;
                 }
             });
         },
@@ -323,8 +348,18 @@ window.SalonAuth = (() => {
                     body: JSON.stringify({ ...Object.fromEntries(new FormData(form)), isActive: form.elements.isActive.value === "true" })
                 });
                 const result = await response.json().catch(() => ({}));
-                message.textContent = result.message || (response.ok ? "Đã tạo tài khoản." : "Không thể tạo tài khoản.");
                 message.className = `alert ${response.ok ? "alert-success" : "alert-danger"}`;
+                message.replaceChildren(document.createTextNode(result.message || (response.ok ? "Đã tạo tài khoản." : "Không thể tạo tài khoản.")));
+                if (response.ok && result.temporaryPassword) {
+                    const credential = document.createElement("div");
+                    credential.className = "admin-temp-password";
+                    const label = document.createElement("strong");
+                    label.textContent = "Mật khẩu tạm — chỉ hiển thị lần này:";
+                    const password = document.createElement("code");
+                    password.textContent = result.temporaryPassword;
+                    credential.append(label, password);
+                    message.append(credential);
+                }
                 if (response.ok) {
                     form.reset();
                     await this.loadStaffAccounts();
@@ -494,7 +529,7 @@ window.SalonAuth = (() => {
             const session = await response.json().catch(() => ({}));
             document.getElementById(contentId)?.classList.remove("d-none");
             document.querySelectorAll("[data-session-email]").forEach(element => {
-                element.textContent = session.email || "";
+                element.textContent = session.fullName || session.email || "";
             });
             const isAdmin = session.role === "Admin";
             document.getElementById(isAdmin ? "admin-tools" : "owner-tools")?.classList.remove("d-none");

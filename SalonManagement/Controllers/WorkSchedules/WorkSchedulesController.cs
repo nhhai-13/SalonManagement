@@ -298,14 +298,18 @@ public sealed class WorkSchedulesController(ApplicationDbContext db) : Controlle
     private async Task<WorkSchedule?> FindConflictingShiftAsync(
         int stylistId, DateTime workDate, TimeSpan startTime, TimeSpan endTime, int? excludedScheduleId = null)
     {
-        var conflicts = await db.WorkSchedules.AsNoTracking()
+        // SQLite cannot translate comparisons between TimeSpan values. Filter the small
+        // same-day set in SQL, then evaluate the interval overlap in memory.
+        var sameDaySchedules = await db.WorkSchedules.AsNoTracking()
             .Where(schedule => schedule.StylistId == stylistId &&
                                schedule.WorkDate == workDate &&
-                               (!excludedScheduleId.HasValue || schedule.WorkScheduleId != excludedScheduleId) &&
-                               schedule.StartTime < endTime && startTime < schedule.EndTime)
+                               (!excludedScheduleId.HasValue || schedule.WorkScheduleId != excludedScheduleId))
             .ToListAsync();
 
-        return conflicts.OrderBy(schedule => schedule.StartTime).FirstOrDefault();
+        return sameDaySchedules
+            .Where(schedule => schedule.StartTime < endTime && startTime < schedule.EndTime)
+            .OrderBy(schedule => schedule.StartTime)
+            .FirstOrDefault();
     }
 
     private static string ConflictMessage(WorkSchedule schedule) =>

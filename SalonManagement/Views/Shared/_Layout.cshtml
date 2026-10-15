@@ -90,6 +90,10 @@ else
                            href="/admin/roles">
                             <i class="bi bi-person-gear"></i> Vai trò &amp; phân quyền
                         </a>
+                        <a class="sl-nav-link @(NavActive("AccessRequests") ? "active" : "")"
+                           href="/management/access-requests">
+                            <i class="bi bi-person-check"></i> Duyệt yêu cầu đăng ký
+                        </a>
                         <a class="sl-nav-link @(NavActive("AuditLogs") ? "active" : "")"
                            asp-controller="AuditLogs" asp-action="Index">
                             <i class="bi bi-clock-history"></i> Nhật ký hệ thống
@@ -124,6 +128,10 @@ else
                            asp-controller="WorkSchedules" asp-action="Index">
                             <i class="bi bi-calendar-week"></i> Lịch làm việc
                         </a>
+                        <a class="sl-nav-link @(NavActive("StaffSchedules") ? "active" : "")"
+                           href="/management/staff-schedules">
+                            <i class="bi bi-people"></i> Lịch nhân viên
+                        </a>
                         <a class="sl-nav-link @(NavActive("Admin","BusinessHours") ? "active" : "")"
                            href="/owner/business-hours">
                             <i class="bi bi-clock"></i> Giờ hoạt động
@@ -135,6 +143,10 @@ else
                         <a class="sl-nav-link @(NavActive("OwnerAppointments") ? "active" : "")"
                            href="/owner/appointments">
                             <i class="bi bi-bell"></i> Lịch hẹn mới
+                        </a>
+                        <a class="sl-nav-link @(NavActive("AccessRequests") ? "active" : "")"
+                           href="/management/access-requests">
+                            <i class="bi bi-person-check"></i> Duyệt yêu cầu đăng ký
                         </a>
                     </div>
                 }
@@ -148,16 +160,48 @@ else
                            asp-controller="StaffPortal" asp-action="Reception">
                             <i class="bi bi-headset"></i> Cổng lễ tân
                         </a>
+                        <a class="sl-nav-link @(NavActive("ReceptionDailySchedule") ? "active" : "")"
+                           href="/reception/daily-schedule">
+                            <i class="bi bi-calendar-day"></i> Lịch hẹn trong ngày
+                        </a>
+                        <a class="sl-nav-link @(NavActive("CounterAppointments") ? "active" : "")"
+                           href="/reception/counter-appointments">
+                            <i class="bi bi-calendar-plus"></i> Đặt lịch tại quầy
+                        </a>
+                        <a class="sl-nav-link @(NavActive("ReceptionAbsenceAppointmentsPage") ? "active" : "")"
+                           href="/reception/absence-appointments">
+                            <i class="bi bi-person-dash"></i> Xử lý thợ nghỉ
+                        </a>
+                        <a class="sl-nav-link @(NavActive("CustomerProfileSearch") ? "active" : "")"
+                           href="/reception/customer-search">
+                            <i class="bi bi-people"></i> Hồ sơ khách hàng
+                        </a>
+                        <a class="sl-nav-link @(NavActive("ReceptionShiftReport") ? "active" : "")"
+                           href="/reception/shift-report">
+                            <i class="bi bi-cash-coin"></i> Báo cáo thu chi ca
+                        </a>
                     </div>
                 }
 
                 @if (User.IsInRole("Stylist"))
                 {
                     <div class="sl-nav-section">
-                        <div class="sl-nav-label">Thợ</div>
+                        <div class="sl-nav-label">Không gian thợ</div>
                         <a class="sl-nav-link @(NavActive("StaffPortal","Stylist") ? "active" : "")"
                            asp-controller="StaffPortal" asp-action="Stylist">
-                            <i class="bi bi-person-workspace"></i> Cổng thợ
+                            <i class="bi bi-person-workspace"></i> Cổng làm việc thợ
+                        </a>
+                        <a class="sl-nav-link @(NavActive("StylistSchedule","Index") ? "active" : "")"
+                           href="/stylist/schedule">
+                            <i class="bi bi-calendar-check"></i> Lịch hẹn của tôi
+                        </a>
+                        <a class="sl-nav-link @(NavActive("StylistSchedule","ServiceHistory") ? "active" : "")"
+                           href="/stylist/service-history">
+                            <i class="bi bi-journal-text"></i> Lịch sử &amp; ghi chú KT
+                        </a>
+                        <a class="sl-nav-link @(NavActive("StylistSchedule","WeekSchedule") ? "active" : "")"
+                           href="/stylist/week-schedule">
+                            <i class="bi bi-calendar-week"></i> Ca làm &amp; lịch nghỉ
                         </a>
                     </div>
                 }
@@ -262,6 +306,18 @@ else
     </div>
 }
 
+<div id="booking-overlay" class="booking-overlay" hidden>
+    <section class="booking-overlay-dialog" role="dialog" aria-modal="true" aria-labelledby="booking-overlay-title">
+        <header class="booking-overlay-header">
+            <h2 id="booking-overlay-title">Đặt lịch</h2>
+            <button id="booking-overlay-close" type="button" class="booking-overlay-close" aria-label="Đóng đặt lịch">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+        </header>
+        <iframe id="booking-overlay-frame" title="Đặt lịch" loading="lazy"></iframe>
+    </section>
+</div>
+
 <script src="~/lib/jquery/dist/jquery.min.js"></script>
 <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 <script src="~/js/site.js" asp-append-version="true"></script>
@@ -305,7 +361,36 @@ else
         if (event.key === 'Escape') {
             closeSidebar();
             closeUserMenu();
+            closeBookingOverlay();
         }
+    });
+    const bookingOverlay = document.getElementById('booking-overlay');
+    const bookingOverlayFrame = document.getElementById('booking-overlay-frame');
+    const bookingOverlayClose = document.getElementById('booking-overlay-close');
+    window.openBookingOverlay = function (url = '/booking/select-services') {
+        const target = new URL(url, window.location.origin);
+        target.searchParams.set('overlay', 'true');
+        bookingOverlayFrame.src = `${target.pathname}${target.search}${target.hash}`;
+        bookingOverlay.hidden = false;
+        document.body.classList.add('booking-overlay-open');
+        closeSidebar();
+        bookingOverlayClose.focus();
+    };
+    window.closeBookingOverlay = function () {
+        if (!bookingOverlay || bookingOverlay.hidden) return;
+        bookingOverlay.hidden = true;
+        bookingOverlayFrame.src = 'about:blank';
+        document.body.classList.remove('booking-overlay-open');
+    };
+    bookingOverlayClose?.addEventListener('click', closeBookingOverlay);
+    bookingOverlay?.addEventListener('click', event => {
+        if (event.target === bookingOverlay) closeBookingOverlay();
+    });
+    document.addEventListener('click', event => {
+        const link = event.target.closest('a[href^="/booking"]');
+        if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        openBookingOverlay(link.getAttribute('href') || '/booking/select-services');
     });
 </script>
 
