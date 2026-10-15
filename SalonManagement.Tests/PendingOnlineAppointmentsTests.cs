@@ -26,6 +26,8 @@ public sealed class PendingOnlineAppointmentsTests
         Assert.IsNotNull(result.Confirmation);
         var appointment = await db.Appointments.SingleAsync();
         Assert.AreEqual("PendingConfirmation", appointment.Status);
+        Assert.IsFalse(await db.AppointmentEmailDeliveries.AnyAsync(delivery => delivery.Kind == AppointmentEmailKinds.Confirmation),
+            "Do not send a confirmation while the salon is still reviewing the booking.");
     }
 
     [TestMethod]
@@ -121,7 +123,7 @@ public sealed class PendingOnlineAppointmentsTests
         await using var db = CreateDb();
         var date = new DateTime(2031, 2, 3);
         await SeedBookableStylistAsync(db, date);
-        var appointment = new Appointment { Customer = new Customer { FullName = "Khách", Phone = "0900000003" }, StylistId = (await db.Stylists.SingleAsync()).StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "PendingConfirmation", BookingReference = "ONLINE03" };
+        var appointment = new Appointment { Customer = new Customer { FullName = "Khách", Phone = "0900000003", Email = "guest@example.test" }, StylistId = (await db.Stylists.SingleAsync()).StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "PendingConfirmation", BookingReference = "ONLINE03" };
         db.Appointments.Add(appointment); await db.SaveChangesAsync();
         var controller = new PendingAppointmentsController(db, TimeProvider.System) { ControllerContext = new ControllerContext { HttpContext = AuthenticatedContext("reception-1") } };
 
@@ -132,6 +134,11 @@ public sealed class PendingOnlineAppointmentsTests
         Assert.AreEqual("Confirmed", saved.Status);
         Assert.AreEqual("reception-1", saved.ConfirmedByUserId);
         Assert.IsNotNull(saved.ConfirmedAt);
+        var confirmationEmail = await db.AppointmentEmailDeliveries.SingleAsync(delivery => delivery.Kind == AppointmentEmailKinds.Confirmation);
+        Assert.AreEqual("guest@example.test", confirmationEmail.RecipientEmail);
+        Assert.AreEqual(AppointmentEmailStatuses.Queued, confirmationEmail.Status);
+        var reminderEmail = await db.AppointmentEmailDeliveries.SingleAsync(delivery => delivery.Kind == AppointmentEmailKinds.Reminder);
+        Assert.AreEqual(AppointmentEmailStatuses.Queued, reminderEmail.Status);
     }
 
     [TestMethod]
