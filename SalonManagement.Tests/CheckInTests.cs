@@ -26,16 +26,14 @@ public class CheckInTests
         db.Add(a); await db.SaveChangesAsync(); return a;
     }
     [Theory]
-    [InlineData(-61, false)] [InlineData(-60, true)] [InlineData(60, true)] [InlineData(61, false)]
+    [InlineData(-61, false)] [InlineData(-60, true)] [InlineData(0, true)] [InlineData(60, true)] [InlineData(61, false)]
     public async Task CheckInWindow(int minutes, bool allowed)
     {
         await using var db = Db(); var a = await Seed(db);
         Assert.Equal(allowed, CheckInService.CanCheckIn(a, Start.AddMinutes(minutes)));
         if (!allowed) await Assert.ThrowsAsync<InvalidOperationException>(() => new CheckInService(db, new Clock { Now = Start.AddMinutes(minutes) }).Apply(a.AppointmentId, "check-in", "desk"));
     }
-    [Theory]
-    [InlineData(-15, 0)] [InlineData(-1, 0)] [InlineData(0, 0)]
-    [InlineData(1, 0)] [InlineData(15, 0)] [InlineData(16, 16)]
+    [Theory] [InlineData(-60, 0)] [InlineData(0, 0)] [InlineData(15, 0)] [InlineData(16, 16)] [InlineData(60, 60)]
     public async Task CheckInPersistsArrivalNotificationAndAuditOnce(int minutes, int late)
     {
         await using var db = Db(); var a = await Seed(db); var clock = new Clock { Now = Start.AddMinutes(minutes) };
@@ -48,12 +46,26 @@ public class CheckInTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => svc.Apply(a.AppointmentId, "check-in", "desk"));
         Assert.Single(db.StylistNotifications); Assert.Single(db.AppointmentAudits);
     }
-    [Theory] [InlineData("Pending")] [InlineData("Cancelled")] [InlineData("Completed")] [InlineData("NoShow")]
+    [Theory] [InlineData("Pending")] [InlineData("Cancelled")] [InlineData("Completed")] [InlineData("NoShow")] [InlineData("Arrived")]
     public async Task CheckInRejectsOtherStatuses(string status)
     {
         await using var db = Db(); var a = await Seed(db); a.Status = status; await db.SaveChangesAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(() => new CheckInService(db, new Clock()).Apply(a.AppointmentId, "check-in", "desk"));
         Assert.Empty(db.AppointmentAudits); Assert.Empty(db.StylistNotifications);
+    }
+    [Fact]
+    public async Task CheckInAcrossMidnightPreservesActualArrival()
+    {
+        await using var db = Db(); var a = await Seed(db);
+        a.StartTime = TimeSpan.FromMinutes(30); a.EndTime = TimeSpan.FromMinutes(90);
+        await db.SaveChangesAsync();
+        var start = new DateTimeOffset(2026, 10, 8, 0, 30, 0, TimeSpan.FromHours(7));
+        var clock = new Clock { Now = start.AddMinutes(-60) };
+        await new CheckInService(db, clock).Apply(a.AppointmentId, "check-in", "desk");
+        Assert.Equal(clock.Now.ToUniversalTime(), a.CheckedInAt);
+        Assert.Equal(AppointmentStatuses.Arrived, a.Status);
+        Assert.Equal(0, a.LateMinutes);
+        Assert.Single(db.StylistNotifications);
     }
     [Fact]
     public async Task RelationalWriteIsAtomicAndStaleVersionIsRejected()
