@@ -120,6 +120,10 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
             a.Status != AppointmentStatuses.NoShow && a.Status != "Rejected")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
  feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
         var timeOffs = await db.StylistTimeOffs.AsNoTracking()
             .Where(t => qualifiedIds.Contains(t.StylistId) &&
                 t.OffDate == date)
@@ -132,7 +136,11 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
            })
            .ToListAsync();
 
+ feature/s2-02-stylist-time-off-warning
         var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
+
+var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
+ develop
                 qualifiedIds.Contains(timeOff.StylistId) && timeOff.OffDate == date)
             .Select(timeOff => new
             {
@@ -147,7 +155,11 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         if (duration > 24 * 60) return [];
         var length = TimeSpan.FromMinutes(duration);
         var busyByStylist = busy.ToLookup(a => a.StylistId);
+ feature/s2-02-stylist-time-off-warning
 feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
         var timeOffByStylist = timeOffs.ToLookup(t => t.StylistId);
         var slots = new HashSet<StylistSlot>();
 
@@ -160,6 +172,10 @@ feature/s2-02-stylist-time-off-warning
             var stylistBusy = busyByStylist[stylistShifts.Key].ToList();
             var stylistTimeOffs = timeOffByStylist[stylistShifts.Key].ToList();
  feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
 
 
             if (stylistTimeOffs.Any(timeOff => timeOff.IsFullDay)) continue;
@@ -186,6 +202,10 @@ feature/s2-02-stylist-time-off-warning
                 {
                     var end = start + length;
  feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
                     var overlapsTimeOff = stylistTimeOffs.Any(t =>
                         !t.IsFullDay &&
                         t.StartTime.HasValue &&

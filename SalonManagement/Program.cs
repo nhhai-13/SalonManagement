@@ -219,6 +219,7 @@ builder.Services.Configure<ScheduleNotificationOptions>(
 builder.Services.AddSingleton<IScheduleChangeEmailSender, SmtpScheduleChangeEmailSender>();
 builder.Services.AddScoped<ScheduleNotificationDispatcher>();
 builder.Services.AddHostedService<ScheduleNotificationBackgroundService>();
+builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
 
 builder.Services.AddSingleton<

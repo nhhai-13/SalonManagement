@@ -29,7 +29,11 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
     public async Task<IActionResult> Create(
         [FromBody] StylistTimeOffRequest request)
     {
+ feature/s2-02-stylist-time-off-warning
     feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
 
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
@@ -100,6 +104,7 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
     }
 }
  feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
         // Kiểm tra các lịch hẹn bị ảnh hưởng bởi ngày/giờ nghỉ
         var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
         var nextDay = appointmentDay.AddDays(1);
@@ -137,6 +142,9 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
     });
 }
         var timeOff = new StylistTimeOff    
+
+ feature/s2-02-stylist-time-off-booking
+ develop
 
         var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
         var nextDay = appointmentDay.AddDays(1);
@@ -182,6 +190,7 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
             }
         }
 
+ develop
         var timeOff = new StylistTimeOff
  develop
         {
@@ -198,6 +207,10 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
                 : request.EndTime,
 
  feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
             Reason = request.Reason
 
             Reason = request.Reason.Trim()
@@ -208,6 +221,10 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         await dbContext.SaveChangesAsync();
 
  feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
         return Ok(timeOff);
 
         return Ok(new
@@ -239,6 +256,10 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         return NoContent();
     }
  feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
 
 
     private async Task<string?> ValidateReplacementAsync(int replacementStylistId, int absentStylistId,
@@ -305,6 +326,10 @@ public class StylistTimeOffRequest
 
     public string? Reason { get; set; }
  feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
 }
 
 
