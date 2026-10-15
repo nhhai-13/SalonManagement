@@ -26,8 +26,7 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
     // Thêm ngày/giờ nghỉ cho thợ
     [HttpPost]
-    public async Task<IActionResult> Create(
-        [FromBody] StylistTimeOffRequest request)
+    public async Task<IActionResult> Create([FromBody] StylistTimeOffRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Reason))
         {
@@ -65,6 +64,7 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
                 });
             }
         }
+
         // Kiểm tra lịch nghỉ bị trùng
         var existingTimeOffs = await dbContext.StylistTimeOffs
             .Where(x =>
@@ -78,16 +78,16 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
             return BadRequest(new
             {
                 message = "Thợ đã có lịch nghỉ trong ngày này."
-         });
+            });
         }
 
-       // Nếu nghỉ theo khoảng giờ
-       if (!request.IsFullDay)
-       {
-           var isOverlap = existingTimeOffs.Any(x =>
-               x.IsFullDay ||
-              (x.StartTime < request.EndTime &&
-               x.EndTime > request.StartTime));
+        // Nếu nghỉ theo khoảng giờ
+        if (!request.IsFullDay)
+        {
+            var isOverlap = existingTimeOffs.Any(x =>
+                x.IsFullDay ||
+                (x.StartTime < request.EndTime &&
+                 x.EndTime > request.StartTime));
 
             if (isOverlap)
             {
@@ -99,82 +99,74 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         }
 
         var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
-    var nextDay = appointmentDay.AddDays(1);
-    var affectedAppointments = await dbContext.Appointments
-        .Include(appointment => appointment.AppointmentServices)
-        .Where(appointment => appointment.StylistId == request.StylistId &&
-            appointment.AppointmentDate >= appointmentDay && appointment.AppointmentDate < nextDay &&
-            appointment.Status != "Cancelled")
-        .Where(appointment => request.IsFullDay ||
-            (request.StartTime.HasValue && request.EndTime.HasValue &&
-             appointment.StartTime < request.EndTime.Value.ToTimeSpan() &&
-             appointment.EndTime > request.StartTime.Value.ToTimeSpan()))
-        .OrderBy(appointment => appointment.StartTime)
-        .ToListAsync();
+        var nextDay = appointmentDay.AddDays(1);
+        var affectedAppointments = await dbContext.Appointments
+            .Include(appointment => appointment.AppointmentServices)
+            .Where(appointment => appointment.StylistId == request.StylistId &&
+                appointment.AppointmentDate >= appointmentDay && appointment.AppointmentDate < nextDay &&
+                appointment.Status != "Cancelled")
+            .Where(appointment => request.IsFullDay ||
+                (request.StartTime.HasValue && request.EndTime.HasValue &&
+                 appointment.StartTime < request.EndTime.Value.ToTimeSpan() &&
+                 appointment.EndTime > request.StartTime.Value.ToTimeSpan()))
+            .OrderBy(appointment => appointment.StartTime)
+            .ToListAsync();
 
-    if (affectedAppointments.Count > 0)
-    {
-        if (!request.ReplacementStylistId.HasValue)
+        if (affectedAppointments.Count > 0)
         {
-            return Conflict(new
+            if (!request.ReplacementStylistId.HasValue)
             {
-                message = "Thời gian nghỉ trùng với lịch hẹn đã có. Vui lòng chọn người thay thế để chuyển lịch.",
-                affectedAppointments = affectedAppointments.Select(appointment => new
+                return Conflict(new
                 {
-                    appointment.AppointmentId,
-                    appointment.AppointmentDate,
-                    appointment.StartTime,
-                    appointment.EndTime,
-                    appointment.Status
-                })
-            });
+                    message = "Thời gian nghỉ trùng với lịch hẹn đã có. Vui lòng chọn người thay thế để chuyển lịch.",
+                    affectedAppointments = affectedAppointments.Select(appointment => new
+                    {
+                        appointment.AppointmentId,
+                        appointment.AppointmentDate,
+                        appointment.StartTime,
+                        appointment.EndTime,
+                        appointment.Status
+                    })
+                });
+            }
+
+            var replacementError = await ValidateReplacementAsync(request.ReplacementStylistId.Value, request.StylistId,
+                request.OffDate, affectedAppointments);
+            if (replacementError is not null)
+                return BadRequest(new { message = replacementError });
+
+            foreach (var appointment in affectedAppointments)
+            {
+                appointment.StylistId = request.ReplacementStylistId.Value;
+                appointment.UpdatedAt = DateTime.Now;
+            }
         }
 
-        var replacementError = await ValidateReplacementAsync(request.ReplacementStylistId.Value, request.StylistId,
-            request.OffDate, affectedAppointments);
-        if (replacementError is not null)
-            return BadRequest(new { message = replacementError });
-
-        foreach (var appointment in affectedAppointments)
+        var timeOff = new StylistTimeOff
         {
-            appointment.StylistId = request.ReplacementStylistId.Value;
-            appointment.UpdatedAt = DateTime.Now;
-        }
+            StylistId = request.StylistId,
+            OffDate = request.OffDate,
+            IsFullDay = request.IsFullDay,
+            StartTime = request.IsFullDay ? null : request.StartTime,
+            EndTime = request.IsFullDay ? null : request.EndTime,
+            Reason = request.Reason.Trim()
+        };
+
+        dbContext.StylistTimeOffs.Add(timeOff);
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new
+        {
+            timeOff,
+            reassignedAppointmentIds = affectedAppointments.Select(appointment => appointment.AppointmentId)
+        });
     }
-
-    var timeOff = new StylistTimeOff
-    {
-        StylistId = request.StylistId,
-        OffDate = request.OffDate,
-        IsFullDay = request.IsFullDay,
-
-        StartTime = request.IsFullDay
-            ? null
-            : request.StartTime,
-
-        EndTime = request.IsFullDay
-            ? null
-            : request.EndTime,
-
-        Reason = request.Reason.Trim()
-    };
-
-    dbContext.StylistTimeOffs.Add(timeOff);
-    await dbContext.SaveChangesAsync();
-
-    return Ok(new
-    {
-        timeOff,
-        reassignedAppointmentIds = affectedAppointments.Select(appointment => appointment.AppointmentId)
-    });
-}
 
     // Xóa lịch nghỉ
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var timeOff = await dbContext.StylistTimeOffs
-            .FindAsync(id);
+        var timeOff = await dbContext.StylistTimeOffs.FindAsync(id);
 
         if (timeOff == null)
         {
