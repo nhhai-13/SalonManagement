@@ -704,6 +704,32 @@ namespace SalonManagement.Data.Migrations
                     b.ToTable("ServiceGroups");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.ShopHoliday", b =>
+                {
+                    b.Property<int>("ShopHolidayId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ShopHolidayId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly>("HolidayDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.HasKey("ShopHolidayId");
+
+                    b.HasIndex("HolidayDate")
+                        .IsUnique();
+
+                    b.ToTable("ShopHolidays");
+                });
+
             modelBuilder.Entity("SalonManagement.Models.Stylist", b =>
                 {
                     b.Property<int>("StylistId")
