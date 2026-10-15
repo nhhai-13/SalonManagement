@@ -119,7 +119,32 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
             a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled" &&
             a.Status != AppointmentStatuses.NoShow && a.Status != "Rejected")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
         var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
+
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking()
+            .Where(t => qualifiedIds.Contains(t.StylistId) &&
+                t.OffDate == date)
+            .Select(t => new
+            {
+                t.StylistId,
+                t.IsFullDay,
+                t.StartTime,
+                t.EndTime
+           })
+           .ToListAsync();
+
+ feature/s2-02-stylist-time-off-warning
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
+
+var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
+ develop
+ develop
                 qualifiedIds.Contains(timeOff.StylistId) && timeOff.OffDate == date)
             .Select(timeOff => new
             {
@@ -133,6 +158,17 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         if (duration > 24 * 60) return [];
         var length = TimeSpan.FromMinutes(duration);
         var busyByStylist = busy.ToLookup(a => a.StylistId);
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+
+feature/s2-02-stylist-time-off-warning
+feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
+        var timeOffByStylist = timeOffs.ToLookup(t => t.StylistId);
+        var slots = new HashSet<StylistSlot>();
+
+ develop
         var timeOffByStylist = timeOffs.ToLookup(timeOff => timeOff.StylistId);
         var slots = new HashSet<AvailableStylistSlot>();
 
@@ -141,6 +177,18 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         {
             var stylistBusy = busyByStylist[stylistShifts.Key].ToList();
             var stylistTimeOffs = timeOffByStylist[stylistShifts.Key].ToList();
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
+
+
+            if (stylistTimeOffs.Any(timeOff => timeOff.IsFullDay)) continue;
+ develop
+ develop
 
             if (stylistTimeOffs.Any(t => t.IsFullDay))
                 continue;
@@ -163,6 +211,26 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
                 for (var start = first; start + length <= window.End; start += TimeSpan.FromMinutes(15))
                 {
                     var end = start + length;
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
+
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
+                    var overlapsTimeOff = stylistTimeOffs.Any(t =>
+                        !t.IsFullDay &&
+                        t.StartTime.HasValue &&
+                        t.EndTime.HasValue &&
+                        start < t.EndTime.Value.ToTimeSpan() &&
+                        end > t.StartTime.Value.ToTimeSpan());
+                   if (day + start <= now ||
+                       stylistBusy.Any(a => start < a.EndTime && end > a.StartTime) ||
+                       overlapsTimeOff)
+                       continue;
+                    slots.Add(new(start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
+
+ develop
                     var overlapsTimeOff = stylistTimeOffs.Any(timeOff =>
                         !timeOff.IsFullDay &&
                         timeOff.StartTime.HasValue &&

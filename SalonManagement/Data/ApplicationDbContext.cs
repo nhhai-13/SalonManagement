@@ -141,6 +141,9 @@ private List<AuditEntry> CreateAuditEntries()
 
         var entityType = entry.Entity.GetType().Name;
 
+ feature/s2-02-stylist-time-off-clean
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
+
         if (entityType != nameof(ApplicationUser) &&
             entry.Entity is not Microsoft.AspNetCore.Identity.IdentityUserRole<string> &&
             entityType != nameof(Service) &&
@@ -607,9 +610,19 @@ private class AuditEntry
                     .WithMany(invoice => invoice.Payments)
                     .HasForeignKey(payment => payment.InvoiceId);
             });
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
 
             // Cấu hình lịch nghỉ riêng của thợ
             builder.Entity<StylistTimeOff>(entity =>
+
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
+               // Cấu hình lịch nghỉ riêng của thợ
+        builder.Entity<StylistTimeOff>(entity =>
+ develop
             {
                 entity.HasKey(timeOff => timeOff.StylistTimeOffId);
 
