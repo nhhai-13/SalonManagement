@@ -436,7 +436,10 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
         invoice.Subtotal = invoice.Lines.Sum(line => line.UnitPrice);
         if (invoice.DiscountCouponId.HasValue && invoice.DiscountTypeSnapshot is not null && invoice.DiscountValueSnapshot.HasValue)
             invoice.DiscountAmount = DiscountCalculator.Calculate(invoice.Subtotal, invoice.DiscountTypeSnapshot, invoice.DiscountValueSnapshot.Value);
-        invoice.TotalAmount = invoice.Subtotal - invoice.DiscountAmount;
+        else
+            invoice.DiscountAmount = 0;
+
+        invoice.TotalAmount = Math.Max(0, invoice.Subtotal - invoice.DiscountAmount);
     }
 
     private static string Money(decimal amount) =>
