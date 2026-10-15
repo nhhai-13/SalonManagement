@@ -143,6 +143,9 @@ private List<AuditEntry> CreateAuditEntries()
 
         var entityType = entry.Entity.GetType().Name;
 
+ feature/s2-02-stylist-time-off-clean
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
+
         if (entityType != nameof(ApplicationUser) &&
             entry.Entity is not Microsoft.AspNetCore.Identity.IdentityUserRole<string> &&
             entityType != nameof(Service) &&
