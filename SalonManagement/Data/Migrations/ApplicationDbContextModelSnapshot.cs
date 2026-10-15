@@ -289,7 +289,6 @@ namespace SalonManagement.Data.Migrations
 
                     b.Property<string>("ConfirmedByUserId")
                         .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime?>("ClosedAt")
                         .HasColumnType("datetime2");
 
@@ -297,6 +296,12 @@ namespace SalonManagement.Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ClosedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ConfirmedByUserId")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -363,7 +368,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("StylistId", "AppointmentDate", "StartTime");
 
-                    b.ToTable("Appointments");
+                    b.ToTable("Appointments", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.AppointmentAudit", b =>
@@ -401,7 +406,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("AppointmentId", "OccurredAt");
 
-                    b.ToTable("AppointmentAudits");
+                    b.ToTable("AppointmentAudits", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.AppointmentChangeEmail", b =>
@@ -455,7 +460,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("Status", "NextAttemptAt");
 
-                    b.ToTable("AppointmentChangeEmails");
+                    b.ToTable("AppointmentChangeEmails", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.AppointmentChangeLog", b =>
@@ -502,7 +507,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("AppointmentId", "ChangedAt");
 
-                    b.ToTable("AppointmentChangeLogs");
+                    b.ToTable("AppointmentChangeLogs", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.AppointmentService", b =>
@@ -558,7 +563,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("AppointmentId", "ServiceId");
 
-                    b.ToTable("AppointmentServices");
+                    b.ToTable("AppointmentServices", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.AuditLog", b =>
@@ -594,7 +599,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasKey("AuditLogId");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.BusinessHour", b =>
@@ -627,7 +632,7 @@ namespace SalonManagement.Data.Migrations
                     b.HasIndex("DayOfWeek")
                         .IsUnique();
 
-                    b.ToTable("BusinessHours");
+                    b.ToTable("BusinessHours", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Customer", b =>
@@ -680,7 +685,43 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("Phone");
 
-                    b.ToTable("Customers");
+                    b.ToTable("Customers", (string)null);
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.DiscountCoupon", b =>
+                {
+                    b.Property<int>("DiscountCouponId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DiscountCouponId"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTime>("EndsOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("StartsOn")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("DiscountCouponId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("DiscountCoupons", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Invoice", b =>
@@ -713,6 +754,21 @@ namespace SalonManagement.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("DiscountCodeSnapshot")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int?>("DiscountCouponId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DiscountTypeSnapshot")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<decimal?>("DiscountValueSnapshot")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -731,7 +787,9 @@ namespace SalonManagement.Data.Migrations
                     b.HasIndex("AppointmentId")
                         .IsUnique();
 
-                    b.ToTable("Invoices");
+                    b.HasIndex("DiscountCouponId");
+
+                    b.ToTable("Invoices", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.InvoiceAdjustment", b =>
@@ -786,7 +844,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("StylistId");
 
-                    b.ToTable("InvoiceAdjustments");
+                    b.ToTable("InvoiceAdjustments", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.InvoiceLine", b =>
@@ -819,7 +877,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("InvoiceId");
 
-                    b.ToTable("InvoiceLines");
+                    b.ToTable("InvoiceLines", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Payment", b =>
@@ -861,7 +919,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("InvoiceId");
 
-                    b.ToTable("Payments");
+                    b.ToTable("Payments", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.RefreshToken", b =>
@@ -897,7 +955,86 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens");
+                    b.ToTable("RefreshTokens", (string)null);
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.RehearsalIssue", b =>
+                {
+                    b.Property<int>("RehearsalIssueId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RehearsalIssueId"));
+
+                    b.Property<string>("Account")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Assignee")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("LastChangedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastChangedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Observation")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("RehearsalRunId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
+                    b.Property<string>("Step")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("RehearsalIssueId");
+
+                    b.HasIndex("RehearsalRunId");
+
+                    b.ToTable("RehearsalIssues", (string)null);
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.RehearsalRun", b =>
+                {
+                    b.Property<int>("RehearsalRunId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RehearsalRunId"));
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("PerformedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PerformedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("RehearsalRunId");
+
+                    b.ToTable("RehearsalRuns", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.RescheduleChangeLog", b =>
@@ -965,7 +1102,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("ChangedAtUtc");
 
-                    b.ToTable("RescheduleChangeLogs");
+                    b.ToTable("RescheduleChangeLogs", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.ScheduleChangeNotification", b =>
@@ -1050,7 +1187,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("Status", "NextAttemptAt");
 
-                    b.ToTable("ScheduleChangeNotifications");
+                    b.ToTable("ScheduleChangeNotifications", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.ScheduleContactFollowUp", b =>
@@ -1105,7 +1242,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("OriginalAppointmentDate", "ContactStatus", "Category");
 
-                    b.ToTable("ScheduleContactFollowUps");
+                    b.ToTable("ScheduleContactFollowUps", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Service", b =>
@@ -1147,7 +1284,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("ServiceGroupId");
 
-                    b.ToTable("Services");
+                    b.ToTable("Services", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.ServiceGroup", b =>
@@ -1168,7 +1305,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasKey("ServiceGroupId");
 
-                    b.ToTable("ServiceGroups");
+                    b.ToTable("ServiceGroups", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.ShopHoliday", b =>
@@ -1194,7 +1331,40 @@ namespace SalonManagement.Data.Migrations
                     b.HasIndex("HolidayDate")
                         .IsUnique();
 
-                    b.ToTable("ShopHolidays");
+                    b.ToTable("ShopHolidays", (string)null);
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.StagingEmailMessage", b =>
+                {
+                    b.Property<int>("StagingEmailMessageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("StagingEmailMessageId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Template")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("StagingEmailMessageId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("StagingEmailMessages", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Stylist", b =>
@@ -1245,7 +1415,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasKey("StylistId");
 
-                    b.ToTable("Stylists");
+                    b.ToTable("Stylists", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.StylistBreak", b =>
@@ -1272,7 +1442,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("StylistId", "BreakDate");
 
-                    b.ToTable("StylistBreaks");
+                    b.ToTable("StylistBreaks", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.StylistDayOff", b =>
@@ -1294,7 +1464,7 @@ namespace SalonManagement.Data.Migrations
                     b.HasIndex("StylistId", "OffDate")
                         .IsUnique();
 
-                    b.ToTable("StylistDaysOff");
+                    b.ToTable("StylistDaysOff", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.StylistNotification", b =>
@@ -1327,7 +1497,60 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("StylistId", "CreatedAt");
 
-                    b.ToTable("StylistNotifications");
+                    b.ToTable("StylistNotifications", (string)null);
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.StylistReview", b =>
+                {
+                    b.Property<int>("StylistReviewId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("StylistReviewId"));
+
+                    b.Property<int>("AppointmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReviewTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("StylistId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("StylistReviewId");
+
+                    b.HasIndex("AppointmentId")
+                        .IsUnique();
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("ReviewTokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("StylistId");
+
+                    b.ToTable("StylistReviews", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.StylistService", b =>
@@ -1342,7 +1565,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("ServiceId");
 
-                    b.ToTable("StylistServices");
+                    b.ToTable("StylistServices", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.StylistTimeOff", b =>
@@ -1379,7 +1602,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("StylistId", "OffDate");
 
-                    b.ToTable("StylistTimeOffs");
+                    b.ToTable("StylistTimeOffs", (string)null);
                 });
 
             modelBuilder.Entity("SalonManagement.Models.WorkSchedule", b =>
@@ -1417,7 +1640,7 @@ namespace SalonManagement.Data.Migrations
 
                     b.HasIndex("StylistId", "WorkDate");
 
-                    b.ToTable("WorkSchedules");
+                    b.ToTable("WorkSchedules", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1545,7 +1768,14 @@ namespace SalonManagement.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SalonManagement.Models.DiscountCoupon", "DiscountCoupon")
+                        .WithMany("Invoices")
+                        .HasForeignKey("DiscountCouponId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Appointment");
+
+                    b.Navigation("DiscountCoupon");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.InvoiceAdjustment", b =>
@@ -1615,6 +1845,17 @@ namespace SalonManagement.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.RehearsalIssue", b =>
+                {
+                    b.HasOne("SalonManagement.Models.RehearsalRun", "Run")
+                        .WithMany("Issues")
+                        .HasForeignKey("RehearsalRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Run");
+                });
+
             modelBuilder.Entity("SalonManagement.Models.RescheduleChangeLog", b =>
                 {
                     b.HasOne("SalonManagement.Models.Appointment", "Appointment")
@@ -1676,6 +1917,33 @@ namespace SalonManagement.Data.Migrations
                         .HasForeignKey("StylistId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Stylist");
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.StylistReview", b =>
+                {
+                    b.HasOne("SalonManagement.Models.Appointment", "Appointment")
+                        .WithOne()
+                        .HasForeignKey("SalonManagement.Models.StylistReview", "AppointmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SalonManagement.Models.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalonManagement.Models.Stylist", "Stylist")
+                        .WithMany()
+                        .HasForeignKey("StylistId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Appointment");
+
+                    b.Navigation("Customer");
 
                     b.Navigation("Stylist");
                 });
@@ -1747,6 +2015,11 @@ namespace SalonManagement.Data.Migrations
                     b.Navigation("Appointments");
                 });
 
+            modelBuilder.Entity("SalonManagement.Models.DiscountCoupon", b =>
+                {
+                    b.Navigation("Invoices");
+                });
+
             modelBuilder.Entity("SalonManagement.Models.Invoice", b =>
                 {
                     b.Navigation("Adjustments");
@@ -1754,6 +2027,11 @@ namespace SalonManagement.Data.Migrations
                     b.Navigation("Lines");
 
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("SalonManagement.Models.RehearsalRun", b =>
+                {
+                    b.Navigation("Issues");
                 });
 
             modelBuilder.Entity("SalonManagement.Models.Service", b =>
@@ -1778,9 +2056,9 @@ namespace SalonManagement.Data.Migrations
 
                     b.Navigation("DaysOff");
 
-                    b.Navigation("Services");
-                    b.Navigation("AppointmentServices");
                     b.Navigation("InvoiceAdjustments");
+
+                    b.Navigation("Services");
 
                     b.Navigation("WorkSchedules");
                 });

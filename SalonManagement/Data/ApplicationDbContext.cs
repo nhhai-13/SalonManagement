@@ -48,6 +48,9 @@ public ApplicationDbContext(
 
         public DbSet<Invoice> Invoices => Set<Invoice>();
         public DbSet<DiscountCoupon> DiscountCoupons => Set<DiscountCoupon>();
+        public DbSet<RehearsalRun> RehearsalRuns => Set<RehearsalRun>();
+        public DbSet<RehearsalIssue> RehearsalIssues => Set<RehearsalIssue>();
+        public DbSet<StagingEmailMessage> StagingEmailMessages => Set<StagingEmailMessage>();
         public DbSet<StylistReview> StylistReviews => Set<StylistReview>();
 
         public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
@@ -512,13 +515,43 @@ private class AuditEntry
                 entity.Property(coupon => coupon.Value).HasPrecision(18, 2);
             });
 
+            builder.Entity<RehearsalRun>(entity =>
+            {
+                entity.HasKey(run => run.RehearsalRunId);
+                entity.Property(run => run.PerformedBy).HasMaxLength(256).IsRequired();
+                entity.Property(run => run.Notes).HasMaxLength(1000);
+            });
+
+            builder.Entity<RehearsalIssue>(entity =>
+            {
+                entity.HasKey(issue => issue.RehearsalIssueId);
+                entity.Property(issue => issue.Step).HasMaxLength(200).IsRequired();
+                entity.Property(issue => issue.Account).HasMaxLength(128).IsRequired();
+                entity.Property(issue => issue.Observation).HasMaxLength(2000).IsRequired();
+                entity.Property(issue => issue.Severity).HasMaxLength(16).IsRequired();
+                entity.Property(issue => issue.Status).HasMaxLength(24).IsRequired();
+                entity.Property(issue => issue.Assignee).HasMaxLength(256);
+                entity.Property(issue => issue.LastChangedBy).HasMaxLength(256);
+                entity.HasOne(issue => issue.Run).WithMany(run => run.Issues)
+                    .HasForeignKey(issue => issue.RehearsalRunId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<StagingEmailMessage>(entity =>
+            {
+                entity.HasKey(message => message.StagingEmailMessageId);
+                entity.Property(message => message.Template).HasMaxLength(40).IsRequired();
+                entity.Property(message => message.Recipient).HasMaxLength(256).IsRequired();
+                entity.Property(message => message.Summary).HasMaxLength(500).IsRequired();
+                entity.HasIndex(message => message.CreatedAt);
+            });
+
             builder.Entity<StylistReview>(entity =>
             {
                 entity.HasKey(review => review.StylistReviewId);
-                entity.HasIndex(review => review.AppointmentId).IsUnique();
-                entity.HasIndex(review => review.ReviewTokenHash).IsUnique();
                 entity.Property(review => review.ReviewTokenHash).HasMaxLength(64).IsRequired();
                 entity.Property(review => review.Comment).HasMaxLength(1000);
+                entity.HasIndex(review => review.AppointmentId).IsUnique();
+                entity.HasIndex(review => review.ReviewTokenHash).IsUnique();
                 entity.HasOne(review => review.Appointment).WithOne().HasForeignKey<StylistReview>(review => review.AppointmentId).OnDelete(DeleteBehavior.Cascade);
                 entity.HasOne(review => review.Customer).WithMany().HasForeignKey(review => review.CustomerId).OnDelete(DeleteBehavior.Restrict);
                 entity.HasOne(review => review.Stylist).WithMany().HasForeignKey(review => review.StylistId).OnDelete(DeleteBehavior.Restrict);

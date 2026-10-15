@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using SalonManagement.Models;
 using SalonManagement.Models.ViewModels;
 using SalonManagement.Data;
@@ -18,6 +19,7 @@ namespace SalonManagement.Controllers
             _dbContext = dbContext;
         }
 
+        [AllowAnonymous]
         public async Task<IActionResult> Index()
         {
             var model = new HomeViewModel
@@ -34,17 +36,20 @@ namespace SalonManagement.Controllers
             return View(model);
         }
 
+        [AllowAnonymous]
         public IActionResult Privacy()
         {
             return View();
         }
 
+        [AllowAnonymous]
         [HttpGet("/access-denied")]
         public IActionResult AccessDenied()
         {
             return View();
         }
 
+        [AllowAnonymous]
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
