@@ -12,7 +12,9 @@ public sealed record AppointmentLookupItem(
     IReadOnlyList<string> Services,
     string StylistName,
     int DurationMinutes,
-    string Status);
+    string Status,
+    DateTimeOffset? CancelledAt,
+    string? CancelledBy);
 
 public sealed record AppointmentLookupResult(
     IReadOnlyList<AppointmentLookupItem> Items,
@@ -20,7 +22,7 @@ public sealed record AppointmentLookupResult(
 
 public sealed record CancelResult(bool Success, string? Error);
 
-public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvider clock)
+public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvider clock, AppointmentNotificationBus? notifications = null)
 {
     public async Task<AppointmentLookupResult> SearchAsync(string? input)
     {
@@ -98,6 +100,12 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         appointment.CancelReason = reason;
         appointment.UpdatedAt = now.UtcDateTime;
         appointment.Version = Guid.NewGuid();
+        var reminder = await db.AppointmentEmailDeliveries.FirstOrDefaultAsync(item => item.AppointmentId == appointment.AppointmentId && item.Kind == AppointmentEmailKinds.Reminder);
+        if (reminder is not null && reminder.Status is AppointmentEmailStatuses.Queued or AppointmentEmailStatuses.Retrying)
+            reminder.Status = AppointmentEmailStatuses.Cancelled;
+        var notification = new StylistNotification { StylistId = appointment.StylistId, AppointmentId = appointment.AppointmentId,
+            Message = $"Lịch #{appointment.AppointmentId} đã bị khách hủy.", CreatedAt = now };
+        db.StylistNotifications.Add(notification);
 
         db.AppointmentAudits.Add(new AppointmentAudit
         {
@@ -110,6 +118,7 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         });
 
         await db.SaveChangesAsync();
+        notifications?.Publish(notification);
         return new(true, null);
     }
 
@@ -123,7 +132,14 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
 
     private static AppointmentLookupItem ToItem(Appointment appointment)
     {
-        var duration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
+        var serviceDuration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
+        var scheduledDuration = (appointment.EndTime - appointment.StartTime).TotalMinutes;
+        var duration = scheduledDuration > 0 ? (int)scheduledDuration : serviceDuration;
+        var cancelledBy = string.IsNullOrWhiteSpace(appointment.CancelledBy)
+            ? null
+            : appointment.CancelledBy.StartsWith("customer:", StringComparison.OrdinalIgnoreCase)
+                ? "Khách hàng"
+                : "Nhân viên tiệm";
 
         return new(
             appointment.BookingReference,
@@ -133,7 +149,9 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
             appointment.AppointmentServices.Select(item => item.Service.ServiceName).ToList(),
             appointment.Stylist?.FullName ?? "Chưa phân công",
             duration,
-            StatusLabel(appointment.Status));
+            StatusLabel(appointment.Status),
+            appointment.CancelledAt,
+            cancelledBy);
     }
 
     private static string StatusLabel(string status) => status switch
@@ -143,6 +161,7 @@ public sealed class AppointmentLookupService(ApplicationDbContext db, TimeProvid
         "Arrived" => "Đã đến",
         "InProgress" => "Đang thực hiện",
         "Completed" => "Đã hoàn thành",
+        "Closed" => "Đã đóng",
         "Cancelled" => "Đã huỷ",
         "NoShow" => "Không đến",
         _ => status

@@ -7,3 +7,6 @@
 @if (User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)) {
 <li class="nav-item"><a class="nav-link" asp-controller="StylistLinks" asp-action="Index">Liên kết thợ</a></li>
 }
+@if (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)) {
+<li class="nav-item"><a class="nav-link" href="/reception/rescheduling">Điều chỉnh lịch hẹn</a></li>
+}

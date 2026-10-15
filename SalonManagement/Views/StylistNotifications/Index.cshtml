@@ -1,10 +1,13 @@
 @model List<SalonManagement.Models.StylistNotification>
-@{ ViewData["Title"] = "Thông báo khách đến"; }
-<h1>Thông báo khách đến</h1>
+@{ ViewData["Title"] = "Thông báo lịch hẹn"; var unreadCount = (int)(ViewBag.UnreadCount ?? 0); }
+@Html.AntiForgeryToken()
+<h1>Thông báo lịch hẹn <span class="badge text-bg-primary" id="unread-count">@unreadCount chưa đọc</span></h1>
 <p id="connection-status" role="status">Đang kết nối thông báo trực tiếp…</p>
 <div id="notifications" aria-live="polite">
 @foreach (var n in Model) {
-    <div class="alert alert-info" data-id="@n.Id">@n.Message <small>@n.CreatedAt.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm 'ngày' dd/MM/yyyy")</small></div>
+    var references = (Dictionary<int, string?>)ViewBag.AppointmentReferences;
+    var reference = references.GetValueOrDefault(n.AppointmentId);
+    <div class="alert @(n.IsRead ? "alert-light" : "alert-info")" data-id="@n.Id"><a class="text-decoration-none" data-notification-id="@n.Id" href="@(string.IsNullOrWhiteSpace(reference) ? Url.Action("Index") : Url.Action("Index", "AppointmentLookup", new { reference }))">@n.Message</a> <small>@n.CreatedAt.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm 'ngày' dd/MM/yyyy")</small> @if (!n.IsRead) { <span class="badge text-bg-primary">Mới</span> }</div>
 }
 </div>
 @if (Model.Count == 0) { <p id="empty">Chưa có thông báo. Tài khoản thợ cần được liên kết với hồ sơ thợ.</p> }
@@ -16,18 +19,32 @@ stream.onopen = async () => {
     status.textContent = 'Đã kết nối thông báo trực tiếp.';
     try {
         const response = await fetch('@Url.Action("Latest")');
-        if (response.ok) for (const item of (await response.json()).reverse()) display({ Id: item.id, Message: item.message });
+        if (response.ok) { const payload = await response.json(); document.getElementById('unread-count').textContent = `${payload.unreadCount} chưa đọc`; for (const item of payload.items.reverse()) display({ Id: item.id, Message: item.message, Url: item.url, IsRead: item.isRead }); }
         else if (response.status === 409) { stream.close(); status.textContent = 'Tài khoản chưa liên kết hồ sơ thợ. Hãy liên hệ quản lý.'; }
     } catch { status.textContent = 'Đã kết nối, chưa tải được lịch sử thông báo.'; }
 };
 stream.onerror = () => { status.textContent = 'Đang kết nối lại. Bạn có thể tải lại trang để xem thông báo đã lưu.'; };
 function display(n) {
     if (document.querySelector('[data-id="' + n.Id + '"]')) return;
-    const item = document.createElement('div'); item.className = 'alert alert-info'; item.dataset.id = n.Id;
-    item.textContent = n.Message; document.getElementById('notifications').prepend(item);
+    const item = document.createElement('div'); item.className = `alert ${n.IsRead ? 'alert-light' : 'alert-info'}`; item.dataset.id = n.Id;
+    const link = document.createElement('a'); link.className = 'text-decoration-none'; link.href = n.Url || '#'; link.textContent = n.Message;
+    link.dataset.notificationId = n.Id;
+    item.append(link); document.getElementById('notifications').prepend(item);
+    if (!n.IsRead) { const badge = document.getElementById('unread-count'); const count = Number.parseInt(badge.textContent, 10) || 0; badge.textContent = `${count + 1} chưa đọc`; }
     document.getElementById('empty')?.remove();
 }
 stream.onmessage = e => display(JSON.parse(e.data));
+document.getElementById('notifications').addEventListener('click', async event => {
+    const link = event.target.closest('a[data-notification-id]');
+    if (!link) return;
+    event.preventDefault();
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+    await fetch('@Url.Action("MarkRead")?id=' + encodeURIComponent(link.dataset.notificationId), {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: '__RequestVerificationToken=' + encodeURIComponent(token)
+    });
+    window.location.assign(link.href);
+});
 window.addEventListener('pagehide', () => stream.close());
 </script>
 }

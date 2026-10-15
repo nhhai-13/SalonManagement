@@ -23,4 +23,5 @@ public class StylistNotification
     public int AppointmentId { get; set; }
     public string Message { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
+    public bool IsRead { get; set; }
 }

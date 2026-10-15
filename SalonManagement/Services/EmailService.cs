@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
+using SalonManagement.Data;
+using SalonManagement.Models;
 
 namespace SalonManagement.Services;
 
@@ -11,10 +13,88 @@ namespace SalonManagement.Services;
 public sealed class EmailService(
     ILogger<EmailService> logger,
     IConfiguration configuration,
-    IWebHostEnvironment env) : IEmailService
+    IWebHostEnvironment env,
+    ApplicationDbContext db) : IEmailService
 {
+    public Task SendBookingConfirmationEmailAsync(string toEmail, string customerName, string bookingReference,
+        string servicesSummary, string stylistName, DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime,
+        string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh") =>
+        SendAppointmentNoticeAsync("booking-confirmation", "Xác nhận lịch hẹn tại Luminol Salon", "Lịch hẹn của bạn đã được ghi nhận",
+            toEmail, customerName, bookingReference, servicesSummary, stylistName, appointmentDate, startTime, endTime, salonAddress);
+
+    public Task SendAppointmentReminderEmailAsync(string toEmail, string customerName, string bookingReference,
+        string servicesSummary, string stylistName, DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime,
+        string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh") =>
+        SendAppointmentNoticeAsync("appointment-reminder", "Nhắc lịch hẹn tại Luminol Salon", "Nhắc bạn sắp đến lịch hẹn",
+            toEmail, customerName, bookingReference, servicesSummary, stylistName, appointmentDate, startTime, endTime, salonAddress);
+
+    private async Task SendAppointmentNoticeAsync(string template, string subject, string heading,
+        string toEmail, string customerName, string bookingReference, string servicesSummary, string stylistName,
+        DateTime appointmentDate, TimeSpan startTime, TimeSpan endTime, string salonAddress)
+    {
+        var smtp = configuration.GetSection("SmtpSettings");
+        var server = smtp["Server"];
+        var sender = smtp["SenderEmail"];
+        var username = smtp["Username"];
+        var password = smtp["Password"];
+        if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(sender) ||
+            string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            if (env.IsDevelopment())
+            {
+                logger.LogInformation("[FALLBACK {Template}] to {Email}; reference {Reference}; {Date:dd/MM/yyyy} {Start:hh\\:mm}.",
+                    template, toEmail, bookingReference, appointmentDate, startTime);
+                return;
+            }
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi email lịch hẹn.");
+        }
+
+        var html = $"""<html lang="vi"><body><h2>{WebUtility.HtmlEncode(heading)}</h2><p>Chào {WebUtility.HtmlEncode(customerName)},</p><p>Mã tra cứu: <strong>{WebUtility.HtmlEncode(bookingReference)}</strong></p><p>Dịch vụ: {WebUtility.HtmlEncode(servicesSummary)}</p><p>Nhân viên: {WebUtility.HtmlEncode(stylistName)}</p><p>Thời gian: {appointmentDate:dd/MM/yyyy}, {startTime.ToString(@"hh\:mm")}–{endTime.ToString(@"hh\:mm")}</p><p>Địa chỉ salon: {WebUtility.HtmlEncode(salonAddress)}</p></body></html>""";
+        using var client = new SmtpClient(server, smtp.GetValue<int>("Port", 587))
+        {
+            EnableSsl = true, UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(username, password), Timeout = 15000
+        };
+        using var message = new MailMessage
+        {
+            From = new MailAddress(sender, smtp["SenderName"] ?? "Luminol Salon"),
+            Subject = subject, IsBodyHtml = true, Body = html
+        };
+        message.To.Add(toEmail);
+        await client.SendMailAsync(message);
+    }
+
+    public async Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
+    {
+        if (await LogStagingDelivery(toEmail, "appointment-change")) return;
+        var smtp = configuration.GetSection("SmtpSettings");
+        if (string.IsNullOrWhiteSpace(smtp["Server"]) || string.IsNullOrWhiteSpace(smtp["SenderEmail"]))
+        {
+            if (env.IsDevelopment() || env.IsStaging())
+            {
+                logger.LogInformation("[FALLBACK EMAIL] Lịch hẹn của {Email} đã đổi: thợ {Stylist}, {Date:dd/MM/yyyy} {Time:hh\\:mm}.", toEmail, stylistName, appointmentDate, startTime);
+                return;
+            }
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi email đổi lịch.");
+        }
+
+        using var client = new SmtpClient(smtp["Server"], smtp.GetValue<int>("Port", 587))
+        {
+            EnableSsl = true,
+            Credentials = new NetworkCredential(smtp["Username"], smtp["Password"]),
+            Timeout = 15000
+        };
+        using var message = new MailMessage(smtp["SenderEmail"]!, toEmail)
+        {
+            Subject = "Luminol Salon: lịch hẹn của bạn đã thay đổi",
+            Body = $"Xin chào,\n\nLịch hẹn của bạn đã được cập nhật.\nThợ phụ trách: {stylistName}\nThời gian mới: {appointmentDate:dd/MM/yyyy} lúc {startTime:hh\\:mm}.\n\nNếu cần hỗ trợ, vui lòng liên hệ Luminol Salon."
+        };
+        await client.SendMailAsync(message);
+    }
+
     public async Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword)
     {
+        if (await LogStagingDelivery(toEmail, "temporary-password")) return;
         var smtp = configuration.GetSection("SmtpSettings");
         if (string.IsNullOrWhiteSpace(smtp["Server"]) || string.IsNullOrWhiteSpace(smtp["SenderEmail"]))
             throw new InvalidOperationException("Chưa cấu hình SMTP để gửi mật khẩu tạm.");
@@ -34,6 +114,7 @@ public sealed class EmailService(
 
     public async Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode)
     {
+        if (await LogStagingDelivery(toEmail, "email-verification")) return;
         var smtpSection = configuration.GetSection("SmtpSettings");
         var server = smtpSection["Server"];
         var senderEmail = smtpSection["SenderEmail"];
@@ -89,6 +170,7 @@ public sealed class EmailService(
 
     public async Task SendPasswordResetEmailAsync(string toEmail, string resetLink)
     {
+        if (await LogStagingDelivery(toEmail, "password-reset")) return;
         var smtpSection = configuration.GetSection("SmtpSettings");
         var server = smtpSection["Server"];
         var portStr = smtpSection["Port"];
@@ -262,4 +344,223 @@ public sealed class EmailService(
 </body>
 </html>
 """;
+
+    public async Task SendRescheduleNotificationEmailAsync(
+        string toEmail,
+        string customerName,
+        string stylistName,
+        DateTime appointmentDate,
+        TimeSpan startTime,
+        TimeSpan endTime,
+        string servicesSummary,
+        string? reason = null,
+        string salonAddress = "123 Đường Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh",
+        string salonHotline = "1900 1234")
+    {
+        if (await LogStagingDelivery(toEmail, "reschedule")) return;
+        var smtpSection = configuration.GetSection("SmtpSettings");
+        var server = smtpSection["Server"];
+        var portStr = smtpSection["Port"];
+        var senderEmail = smtpSection["SenderEmail"];
+        var senderName = smtpSection["SenderName"] ?? "Salon Management Support";
+        var username = smtpSection["Username"];
+        var password = smtpSection["Password"];
+
+        int port = int.TryParse(portStr, out var p) ? p : 587;
+
+        var hasSmtpConfig = !string.IsNullOrWhiteSpace(server)
+            && !string.IsNullOrWhiteSpace(senderEmail)
+            && !string.IsNullOrWhiteSpace(username)
+            && !string.IsNullOrWhiteSpace(password);
+
+        var htmlBody = BuildRescheduleNotificationHtmlBody(
+            customerName,
+            stylistName,
+            appointmentDate,
+            startTime,
+            endTime,
+            servicesSummary,
+            reason,
+            salonAddress,
+            salonHotline);
+
+        if (hasSmtpConfig)
+        {
+            try
+            {
+                using var client = new SmtpClient(server, port)
+                {
+                    EnableSsl = true,
+                    UseDefaultCredentials = false,
+                    Credentials = new NetworkCredential(username, password),
+                    DeliveryMethod = SmtpDeliveryMethod.Network,
+                    Timeout = 15000
+                };
+
+                using var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(senderEmail!, senderName),
+                    Subject = $"[Salon Management] Cập nhật lịch hẹn của quý khách - {appointmentDate:dd/MM/yyyy}",
+                    IsBodyHtml = true,
+                    Body = htmlBody
+                };
+                mailMessage.To.Add(toEmail);
+
+                await client.SendMailAsync(mailMessage);
+                logger.LogInformation("Đã gửi email thông báo dời lịch hẹn thành công qua SMTP tới {Email}", toEmail);
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Lỗi khi gửi email thông báo dời lịch qua SMTP tới {Email}", toEmail);
+                if (!env.IsDevelopment() && !env.IsStaging()) throw;
+            }
+        }
+        else if (!env.IsDevelopment() && !env.IsStaging())
+        {
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi email thông báo dời lịch.");
+        }
+
+        logger.LogWarning("[FALLBACK EMAIL] Thông báo dời lịch gửi tới {Email} (Thợ: {Stylist}, Ngày: {Date:dd/MM/yyyy}, Giờ: {Start:hh\\:mm}-{End:hh\\:mm})",
+            toEmail, stylistName, appointmentDate, startTime, endTime);
+    }
+
+    public async Task SendReviewRequestEmailAsync(string toEmail, string customerName, string stylistName, string reviewUrl)
+    {
+        if (await LogStagingDelivery(toEmail, "review-request", reviewUrl)) return;
+        var smtp = configuration.GetSection("SmtpSettings");
+        var server = smtp["Server"];
+        var sender = smtp["SenderEmail"];
+        var username = smtp["Username"];
+        var password = smtp["Password"];
+        if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(sender) ||
+            string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            if (env.IsDevelopment())
+            {
+                logger.LogInformation("[FALLBACK REVIEW EMAIL] Review link for {Recipient}: {ReviewUrl}", toEmail, reviewUrl);
+                return;
+            }
+            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi lời mời đánh giá.");
+        }
+
+        using var client = new SmtpClient(server, smtp.GetValue<int>("Port", 587))
+        {
+            EnableSsl = true,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(username, password),
+            Timeout = 15000
+        };
+        using var message = new MailMessage
+        {
+            From = new MailAddress(sender, smtp["SenderName"] ?? "Luminol Salon"),
+            Subject = "Mời bạn đánh giá trải nghiệm tại Luminol Salon",
+            IsBodyHtml = true,
+            Body = $"<p>Chào {WebUtility.HtmlEncode(customerName)}, cảm ơn bạn đã trải nghiệm dịch vụ với {WebUtility.HtmlEncode(stylistName)}.</p><p><a href=\"{WebUtility.HtmlEncode(reviewUrl)}\">Gửi đánh giá của bạn</a></p><p>Liên kết có hiệu lực trong 14 ngày và chỉ dùng một lần.</p>"
+        };
+        message.To.Add(toEmail);
+        await client.SendMailAsync(message);
+    }
+
+    private async Task<bool> LogStagingDelivery(string toEmail, string template, string? summary = null)
+    {
+        if (!env.IsStaging()) return false;
+        logger.LogInformation("[STAGING EMAIL SIMULATION] {Template} to {Recipient}; external delivery suppressed.", template, toEmail);
+        db.StagingEmailMessages.Add(new StagingEmailMessage
+        {
+            Template = template,
+            Recipient = toEmail,
+            Summary = summary ?? "Email được mô phỏng trên staging; không gửi tới hộp thư bên ngoài."
+        });
+        await db.SaveChangesAsync();
+        return true;
+    }
+
+    private static string BuildRescheduleNotificationHtmlBody(
+        string customerName,
+        string stylistName,
+        DateTime appointmentDate,
+        TimeSpan startTime,
+        TimeSpan endTime,
+        string servicesSummary,
+        string? reason,
+        string salonAddress,
+        string salonHotline) => $"""
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cập nhật lịch hẹn</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 15px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding: 32px 30px; text-align: center;">
+                            <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">
+                                💈 Salon Management
+                            </h1>
+                            <p style="margin: 6px 0 0 0; font-size: 14px; color: #e0f2fe;">
+                                Thông báo cập nhật lịch hẹn
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px 30px;">
+                            <p style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #0f172a;">
+                                Kính chào {WebUtility.HtmlEncode(customerName)},
+                            </p>
+                            <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                                Lịch hẹn của quý khách tại Salon đã được điều chỉnh thành công với thông tin mới nhất như sau:
+                            </p>
+                            <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                                <tr>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; width: 35%; color: #64748b; font-size: 13px;">Thợ phụ trách:</td>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #0f172a; font-size: 14px;">{WebUtility.HtmlEncode(stylistName)}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b; font-size: 13px;">Thời gian mới:</td>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #0284c7; font-size: 14px;">{appointmentDate:dd/MM/yyyy} ({startTime:hh\:mm} - {endTime:hh\:mm})</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b; font-size: 13px;">Dịch vụ đã chọn:</td>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 13px;">{WebUtility.HtmlEncode(servicesSummary)}</td>
+                                </tr>
+                                {(string.IsNullOrWhiteSpace(reason) ? "" : $@"
+                                <tr>
+                                    <td style=""padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b; font-size: 13px;"">Ghi chú điều chỉnh:</td>
+                                    <td style=""padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 13px; font-style: italic;"">{WebUtility.HtmlEncode(reason)}</td>
+                                </tr>")}
+                                <tr>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b; font-size: 13px;">Địa chỉ salon:</td>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 13px;">{WebUtility.HtmlEncode(salonAddress)}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px 16px; font-weight: 600; color: #64748b; font-size: 13px;">Hotline hỗ trợ:</td>
+                                    <td style="padding: 12px 16px; font-weight: 600; color: #e11d48; font-size: 14px;">{WebUtility.HtmlEncode(salonHotline)}</td>
+                                </tr>
+                            </table>
+                            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                                Nếu cần điều chỉnh thêm thông tin hoặc có thắc mắc, quý khách vui lòng liên hệ hotline trên để được phục vụ chu đáo nhất.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 20px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                                © {DateTime.UtcNow.Year} Salon Management System. Hân hạnh được phục vụ quý khách.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+""";
 }
+

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
 namespace SalonManagement.Services;
-public class DeskBookingService(ApplicationDbContext db, TimeProvider clock)
+public class DeskBookingService(ApplicationDbContext db, TimeProvider clock, AppointmentNotificationBus? notifications = null)
 {
     public Task<Appointment> Create(DeskBookingRequest request, string actor)
     {
@@ -51,13 +51,19 @@ public class DeskBookingService(ApplicationDbContext db, TimeProvider clock)
         if (count > 0 && !request.AcknowledgeNoShow)
             throw new InvalidOperationException($"Khách đã không đến {count} lần. Vui lòng xác nhận đã xem cảnh báo.");
         var customer = await db.Customers.OrderBy(c => c.CustomerId).FirstOrDefaultAsync(c => c.Phone == request.Phone);
+        if (customer is not null && !string.Equals(customer.FullName.Trim(), request.FullName.Trim(), StringComparison.OrdinalIgnoreCase) && !request.ConfirmExistingName)
+            throw new InvalidOperationException($"Số điện thoại đã thuộc hồ sơ “{customer.FullName}”. Xác nhận dùng hồ sơ cũ; tên nhập mới không làm thay đổi hồ sơ.");
         customer ??= new Customer { FullName = request.FullName.Trim(), Phone = request.Phone, CreatedAt = now.UtcDateTime };
         var appointment = new Appointment { Customer = customer, StylistId = stylist.StylistId,
-            AppointmentDate = start.Date, StartTime = start.TimeOfDay, EndTime = end.TimeOfDay, Status = "Confirmed", CreatedAt = now.UtcDateTime };
+            AppointmentDate = start.Date, StartTime = start.TimeOfDay, EndTime = end.TimeOfDay, Status = "Confirmed", Source = "Desk", CreatedAt = now.UtcDateTime };
         appointment.AppointmentServices.Add(new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes });
         db.Add(appointment); await db.SaveChangesAsync();
         db.AppointmentAudits.Add(new() { AppointmentId = appointment.AppointmentId, ActorId = actor, Action = "desk-booking", PreviousStatus = "", NewStatus = appointment.Status, OccurredAt = now });
+        var notification = new StylistNotification { StylistId = stylist.StylistId, AppointmentId = appointment.AppointmentId,
+            Message = $"Lịch mới #{appointment.AppointmentId} được phân công cho bạn.", CreatedAt = now };
+        db.StylistNotifications.Add(notification);
         await db.SaveChangesAsync(); await transaction.CommitAsync();
+        notifications?.Publish(notification);
         return appointment;
     }
 }

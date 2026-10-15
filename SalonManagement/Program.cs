@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
 using SalonManagement.Services;
+using SalonManagement.Services.Appointments;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
@@ -30,9 +31,17 @@ var connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
         "Connection string 'DefaultConnection' not found.");
+var databaseProvider = builder.Configuration["DatabaseProvider"];
+var usesSqlite = string.Equals(databaseProvider, "SQLite", StringComparison.OrdinalIgnoreCase);
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
+    if (usesSqlite)
+    {
+        options.UseSqlite(connectionString);
+        return;
+    }
+
     options.UseSqlServer(connectionString, sqlServerOptions =>
         sqlServerOptions.EnableRetryOnFailure());
 });
@@ -149,6 +158,13 @@ builder.Services.AddAuthentication(options =>
         OnChallenge = async context =>
         {
             context.HandleResponse();
+            if (context.Request.Headers.Accept.ToString()
+                    .Contains("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Redirect("/admin/login");
+                return;
+            }
+
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             context.Response.ContentType = "application/json; charset=utf-8";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new
@@ -159,6 +175,13 @@ builder.Services.AddAuthentication(options =>
         },
         OnForbidden = async context =>
         {
+            if (context.Request.Headers.Accept.ToString()
+                    .Contains("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Redirect("/access-denied");
+                return;
+            }
+
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             context.Response.ContentType = "application/json; charset=utf-8";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new
@@ -176,6 +199,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAttendanceModules();
+builder.Services.AddHostedService<StylistNotificationCleanupService>();
 builder.Services.AddScoped<StylistAvailabilityService>();
 
 builder.Services.AddScoped<
@@ -188,8 +212,14 @@ builder.Services.AddScoped<
     IEmailService,
     EmailService>();
 
+builder.Services.Configure<ScheduleEmailOptions>(
+    builder.Configuration.GetSection("ScheduleChangeEmail:Smtp"));
+builder.Services.Configure<ScheduleNotificationOptions>(
+    builder.Configuration.GetSection("ScheduleChangeEmail:Delivery"));
+builder.Services.AddSingleton<IScheduleChangeEmailSender, SmtpScheduleChangeEmailSender>();
+builder.Services.AddScoped<ScheduleNotificationDispatcher>();
+builder.Services.AddHostedService<ScheduleNotificationBackgroundService>();
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
-
 builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
 
 builder.Services.AddSingleton<
@@ -197,14 +227,26 @@ builder.Services.AddSingleton<
     PasswordResetRateLimiter>();
 
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<AppointmentBookingService>();
+builder.Services.AddScoped<AppointmentReschedulingService>();
+builder.Services.AddScoped<AppointmentChangeEmailProcessor>();
+builder.Services.AddHostedService<AppointmentChangeEmailBackgroundService>();
+builder.Services.AddScoped<AppointmentEmailDeliveryProcessor>();
+builder.Services.AddHostedService<AppointmentEmailDeliveryWorker>();
+builder.Services.AddScoped<BookingEmailVerificationService>();
+
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
+builder.Services.AddScoped<AvailabilityService>();
 builder.Services.AddControllersWithViews(options => options.Filters.Add<RequirePasswordChangeFilter>());
 
 // =====================================
 // BUILD APPLICATION
 // =====================================
 
+builder.Services.AddSingleton<IAppointmentRescheduleEmailQueue, AppointmentRescheduleEmailQueue>();
+builder.Services.AddHostedService<AppointmentRescheduleEmailWorker>();
+builder.Services.AddScoped<IAppointmentRescheduleService, AppointmentRescheduleService>();
 var app = builder.Build();
 
 // =====================================
@@ -217,7 +259,15 @@ await using (var scope = app.Services.CreateAsyncScope())
         scope.ServiceProvider
             .GetRequiredService<ApplicationDbContext>();
 
-    await dbContext.Database.MigrateAsync();
+    if (usesSqlite)
+    {
+        await dbContext.Database.EnsureCreatedAsync();
+        await SqliteSprint4SchemaUpgrade.EnsureAsync(dbContext);
+    }
+    else
+    {
+        await dbContext.Database.MigrateAsync();
+    }
 }
 
 // =====================================
@@ -323,11 +373,18 @@ using (var scope = app.Services.CreateScope())
 
     await SeedData.SeedAsync(
         dbContext,
-        userManager);
-    if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
+        userManager,
+        app.Environment.IsDevelopment() || app.Environment.IsStaging());
+    if ((app.Environment.IsDevelopment() || app.Environment.IsStaging()) && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
     {
         var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;
         await StylistBookingDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
+        await StylistAssignmentDemoSeed.SeedAsync(dbContext, now.Date.AddDays(1));
+    }
+    if (app.Environment.IsStaging() && builder.Configuration.GetValue<bool>("Seed:Sprint4Demo"))
+    {
+        var today = services.GetRequiredService<StylistAvailabilityService>().SalonNow.Date;
+        await Sprint4DemoSeed.SeedAsync(dbContext, today);
     }
 }
 

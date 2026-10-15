@@ -31,6 +31,7 @@ public class AuthController(
     }
 
 
+    [AllowAnonymous]
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterStaffRequest request)
     {
@@ -102,6 +103,7 @@ public class AuthController(
         });
     }
 
+    [AllowAnonymous]
     [HttpPost("confirm-email")]
     public async Task<IActionResult> ConfirmEmail(ConfirmEmailRequest request)
     {
@@ -155,6 +157,7 @@ public class AuthController(
         return Ok(new { message = "Xác minh email thành công. Bạn có thể đăng nhập ngay." });
     }
 
+    [AllowAnonymous]
     [HttpPost("resend-email-verification")]
     public async Task<IActionResult> ResendEmailVerification(ResendEmailVerificationRequest request)
     {
@@ -185,6 +188,7 @@ public class AuthController(
         }
     }
 
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<ActionResult<TokenResponse>> Login(LoginRequest request)
     {
@@ -256,6 +260,7 @@ public class AuthController(
         return Ok(await IssueTokens(user, role));
     }
 
+    [AllowAnonymous]
     [HttpPost("refresh")]
     public async Task<ActionResult<TokenResponse>> Refresh(RefreshRequest request)
     {
@@ -278,6 +283,7 @@ public class AuthController(
         return Ok(await IssueTokens(storedToken.User, role));
     }
 
+    [AllowAnonymous]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(RefreshRequest request)
     {

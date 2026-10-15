@@ -176,8 +176,14 @@ public class AppointmentLookupServiceTests
     // ============================================================
     // TEST 6: CancelAsync — thành công (>= 120 phút)
     // ============================================================
-    [Fact]
-    public async Task CancelAsync_MoreThan120Minutes_Succeeds()
+    [Theory]
+    [InlineData(15)]
+    [InlineData(30)]
+    [InlineData(45)]
+    [InlineData(60)]
+    [InlineData(90)]
+    [InlineData(120)]
+    public async Task CancelAsync_MoreThan120Minutes_SucceedsAndLookupKeepsScheduledDuration(int durationMinutes)
     {
         using var ctx = CreateContext();
         var (custId, stylId) = await SeedBaseAsync(ctx);
@@ -186,7 +192,7 @@ public class AppointmentLookupServiceTests
         var startTime = new TimeSpan(10, 0, 0);
 
         var appt = await SeedAppointmentAsync(ctx, custId, stylId, "TEST0001",
-            appointmentDate, startTime, new TimeSpan(11, 0, 0));
+            appointmentDate, startTime, startTime.Add(TimeSpan.FromMinutes(durationMinutes)));
 
         // Clock giả lập: 2026-10-15 07:00 (còn 3 tiếng = 180 phút)
         var clock = new FixedTimeProvider(
@@ -211,6 +217,35 @@ public class AppointmentLookupServiceTests
         Assert.Equal("cancel", audit!.Action);
         Assert.Equal("Confirmed", audit.PreviousStatus);
         Assert.Equal("Cancelled", audit.NewStatus);
+
+        // After cancellation, the lookup card must keep the duration from the actual scheduled slot.
+        // The catalog snapshot is intentionally shorter to verify the appointment time is authoritative.
+        var service = new Service
+        {
+            ServiceId = 1,
+            ServiceName = "Cắt tóc nam",
+            DurationMinutes = 30,
+            Price = 100_000m
+        };
+        ctx.Services.Add(service);
+        ctx.AppointmentServices.Add(new AppointmentService
+        {
+            Appointment = updated,
+            Service = service,
+            ServiceId = service.ServiceId,
+            DurationMinutes = 30,
+            Price = service.Price
+        });
+        await ctx.SaveChangesAsync();
+
+        var lookupAfterCancellation = await svc.SearchAsync("TEST0001");
+        var cancelledItem = Assert.Single(lookupAfterCancellation.Items);
+        Assert.Equal("Đã huỷ", cancelledItem.Status);
+        Assert.Equal(TimeSpan.FromHours(10), cancelledItem.StartTime);
+        Assert.Equal(startTime.Add(TimeSpan.FromMinutes(durationMinutes)), cancelledItem.EndTime);
+        Assert.Equal(durationMinutes, cancelledItem.DurationMinutes);
+        Assert.Equal(new DateTimeOffset(2026, 10, 15, 0, 0, 0, TimeSpan.Zero), cancelledItem.CancelledAt);
+        Assert.Equal("Khách hàng", cancelledItem.CancelledBy);
     }
 
     // ============================================================
@@ -237,6 +272,76 @@ public class AppointmentLookupServiceTests
 
         Assert.False(result.Success);
         Assert.Contains("120 phút", result.Error);
+    }
+
+    [Fact]
+    public async Task CancelAsync_At120MinuteBoundary_ReleasesTheScheduledSlotImmediately()
+    {
+        using var ctx = CreateContext();
+        var date = new DateTime(2030, 1, 7); // Monday
+        var customer = new Customer { FullName = "Khách Test", Phone = "0900000001", IsActive = true };
+        var stylist = new Stylist { FullName = "Thợ Test", IsActive = true };
+        var service = new Service
+        {
+            ServiceName = "Cắt tóc 60 phút",
+            DurationMinutes = 60,
+            Price = 100_000m,
+            IsActive = true
+        };
+        ctx.AddRange(customer, stylist, service, new BusinessHour
+        {
+            DayOfWeek = DayOfWeek.Monday,
+            OpensAt = new TimeOnly(9, 0),
+            ClosesAt = new TimeOnly(17, 0),
+            IsClosed = false
+        });
+        await ctx.SaveChangesAsync();
+
+        ctx.StylistServices.Add(new StylistService
+        {
+            StylistId = stylist.StylistId,
+            ServiceId = service.ServiceId
+        });
+        ctx.WorkSchedules.Add(new WorkSchedule
+        {
+            StylistId = stylist.StylistId,
+            Stylist = stylist,
+            WorkDate = date,
+            StartTime = TimeSpan.FromHours(9),
+            EndTime = TimeSpan.FromHours(17),
+            Status = "Working"
+        });
+        ctx.Appointments.Add(new Appointment
+        {
+            Customer = customer,
+            Stylist = stylist,
+            AppointmentDate = date,
+            StartTime = TimeSpan.FromHours(10),
+            EndTime = TimeSpan.FromHours(11),
+            Status = "Confirmed",
+            BookingReference = "SLOT0060",
+            AppointmentServices = [new AppointmentService
+            {
+                Service = service,
+                ServiceId = service.ServiceId,
+                DurationMinutes = 60,
+                Price = service.Price
+            }]
+        });
+        await ctx.SaveChangesAsync();
+
+        var clock = new FixedTimeProvider(new DateTimeOffset(2030, 1, 7, 1, 0, 0, TimeSpan.Zero)); // 08:00 VN
+        var availability = new StylistAvailabilityService(ctx, clock);
+        var day = DateOnly.FromDateTime(date);
+        Assert.DoesNotContain(new StylistSlot("10:00", "11:00"),
+            await availability.GetSlotsAsync([service.ServiceId], stylist.StylistId, day));
+
+        var result = await new AppointmentLookupService(ctx, clock)
+            .CancelAsync("SLOT0060", "customer:0900000001");
+
+        Assert.True(result.Success); // Exactly 120 minutes before start is allowed.
+        Assert.Contains(new StylistSlot("10:00", "11:00"),
+            await availability.GetSlotsAsync([service.ServiceId], stylist.StylistId, day));
     }
 
     // ============================================================

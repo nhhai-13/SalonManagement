@@ -1,0 +1,108 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace SalonManagement.Models;
+
+/// <summary>
+/// Statuses that still need front-desk review when a stylist is unavailable.
+/// Started work is deliberately excluded from reallocation.
+/// </summary>
+public static class ScheduleCoordinationStatuses
+{
+    public static readonly string[] NeedsReview = ["Pending", "Confirmed", "Arrived"];
+}
+
+public sealed record ScheduleCoordinationStylist(int Id, string Name);
+
+public sealed record ScheduleCoordinationAppointment(
+    int Id,
+    string CustomerName,
+    string CustomerPhone,
+    string? CustomerEmail,
+    string[] Services,
+    string StartTime,
+    int DurationMinutes,
+    string Status,
+    ScheduleCoordinationPlan Plan);
+
+public sealed record ScheduleCoordinationPlan(
+    IReadOnlyList<ScheduleCoordinationStylistOption> Stylists,
+    bool HasOptions);
+
+public sealed record ScheduleCoordinationStylistOption(
+    int StylistId,
+    string StylistName,
+    bool AvailableAtOriginalTime,
+    IReadOnlyList<string> ReasonsUnavailableAtOriginalTime,
+    IReadOnlyList<string> SuggestedStartTimes);
+
+public sealed record ScheduleCoordinationAppointmentsResponse(
+    int StylistId,
+    DateOnly Date,
+    int TotalCount,
+    IReadOnlyList<ScheduleCoordinationAppointment> Appointments);
+
+public sealed record ScheduleTransferBatchRequest(
+    [Required, MinLength(1), MaxLength(100)] IReadOnlyList<ScheduleTransferSelection> Items);
+
+public sealed record ScheduleTransferSelection(
+    int AppointmentId,
+    int StylistId,
+    int StartMinuteOfDay,
+    bool CustomerConfirmed);
+
+public sealed record ScheduleTransferBatchResponse(
+    int TotalSelected,
+    int SuccessCount,
+    int FailureCount,
+    IReadOnlyList<ScheduleTransferItemResult> Results);
+
+public sealed record ScheduleTransferItemResult(
+    int AppointmentId,
+    string Outcome,
+    string Message,
+    int? StylistId,
+    string? StylistName,
+    string? StartTime,
+    string? AppointmentStatus,
+    int? EmailNotificationId = null,
+    string? EmailStatus = null,
+    int EmailAttemptCount = 0,
+    DateTime? EmailSentAt = null);
+
+public sealed record ScheduleChangeNotificationStatus(
+    int Id,
+    int AppointmentId,
+    int Version,
+    string Status,
+    int AttemptCount,
+    DateTime TransferredAt,
+    DateTime? SentAt,
+    DateTime? NextAttemptAt,
+    string? LastError);
+
+public sealed record ScheduleFollowUpSyncRequest(int StylistId, DateOnly Date);
+
+public sealed record ScheduleFollowUpSyncResponse(int AddedOrUpdated, int TotalWithoutOptions);
+
+public sealed record ScheduleFollowUpItem(
+    int Id,
+    int AppointmentId,
+    string Category,
+    string CategoryLabel,
+    string CustomerName,
+    string CustomerPhone,
+    string[] Services,
+    DateOnly OriginalDate,
+    string OriginalStartTime,
+    string Reason,
+    string ContactStatus,
+    string? ContactNote,
+    DateTime? ContactedAt);
+
+public sealed record ScheduleFollowUpListResponse(
+    int TotalCount,
+    IReadOnlyList<ScheduleFollowUpItem> Items);
+
+public sealed record ScheduleFollowUpUpdateRequest(
+    [Required, MaxLength(30)] string ContactStatus,
+    [MaxLength(1000)] string? ContactNote);

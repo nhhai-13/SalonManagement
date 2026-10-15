@@ -19,8 +19,20 @@
     <article class="card attendance-card mb-3"><div class="card-body">
         <h2 class="h5">@a.StartTime.ToString(@"hh\:mm") – @a.EndTime.ToString(@"hh\:mm") · @a.Customer.FullName</h2>
         <p>@a.Customer.Phone · Thợ: @a.Stylist.FullName · <strong class="attendance-status attendance-status-@a.Status.ToLowerInvariant()">@Label(a.Status)</strong></p>
-        @if (a.CheckedInAt.HasValue) { <p>Giờ đến: @a.CheckedInAt.Value.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm 'ngày' dd/MM/yyyy")</p> }
-        @if (a.LateMinutes > 0) { <p class="text-danger">Đến muộn @a.LateMinutes phút</p> }
+        @if (a.CheckedInAt.HasValue) {
+            var checkedInAt = a.CheckedInAt.Value.ToOffset(TimeSpan.FromHours(7));
+            var offsetMinutes = (checkedInAt - CheckInService.StartsAt(a)).TotalMinutes;
+            <p>Giờ đến: @checkedInAt.ToString("HH:mm 'ngày' dd/MM/yyyy")</p>
+            @if (offsetMinutes < 0) {
+                <p class="text-info">Khách đến sớm @Math.Ceiling(Math.Abs(offsetMinutes)) phút. Giữ nguyên khung giờ đã đặt; lễ tân có thể mời khách chờ hoặc hỏi thợ nếu có thể phục vụ sớm.</p>
+            } else if (offsetMinutes > 0 && a.LateMinutes == 0) {
+                <p class="text-warning">Khách đến muộn @Math.Ceiling(offsetMinutes) phút, trong ngưỡng 15 phút. Giữ nguyên giờ kết thúc và báo thợ để xác nhận khả năng phục vụ.</p>
+            } else if (a.LateMinutes > 0) {
+                <p class="text-danger">Đến muộn @a.LateMinutes phút. Giữ nguyên khung giờ; báo thợ và trao đổi với khách nếu cần đổi lịch.</p>
+            } else {
+                <p class="text-success">Khách đến đúng giờ.</p>
+            }
+        }
         <form asp-action="Change" method="post" class="d-flex flex-wrap gap-2">
             <input type="hidden" name="id" value="@a.AppointmentId" /><input type="hidden" name="date" value="@day.ToString("yyyy-MM-dd")" />
             <button class="btn btn-success" name="operation" value="check-in" disabled="@(!CheckInService.CanCheckIn(a, now))">Check-in</button>
