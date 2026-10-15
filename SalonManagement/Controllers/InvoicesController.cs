@@ -29,12 +29,16 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
             .OrderBy(item => item.StartTime)
             .ToListAsync();
 
+ codex/sprint-4-todo
         var paidInvoices = await db.Invoices.AsNoTracking()
             .Include(invoice => invoice.Appointment).ThenInclude(appointment => appointment.Customer)
             .Where(invoice => invoice.Status == "Paid" && invoice.Appointment.AppointmentDate.Date == selectedDate)
             .OrderBy(invoice => invoice.Appointment.StartTime)
             .ToListAsync();
         return View(new InvoiceDayViewModel { SelectedDate = selectedDate, Appointments = appointments, PaidInvoices = paidInvoices });
+
+        return View(appointments);
+develop
     }
 
     [HttpPost]
@@ -144,13 +148,20 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
             return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
         }
 
+ codex/sprint-4-todo
         var discount = DiscountCalculator.Calculate(invoice.Subtotal, coupon.DiscountType, coupon.Value);
+
+ develop
         invoice.DiscountCouponId = coupon.DiscountCouponId;
         invoice.DiscountCoupon = coupon;
         invoice.DiscountCodeSnapshot = coupon.Code;
         invoice.DiscountTypeSnapshot = coupon.DiscountType;
         invoice.DiscountValueSnapshot = coupon.Value;
+ codex/sprint-4-todo
         invoice.DiscountAmount = discount;
+
+        invoice.DiscountAmount = DiscountCalculator.Calculate(invoice.Subtotal, coupon.DiscountType, coupon.Value);
+develop
         Recalculate(invoice);
         await db.SaveChangesAsync();
         TempData["Success"] = "Đã áp dụng mã giảm giá.";
@@ -309,12 +320,17 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
         invoice.Appointment.Status = "Closed";
         invoice.Appointment.UpdatedAt = now;
         await db.SaveChangesAsync();
+ codex/sprint-4-todo
         if (!string.IsNullOrWhiteSpace(invoice.Appointment.Customer.Email) &&
             !await db.StylistReviews.AnyAsync(review => review.AppointmentId == invoice.AppointmentId))
+
+        if (!await db.StylistReviews.AnyAsync(review => review.AppointmentId == invoice.AppointmentId))
+ develop
         {
             var token = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
             var review = new StylistReview
             {
+ codex/sprint-4-todo
                 AppointmentId = invoice.AppointmentId,
                 CustomerId = invoice.Appointment.CustomerId,
                 StylistId = invoice.Appointment.StylistId,
@@ -335,6 +351,29 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
                 catch (Exception exception)
                 {
                     logger.LogError(exception, "Unable to send review request for appointment {AppointmentId}.", invoice.AppointmentId);
+
+                AppointmentId = invoice.AppointmentId, CustomerId = invoice.Appointment.CustomerId,
+                StylistId = invoice.Appointment.StylistId,
+                ReviewTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))),
+                RequestedAt = now, ExpiresAt = now.AddDays(7)
+            };
+            db.StylistReviews.Add(review);
+            await db.SaveChangesAsync();
+            if (!string.IsNullOrWhiteSpace(invoice.Appointment.Customer.Email))
+            {
+                var reviewUrl = Url.Action("Create", "Reviews", new { token }, Request.Scheme);
+                if (!string.IsNullOrWhiteSpace(reviewUrl))
+                {
+                    try
+                    {
+                        await emailService.SendReviewRequestEmailAsync(invoice.Appointment.Customer.Email,
+                            invoice.Appointment.Customer.FullName, invoice.Appointment.Stylist.FullName, reviewUrl);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogError(exception, "Unable to send review request for appointment {AppointmentId}.", invoice.AppointmentId);
+                    }
+ develop
                 }
             }
         }
@@ -441,9 +480,13 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
     {
         invoice.Subtotal = invoice.Lines.Sum(line => line.UnitPrice);
         if (invoice.DiscountCouponId.HasValue && invoice.DiscountTypeSnapshot is not null && invoice.DiscountValueSnapshot.HasValue)
+ codex/sprint-4-todo
         {
             invoice.DiscountAmount = DiscountCalculator.Calculate(invoice.Subtotal, invoice.DiscountTypeSnapshot, invoice.DiscountValueSnapshot.Value);
         }
+
+            invoice.DiscountAmount = DiscountCalculator.Calculate(invoice.Subtotal, invoice.DiscountTypeSnapshot, invoice.DiscountValueSnapshot.Value);
+ develop
         invoice.TotalAmount = invoice.Subtotal - invoice.DiscountAmount;
     }
 

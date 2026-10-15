@@ -13,6 +13,40 @@ namespace SalonManagement.Controllers;
 public class ReviewsController(ApplicationDbContext db) : Controller
 {
     [HttpGet]
+ codex/sprint-4-todo
+
+    public async Task<IActionResult> CreateByReference(string reference)
+    {
+        var review = await FindValidReviewByReference(reference);
+        if (review is null) return View("Unavailable");
+        return View("CreateFromLookup", new StylistReviewViewModel
+        {
+            Reference = reference.Trim().ToUpperInvariant(),
+            StylistName = review.Stylist.FullName,
+            CustomerName = review.Customer.FullName
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateByReference(StylistReviewViewModel model)
+    {
+        var review = await FindValidReviewByReference(model.Reference);
+        if (review is null) return View("Unavailable");
+        model.StylistName = review.Stylist.FullName;
+        model.CustomerName = review.Customer.FullName;
+        ModelState.Remove(nameof(model.Token));
+        ModelState.Remove(nameof(model.Reference));
+        if (!ModelState.IsValid) return View("CreateFromLookup", model);
+        review.Rating = model.Rating;
+        review.Comment = model.Comment?.Trim();
+        review.SubmittedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return View("Thanks");
+    }
+
+    [HttpGet]
+ develop
     public async Task<IActionResult> Create(string token)
     {
         var review = await FindValidReview(token);
@@ -46,4 +80,18 @@ public class ReviewsController(ApplicationDbContext db) : Controller
             .FirstOrDefaultAsync(item => item.ReviewTokenHash == hash && item.Rating == null &&
                 item.ExpiresAt > now && item.Appointment.Status == "Closed");
     }
+ codex/sprint-4-todo
+
+
+    private async Task<StylistReview?> FindValidReviewByReference(string? reference)
+    {
+        var code = reference?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(code) || code.Length != 8) return null;
+        var now = DateTime.UtcNow;
+        return await db.StylistReviews.Include(item => item.Stylist).Include(item => item.Customer)
+            .Include(item => item.Appointment)
+            .FirstOrDefaultAsync(item => item.Appointment.BookingReference == code && item.Rating == null &&
+                item.ExpiresAt > now && item.Appointment.Status == "Closed");
+    }
+ develop
 }

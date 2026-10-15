@@ -33,10 +33,21 @@ namespace SalonManagement.Models
         public ICollection<Appointment> Appointments { get; set; }
             = new List<Appointment>();
 
+ codex/sprint-4-todo
 public ICollection<AppointmentService> AppointmentServices { get; set; } = new List<AppointmentService>();
 
         public ICollection<InvoiceAdjustment> InvoiceAdjustments { get; set; } = new List<InvoiceAdjustment>();
 
         public ICollection<StylistService> Services { get; set; } = new List<StylistService>();
+
+        public ICollection<StylistService> Services { get; set; }
+            = new List<StylistService>();
+
+        public ICollection<AppointmentService> AppointmentServices { get; set; }
+            = new List<AppointmentService>();
+
+        public ICollection<InvoiceAdjustment> InvoiceAdjustments { get; set; }
+            = new List<InvoiceAdjustment>();
+ develop
     }
 }

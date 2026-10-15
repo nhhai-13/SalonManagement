@@ -13,10 +13,18 @@ namespace SalonManagement.Controllers;
 public class AppointmentsController(ApplicationDbContext db, ILogger<AppointmentsController> logger) : Controller
 {
     [HttpGet]
+ codex/sprint-4-todo
     public async Task<IActionResult> Index(DateTime? date)
     {
         var selectedDate = (date ?? VietnamTime.Today).Date;
         ViewBag.SelectedDate = selectedDate.ToString("yyyy-MM-dd");
+
+    public async Task<IActionResult> Index(DateTime? date, string? status)
+    {
+        var selectedDate = (date ?? VietnamTime.Today).Date;
+        ViewBag.SelectedDate = selectedDate.ToString("yyyy-MM-dd");
+        ViewBag.SelectedStatus = status;
+ develop
         IQueryable<Appointment> query = db.Appointments.AsNoTracking()
             .Include(item => item.Customer)
             .Include(item => item.Stylist)
@@ -24,6 +32,7 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                 .ThenInclude(item => item.Service)
             .Include(item => item.Invoice)
             .Where(item => item.AppointmentDate.Date == selectedDate);
+ codex/sprint-4-todo
 
         if (User.IsInRole(UserRoles.Stylist))
         {
@@ -35,6 +44,11 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                 item.AppointmentServices.Any(service => service.StylistId == stylistId.Value));
         }
 
+
+        if (status == "Pending") query = query.Where(item => item.Status == "Pending" || item.Status == "PendingConfirmation");
+        else if (status == "Cancelled") query = query.Where(item => item.Status == "Cancelled" || item.Status == "Canceled");
+        else if (status is "Confirmed" or "Arrived" or "Completed" or "NoShow") query = query.Where(item => item.Status == status);
+ develop
         var appointments = await query.OrderBy(item => item.StartTime).ToListAsync();
 
         return View(appointments);
@@ -58,6 +72,7 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             return NotFound();
         }
 
+ codex/sprint-4-todo
         var isStylist = User.IsInRole(UserRoles.Stylist);
         int? currentStylistId = null;
         var canViewTechnicalNotes = isStylist || User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner);
@@ -89,6 +104,8 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             }
         }
 
+
+ develop
         var history = new List<AppointmentHistoryRow>();
         var historyLoadFailed = false;
         var isNewCustomer = false;
@@ -110,8 +127,12 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                         StylistName = service.Stylist != null
                             ? service.Stylist.FullName
                             : item.Stylist.FullName,
+ codex/sprint-4-todo
                         service.TechnicalNotes,
                         service.StylistId
+
+                        service.TechnicalNotes
+ develop
                     }).ToList()
                 })
                 .ToListAsync();
@@ -124,6 +145,7 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                         AppointmentDate = item.AppointmentDate,
                         ServiceName = service?.ServiceName ?? "Chưa có dịch vụ",
                         StylistName = service?.StylistName ?? "Chưa phân công",
+ codex/sprint-4-todo
                         TechnicalNotes = service is not null && (!isStylist || service.StylistId == currentStylistId)
                             ? service.TechnicalNotes : null
                     }))
@@ -132,6 +154,11 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             {
                 foreach (var row in history) row.TechnicalNotes = null;
             }
+
+                        TechnicalNotes = service?.TechnicalNotes
+                    }))
+                .ToList();
+ develop
         }
         catch (Exception exception)
         {
@@ -168,8 +195,17 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             return NotFound();
         }
 
+codex/sprint-4-todo
         var stylistId = await GetCurrentStylistId();
         if (!stylistId.HasValue || (item.StylistId != stylistId.Value && item.Appointment.StylistId != stylistId.Value))
+
+        var assignedStylist = item.Stylist
+            ?? await db.Stylists.FindAsync(item.Appointment.StylistId);
+        if (assignedStylist is null || !string.Equals(
+                assignedStylist.Email,
+                User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name,
+                StringComparison.OrdinalIgnoreCase))
+ develop
         {
             return Forbid();
         }
@@ -198,8 +234,17 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             return NotFound();
         }
 
+ codex/sprint-4-todo
         var stylistId = await GetCurrentStylistId();
         if (!stylistId.HasValue || (item.StylistId != stylistId.Value && item.Appointment.StylistId != stylistId.Value))
+
+        var assignedStylist = item.Stylist
+            ?? await db.Stylists.FindAsync(item.Appointment.StylistId);
+        if (assignedStylist is null || !string.Equals(
+                assignedStylist.Email,
+                User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name,
+                StringComparison.OrdinalIgnoreCase))
+ develop
         {
             return Forbid();
         }
@@ -223,6 +268,7 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
     private async Task<int> GetAppointmentId(int appointmentServiceId) =>
         await db.AppointmentServices.Where(item => item.AppointmentServiceId == appointmentServiceId)
             .Select(item => item.AppointmentId).FirstOrDefaultAsync();
+ codex/sprint-4-todo
 
     private async Task<int?> GetCurrentStylistId()
     {
@@ -230,4 +276,6 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
         return await db.Users.Where(user => user.Id == userId)
             .Select(user => user.StylistId).SingleOrDefaultAsync();
     }
+
+ develop
 }

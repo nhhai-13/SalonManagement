@@ -12,5 +12,6 @@ public partial class ApplicationDbContext
         builder.Entity<AppointmentAudit>().Property(a => a.ActorId).HasMaxLength(450);
         builder.Entity<AppointmentAudit>().HasIndex(a => new { a.AppointmentId, a.OccurredAt });
         builder.Entity<StylistNotification>().HasIndex(n => new { n.StylistId, n.CreatedAt });
+        builder.Entity<StylistNotification>().Property(n => n.IsRead).HasDefaultValue(false);
     }
 }

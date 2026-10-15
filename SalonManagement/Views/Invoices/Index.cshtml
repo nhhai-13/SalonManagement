@@ -1,7 +1,14 @@
+ codex/sprint-4-todo
 @model InvoiceDayViewModel
 @{
     ViewData["Title"] = "Lập phiếu trong ngày";
     var selectedDate = Model.SelectedDate.ToString("yyyy-MM-dd");
+
+@model IReadOnlyList<Appointment>
+@{
+    ViewData["Title"] = "Lập phiếu trong ngày";
+    var selectedDate = (string)ViewBag.SelectedDate;
+ develop
 }
 
 <div class="container py-4">
@@ -20,7 +27,11 @@
         <table class="table align-middle mb-0">
             <thead><tr><th>Giờ</th><th>Khách hàng</th><th>Thợ</th><th>Lịch hẹn</th><th>Phiếu</th><th></th></tr></thead>
             <tbody>
+ codex/sprint-4-todo
             @foreach (var appointment in Model.Appointments)
+
+            @foreach (var appointment in Model)
+develop
             {
                 <tr>
                     <td>@appointment.StartTime.ToString(@"hh\:mm")</td>
@@ -58,6 +69,7 @@
                     </td>
                 </tr>
             }
+ codex/sprint-4-todo
             @if (Model.Appointments.Count == 0) { <tr><td colspan="6" class="text-center text-secondary py-5">Không có lịch hẹn trong ngày này.</td></tr> }
             </tbody>
         </table>
@@ -71,4 +83,10 @@
             else { <tr class="fw-bold"><td colspan="2">Tổng cộng</td><td class="text-end">@Model.SubtotalTotal.ToString("N0") đ</td><td class="text-end">@Model.DiscountTotal.ToString("N0") đ</td><td class="text-end">@Model.CollectedTotal.ToString("N0") đ</td></tr> }
             </tbody></table></div>
     </section>
+
+            @if (Model.Count == 0) { <tr><td colspan="6" class="text-center text-secondary py-5">Không có lịch hẹn trong ngày này.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+ develop
 </div>

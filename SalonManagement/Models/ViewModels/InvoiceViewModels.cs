@@ -11,6 +11,7 @@ public class InvoiceDetailsViewModel
     public decimal AdjustedTotal { get; set; }
 }
 
+ codex/sprint-4-todo
 public class InvoiceDayViewModel
 {
     public DateTime SelectedDate { get; init; }
@@ -21,6 +22,8 @@ public class InvoiceDayViewModel
     public decimal CollectedTotal => PaidInvoices.Sum(item => item.TotalAmount);
 }
 
+
+ develop
 public class AddInvoiceServiceViewModel
 {
     [Required]

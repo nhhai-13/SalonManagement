@@ -92,6 +92,8 @@
         (function () {
             const form = document.getElementById('lookup-form');
             const queryInput = document.getElementById('lookup-query');
+            const initialReference = new URLSearchParams(window.location.search).get('reference');
+            if (initialReference) { queryInput.value = initialReference; document.getElementById('lookup-form').dispatchEvent(new Event('submit')); }
             const message = document.getElementById('lookup-message');
             const list = document.getElementById('lookup-list');
             const loading = document.getElementById('lookup-loading');
@@ -239,6 +241,7 @@
                                         </button>
                                     </div>
                                 ` : ''}
+                                ${a.reviewUrl ? `<div class="text-end border-top pt-3"><a class="btn btn-primary btn-sm" href="${escapeHtml(a.reviewUrl)}"><i class="bi bi-star me-1"></i>Đánh giá dịch vụ</a></div>` : ''}
                             </div>
                         </div>`;
                 }).join('');

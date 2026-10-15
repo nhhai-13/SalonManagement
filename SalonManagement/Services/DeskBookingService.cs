@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
 namespace SalonManagement.Services;
-public class DeskBookingService(ApplicationDbContext db, TimeProvider clock)
+public class DeskBookingService(ApplicationDbContext db, TimeProvider clock, AppointmentNotificationBus? notifications = null)
 {
     public Task<Appointment> Create(DeskBookingRequest request, string actor)
     {
@@ -59,7 +59,11 @@ public class DeskBookingService(ApplicationDbContext db, TimeProvider clock)
         appointment.AppointmentServices.Add(new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes });
         db.Add(appointment); await db.SaveChangesAsync();
         db.AppointmentAudits.Add(new() { AppointmentId = appointment.AppointmentId, ActorId = actor, Action = "desk-booking", PreviousStatus = "", NewStatus = appointment.Status, OccurredAt = now });
+        var notification = new StylistNotification { StylistId = stylist.StylistId, AppointmentId = appointment.AppointmentId,
+            Message = $"Lịch mới #{appointment.AppointmentId} được phân công cho bạn.", CreatedAt = now };
+        db.StylistNotifications.Add(notification);
         await db.SaveChangesAsync(); await transaction.CommitAsync();
+        notifications?.Publish(notification);
         return appointment;
     }
 }

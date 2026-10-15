@@ -29,8 +29,16 @@ namespace SalonManagement.Models
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; }
+ codex/sprint-4-todo
         public DateTime? ClosedAt { get; set; }
         public string? ClosedByUserId { get; set; }
+
+
+        public DateTime? ClosedAt { get; set; }
+
+        public string? ClosedByUserId { get; set; }
+
+ develop
         public string? ClosedByName { get; set; }
         public Customer Customer { get; set; } = null!;
         public Stylist Stylist { get; set; } = null!;
@@ -38,5 +46,6 @@ namespace SalonManagement.Models
         public Invoice? Invoice { get; set; }
         public ScheduleContactFollowUp? ScheduleContactFollowUp { get; set; }
         public ICollection<ScheduleChangeNotification> ScheduleChangeNotifications { get; set; } = new List<ScheduleChangeNotification>();
+        public ICollection<AppointmentEmailDelivery> EmailDeliveries { get; set; } = new List<AppointmentEmailDelivery>();
     }
 }

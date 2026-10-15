@@ -38,6 +38,7 @@ public ApplicationDbContext(
 
         public DbSet<AppointmentChangeLog> AppointmentChangeLogs => Set<AppointmentChangeLog>();
         public DbSet<AppointmentChangeEmail> AppointmentChangeEmails => Set<AppointmentChangeEmail>();
+        public DbSet<AppointmentEmailDelivery> AppointmentEmailDeliveries => Set<AppointmentEmailDelivery>();
 
         public DbSet<AppointmentService> AppointmentServices => Set<AppointmentService>();
 
@@ -71,6 +72,8 @@ public override int SaveChanges()
 {
     return SaveChangesAsync().GetAwaiter().GetResult();
 }
+
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
 
 public override int SaveChanges(bool acceptAllChangesOnSuccess)
 {
@@ -139,6 +142,9 @@ private List<AuditEntry> CreateAuditEntries()
         }
 
         var entityType = entry.Entity.GetType().Name;
+
+ feature/s2-02-stylist-time-off-clean
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
 
         if (entityType != nameof(ApplicationUser) &&
             entry.Entity is not Microsoft.AspNetCore.Identity.IdentityUserRole<string> &&
@@ -412,6 +418,19 @@ private class AuditEntry
                 entity.HasIndex(email => new { email.Status, email.NextAttemptAt });
             });
 
+            builder.Entity<AppointmentEmailDelivery>(entity =>
+            {
+                entity.HasKey(delivery => delivery.AppointmentEmailDeliveryId);
+                entity.Property(delivery => delivery.Kind).HasMaxLength(20).IsRequired();
+                entity.Property(delivery => delivery.RecipientEmail).HasMaxLength(256);
+                entity.Property(delivery => delivery.Status).HasMaxLength(20).IsRequired();
+                entity.Property(delivery => delivery.LastError).HasMaxLength(1000);
+                entity.HasIndex(delivery => new { delivery.AppointmentId, delivery.Kind }).IsUnique();
+                entity.HasIndex(delivery => new { delivery.Status, delivery.NextAttemptAt });
+                entity.HasOne(delivery => delivery.Appointment).WithMany(appointment => appointment.EmailDeliveries)
+                    .HasForeignKey(delivery => delivery.AppointmentId).OnDelete(DeleteBehavior.Cascade);
+            });
+
             builder.Entity<AppointmentService>(entity =>
             {
                 entity.HasKey(item => item.AppointmentServiceId);
@@ -593,6 +612,22 @@ private class AuditEntry
                     .WithMany(invoice => invoice.Payments)
                     .HasForeignKey(payment => payment.InvoiceId);
             });
+ feature/s2-02-stylist-time-off-warning
+ feature/s2-02-stylist-time-off-warning
+
+ feature/s2-02-stylist-time-off-booking
+ develop
+               // Cấu hình lịch nghỉ riêng của thợ
+        builder.Entity<StylistTimeOff>(entity =>
+            {
+                entity.HasKey(timeOff => timeOff.StylistTimeOffId);
+
+                entity.HasOne(timeOff => timeOff.Stylist)
+                    .WithMany()
+                    .HasForeignKey(timeOff => timeOff.StylistId)
+                    .OnDelete(DeleteBehavior.Cascade);
+           });
+
 
             builder.Entity<RescheduleChangeLog>(entity =>
             {
@@ -611,6 +646,7 @@ private class AuditEntry
                 entity.HasIndex(log => log.AppointmentId);
                 entity.HasIndex(log => log.ChangedAtUtc);
             });
+ develop
         }
     }
 }

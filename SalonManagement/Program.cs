@@ -199,6 +199,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAttendanceModules();
+builder.Services.AddHostedService<StylistNotificationCleanupService>();
 builder.Services.AddScoped<StylistAvailabilityService>();
 
 builder.Services.AddScoped<
@@ -218,6 +219,7 @@ builder.Services.Configure<ScheduleNotificationOptions>(
 builder.Services.AddSingleton<IScheduleChangeEmailSender, SmtpScheduleChangeEmailSender>();
 builder.Services.AddScoped<ScheduleNotificationDispatcher>();
 builder.Services.AddHostedService<ScheduleNotificationBackgroundService>();
+builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
 
 builder.Services.AddSingleton<
@@ -229,6 +231,8 @@ builder.Services.AddScoped<AppointmentBookingService>();
 builder.Services.AddScoped<AppointmentReschedulingService>();
 builder.Services.AddScoped<AppointmentChangeEmailProcessor>();
 builder.Services.AddHostedService<AppointmentChangeEmailBackgroundService>();
+builder.Services.AddScoped<AppointmentEmailDeliveryProcessor>();
+builder.Services.AddHostedService<AppointmentEmailDeliveryWorker>();
 builder.Services.AddScoped<BookingEmailVerificationService>();
 
 

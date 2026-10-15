@@ -104,7 +104,35 @@
                                 <i class="bi bi-calendar-check me-1"></i>Đặt lịch
                             </a>
                         </li>
-
+                        @if (User.Identity?.IsAuthenticated == true &&
+                             (User.IsInRole(UserRoles.Stylist) || User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Appointments" asp-action="Index">Lịch hẹn</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true &&
+                             (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Phiếu tính tiền</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && (User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="DiscountCoupons" asp-action="Index">Mã giảm giá</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Owner))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Index">Báo cáo lịch hẹn</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Revenue">Doanh thu</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Today">Tổng quan hôm nay</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="StylistReviews" asp-action="Index">Đánh giá thợ</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="PermissionAudit" asp-action="Index">Đối chiếu phân quyền</a></li>
+                        }
+                        @if (HostEnvironment.IsStaging() && User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Sprint4Staging" asp-action="Index">Kịch bản demo</a></li>
+                        }
                     </ul>
 
                     <partial name="_LoginPartial" />
