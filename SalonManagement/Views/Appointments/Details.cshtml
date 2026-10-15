@@ -1,0 +1,78 @@
+@model AppointmentDetailsViewModel
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Chi tiết lịch hẹn";
+    var appointment = Model.Appointment;
+    var email = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name;
+    string Money(decimal amount) => string.Concat(amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")), " đ");
+    string MaskPhone(string phone) => phone.Length < 5 ? "••••" : phone[..Math.Min(3, phone.Length)] + new string('•', Math.Max(0, phone.Length - 5)) + phone[^2..];
+}
+<div class="container py-4 appointment-detail">
+    <a asp-action="Index" asp-route-date="@appointment.AppointmentDate.ToString("yyyy-MM-dd")" class="text-decoration-none">← Lịch hẹn trong ngày</a>
+    <div class="d-flex flex-wrap justify-content-between gap-3 mt-3 mb-4"><div><p class="text-uppercase text-secondary small mb-1">Lịch hẹn #@appointment.AppointmentId</p><h1 class="h3 mb-1">@appointment.Customer.FullName</h1><p class="text-secondary mb-0">@(User.IsInRole(UserRoles.Stylist) ? MaskPhone(appointment.Customer.Phone) : appointment.Customer.Phone) · @appointment.AppointmentDate.ToString("dd/MM/yyyy") · @appointment.StartTime.ToString(@"hh\:mm")</p></div><span class="badge text-bg-light align-self-start">@appointment.Status</span></div>
+    @if (TempData["Error"] is string error) { <div class="alert alert-danger">@error</div> }
+    @if (TempData["Success"] is string success) { <div class="alert alert-success">@success</div> }
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <section class="card border-0 shadow-sm"><div class="card-body p-4"><h2 class="h5 mb-3">Dịch vụ trong lượt này</h2>
+            @foreach (var item in appointment.AppointmentServices.OrderBy(item => item.AppointmentServiceId))
+            {
+                var stylist = item.Stylist ?? appointment.Stylist;
+                var canEdit = User.IsInRole(UserRoles.Stylist) && string.Equals(stylist.Email, email, StringComparison.OrdinalIgnoreCase);
+                <article class="visit-service border rounded-3 p-3 mb-3">
+                    <div class="d-flex justify-content-between gap-3"><div><h3 class="h6 mb-1">@item.Service.ServiceName</h3><div class="small text-secondary">@stylist.FullName · @Money(item.Price) · @(item.IsCompleted ? "Đã hoàn tất" : "Đang thực hiện")</div></div>
+                    @if (canEdit && !item.IsCompleted)
+                    {
+                        <form asp-action="CompleteService" method="post">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@item.AppointmentServiceId" /><button type="submit" class="btn btn-sm btn-outline-success">Hoàn tất</button></form>
+                    }
+                    </div>
+                    <form asp-action="SaveTechnicalNote" method="post" class="mt-3 technical-note-form" data-max="500">
+                        @Html.AntiForgeryToken()<input type="hidden" name="id" value="@item.AppointmentServiceId" />
+                        <label class="form-label" for="note-@item.AppointmentServiceId">Ghi chú kỹ thuật</label>
+                        <textarea id="note-@item.AppointmentServiceId" name="technicalNotes" class="form-control" maxlength="500" rows="3" readonly="@(!canEdit)">@item.TechnicalNotes</textarea>
+                        <div class="d-flex justify-content-between align-items-center mt-2"><span class="small text-secondary note-counter">@(item.TechnicalNotes?.Length ?? 0)/500</span>
+                        @if (canEdit) { <button type="submit" class="btn btn-sm btn-primary">Lưu ghi chú</button> }</div>
+                        @if (!string.IsNullOrWhiteSpace(item.TechnicalNotes)) { <div class="small text-secondary mt-2">Nhập bởi @item.TechnicalNotesUpdatedBy · @(item.TechnicalNotesUpdatedAt is DateTime noteUpdatedAt ? VietnamTime.FromUtc(noteUpdatedAt).ToString("dd/MM/yyyy HH:mm") : "")</div> }
+                    </form>
+                </article>
+            }
+            @if (appointment.AppointmentServices.Count == 0) { <p class="text-secondary mb-0">Lịch hẹn chưa có dịch vụ.</p> }
+            </div></section>
+        </div>
+        <div class="col-lg-5">
+            <section class="card border-0 shadow-sm"><div class="card-body p-4"><h2 class="h5 mb-3">Lịch sử khách</h2>
+                @if (Model.HistoryLoadFailed)
+                {
+                    <div class="alert alert-warning mb-0" role="alert">Không tải được lịch sử dịch vụ. Ghi chú cho lượt hiện tại vẫn dùng được.</div>
+                }
+                else if (Model.IsNewCustomer)
+                {
+                    <div class="alert alert-info mb-0" role="status">Khách mới, chưa có lịch sử dịch vụ</div>
+                }
+                else
+                {
+                    <div class="history-list">
+                    @foreach (var row in Model.History)
+                    {
+                        <article class="history-item border-top py-3"><div class="d-flex justify-content-between gap-2"><strong>@row.ServiceName</strong><time class="small text-secondary">@row.AppointmentDate.ToString("dd/MM/yyyy")</time></div><div class="small text-secondary">Thợ: @row.StylistName</div>
+                        @if (string.IsNullOrWhiteSpace(row.TechnicalNotes)) { <p class="small mb-0 mt-2">Không có ghi chú</p> }
+                        else if (row.TechnicalNotes.Length > 120) { <p class="small mb-1 mt-2">@row.TechnicalNotes[..120]…</p><details><summary class="small text-primary">Xem thêm</summary><p class="small mb-0 mt-2">@row.TechnicalNotes</p></details> }
+                        else { <p class="small mb-0 mt-2">@row.TechnicalNotes</p> }
+                        </article>
+                    }
+                    </div>
+                }
+            </div></section>
+        </div>
+    </div>
+</div>
+@section Scripts {
+<script>
+document.querySelectorAll('.technical-note-form textarea').forEach(field => {
+    const counter = field.closest('form').querySelector('.note-counter');
+    const update = () => counter.textContent = `${field.value.length}/500`;
+    field.addEventListener('input', update);
+    update();
+});
+</script>
+}

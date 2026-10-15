@@ -1,0 +1,177 @@
+@model InvoiceDetailsViewModel
+@{
+    ViewData["Title"] = $"Phiếu #{Model.Invoice.InvoiceId}";
+    var invoice = Model.Invoice;
+    var editable = invoice.Status == "Unpaid" && invoice.ClosedAt is null;
+    var paid = invoice.Status == "Paid";
+    string Money(decimal amount) => string.Concat(amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")), " đ");
+}
+
+<div class="container py-4 invoice-page">
+    <a asp-action="Index" asp-route-date="@invoice.Appointment.AppointmentDate.ToString("yyyy-MM-dd")" class="text-decoration-none">← Lịch hẹn trong ngày</a>
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mt-3 mb-4">
+        <div><p class="text-uppercase text-secondary small mb-1">Phiếu tính tiền</p><h1 class="h3">Phiếu #@invoice.InvoiceId</h1><p class="mb-0">@invoice.Appointment.Customer.FullName · @invoice.Appointment.AppointmentDate.ToString("dd/MM/yyyy") @invoice.Appointment.StartTime.ToString(@"hh\:mm")</p></div>
+        <span class="badge rounded-pill @(invoice.ClosedAt is not null ? "text-bg-secondary" : paid ? "text-bg-success" : "text-bg-warning")">@(invoice.ClosedAt is not null ? "Đã đóng" : paid ? "Đã thanh toán" : "Chưa thanh toán")</span>
+    </div>
+
+    @if (TempData["Error"] is string error) { <div class="alert alert-danger">@error</div> }
+    @if (TempData["Success"] is string success) { <div class="alert alert-success">@success</div> }
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <section class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive"><table class="table align-middle mb-0" id="invoice-lines">
+                        <thead><tr><th>Dịch vụ</th><th>Thợ thực hiện</th><th class="text-end">Đơn giá</th><th class="text-end">Đã thu</th>@if (editable) { <th></th> }</tr></thead>
+                        <tbody>
+                        @foreach (var line in invoice.Lines)
+                        {
+                            var stylist = line.AppointmentService.Stylist ?? invoice.Appointment.Stylist;
+                            <tr data-line-id="@line.InvoiceLineId"><td>@line.ServiceName</td><td>@stylist.FullName</td><td class="text-end">@Money(line.UnitPrice)</td><td class="text-end">@Money(line.AppointmentService.CollectedAmount)</td>
+                            @if (editable) { <td class="text-end"><form asp-action="RemoveService" method="post" class="invoice-ajax-form"><input type="hidden" name="id" value="@invoice.InvoiceId" /><input type="hidden" name="lineId" value="@line.InvoiceLineId" />@Html.AntiForgeryToken()<button class="btn btn-sm btn-link text-danger" type="submit">Xóa</button></form></td> }
+                            </tr>
+                        }
+                        @if (invoice.Lines.Count == 0) { <tr class="empty-lines"><td colspan="5" class="text-center text-secondary py-4">Phiếu chưa có dịch vụ.</td></tr> }
+                        </tbody>
+                    </table></div>
+                    @if (editable)
+                    {
+                        <form asp-action="AddService" method="post" class="d-flex flex-wrap gap-2 p-3 border-top invoice-ajax-form" id="add-service-form">
+                            @Html.AntiForgeryToken()<input type="hidden" name="id" value="@invoice.InvoiceId" />
+                            <select class="form-select flex-grow-1" name="ServiceId" required aria-label="Chọn dịch vụ">
+                                <option value="">Thêm dịch vụ…</option>
+                                @foreach (var service in Model.AvailableServices) { <option value="@service.ServiceId">@service.ServiceName — @Money(service.Price)</option> }
+                            </select><button class="btn btn-outline-primary" type="submit">Thêm dịch vụ</button>
+                            <small class="w-100 text-secondary">Dòng mới dùng giá hiện hành và gán cho thợ của lịch hẹn.</small>
+                        </form>
+                    }
+                </div>
+            </section>
+
+            <section class="card border-0 shadow-sm"><div class="card-body p-4">
+                <div class="d-flex justify-content-between"><span>Tổng trước giảm</span><strong id="invoice-subtotal">@Money(invoice.Subtotal)</strong></div>
+                <div class="d-flex justify-content-between mt-2"><span>Giảm giá@(invoice.DiscountCodeSnapshot is null ? "" : $" · {invoice.DiscountCodeSnapshot}")</span><strong id="invoice-discount">@Money(invoice.DiscountAmount)</strong></div>
+                <div class="d-flex justify-content-between mt-2"><span>Tổng thực thu</span><strong id="invoice-total">@Money(invoice.TotalAmount)</strong></div>
+                @if (invoice.Adjustments.Count > 0)
+                {
+                    <div class="d-flex justify-content-between mt-2"><span>Sau điều chỉnh</span><strong>@Money(Model.AdjustedTotal)</strong></div>
+                }
+                @if (paid)
+                {
+                    @foreach (var payment in invoice.Payments.OrderBy(item => item.PaidAt))
+                    {
+                        <hr /><div class="d-flex justify-content-between"><span>@(payment.PaymentMethod == "BankTransfer" ? "Chuyển khoản" : "Tiền mặt") · @(payment.PaidAt is DateTime paidAt ? VietnamTime.FromUtc(paidAt).ToString("dd/MM/yyyy HH:mm") : "")</span><strong>@Money(payment.Amount)</strong></div>
+                        @if (payment.PaymentMethod == "BankTransfer") { <div class="small text-secondary mt-1">Đối soát: @payment.TransactionCode</div> }
+                    }
+                }
+                @if (invoice.ClosedAt is not null) { <div class="small text-secondary mt-2">Đóng bởi @invoice.ClosedByName · @VietnamTime.FromUtc(invoice.ClosedAt.Value).ToString("dd/MM/yyyy HH:mm")</div> }
+            </div></section>
+        </div>
+
+        <div class="col-lg-4">
+            @if (editable)
+            {
+                <section class="card border-0 shadow-sm mb-4"><div class="card-body p-4"><h2 class="h5">Mã giảm giá</h2>
+                    <form asp-action="ApplyDiscount" method="post" class="d-flex gap-2">
+                        @Html.AntiForgeryToken()<input type="hidden" name="InvoiceId" value="@invoice.InvoiceId" />
+                        <input class="form-control" name="Code" maxlength="32" value="@invoice.DiscountCodeSnapshot" placeholder="Nhập mã; để trống để gỡ" aria-label="Mã giảm giá" />
+                        <button class="btn btn-outline-primary" type="submit">Áp mã</button>
+                    </form>
+                </div></section>
+                <section class="card border-0 shadow-sm mb-4"><div class="card-body p-4">
+                    <h2 class="h5">Thanh toán</h2>
+                    <form asp-action="Pay" method="post" id="pay-form">
+                        @Html.AntiForgeryToken()<input type="hidden" name="id" value="@invoice.InvoiceId" />
+                        <label class="form-label" for="payment-method">Hình thức</label>
+                        <select class="form-select mb-3" name="PaymentMethod" id="payment-method"><option value="Cash">Tiền mặt</option><option value="BankTransfer">Chuyển khoản</option></select>
+                        <div id="reconciliation-field" hidden><label class="form-label" for="reconciliation-note">Ghi chú đối soát</label><textarea class="form-control mb-2" name="ReconciliationNote" id="reconciliation-note" maxlength="500" rows="2"></textarea><span class="text-danger small" id="reconciliation-error"></span></div>
+                        <p class="text-secondary small">Thành tiền <strong id="payment-total">@Money(invoice.TotalAmount)</strong></p>
+                        <button class="btn btn-primary w-100" type="submit">Ghi nhận thanh toán</button>
+                    </form>
+                </div></section>
+            }
+
+            @if (invoice.ClosedAt is null)
+            {
+                <section class="card border-0 shadow-sm mb-4"><div class="card-body p-4">
+                    <h2 class="h5">Đóng lịch hẹn</h2>
+                    @if (Model.CloseBlockers.Count > 0) { <ul class="small text-secondary mb-3">@foreach (var blocker in Model.CloseBlockers) { <li>@blocker</li> }</ul> }
+                    else { <p class="small text-secondary">Thợ đã hoàn tất và phiếu đã thanh toán.</p> }
+                    <form asp-action="Close" method="post">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@invoice.InvoiceId" /><button class="btn btn-outline-primary w-100" type="submit" disabled="@(!Model.CanClose)">Đóng lịch hẹn</button></form>
+                </div></section>
+            }
+
+            @if (invoice.ClosedAt is not null)
+            {
+                <section class="card border-0 shadow-sm"><div class="card-body p-4">
+                    <h2 class="h5">Phiếu điều chỉnh</h2><p class="small text-secondary">Phiếu gốc được giữ nguyên; mỗi điều chỉnh ghi nhận số chênh lệch và thợ phụ trách.</p>
+                    <form asp-action="AddAdjustment" method="post" class="vstack gap-2">
+                        @Html.AntiForgeryToken()<input type="hidden" name="id" value="@invoice.InvoiceId" />
+                        <label class="form-label mb-0" for="adjustment-description">Nội dung</label><input class="form-control" name="Description" id="adjustment-description" maxlength="150" required />
+                        <label class="form-label mb-0" for="adjustment-amount">Chênh lệch (VND, âm hoặc dương)</label><input class="form-control" type="number" step="1" name="AmountDelta" id="adjustment-amount" required />
+                        <label class="form-label mb-0" for="adjustment-line">Dòng dịch vụ</label><select class="form-select" name="InvoiceLineId" id="adjustment-line" required><option value="">Chọn dòng</option>@foreach (var line in invoice.Lines) { var lineStylist = line.AppointmentService.Stylist ?? invoice.Appointment.Stylist; <option value="@line.InvoiceLineId">@line.ServiceName — @lineStylist.FullName</option> }</select>
+                        <label class="form-label mb-0" for="adjustment-reason">Lý do</label><textarea class="form-control" name="Reason" id="adjustment-reason" maxlength="500" required></textarea>
+                        <button class="btn btn-outline-primary" type="submit">Tạo phiếu điều chỉnh</button>
+                    </form>
+                    @if (invoice.Adjustments.Count > 0)
+                    {
+                        <hr /><h3 class="h6">Lịch sử điều chỉnh</h3>
+                        @foreach (var adjustment in invoice.Adjustments.OrderByDescending(item => item.CreatedAt))
+                        {
+                            <div class="border-top py-2"><div class="d-flex justify-content-between"><strong>@adjustment.Description · @adjustment.InvoiceLine.ServiceName</strong><span>@Money(adjustment.AmountDelta)</span></div><div class="small text-secondary">@adjustment.Reason · @adjustment.CreatedByName · @VietnamTime.FromUtc(adjustment.CreatedAt).ToString("dd/MM/yyyy HH:mm") · @adjustment.Stylist?.FullName</div></div>
+                        }
+                    }
+                </div></section>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(() => {
+    const method = document.getElementById('payment-method');
+    const noteBox = document.getElementById('reconciliation-field');
+    const note = document.getElementById('reconciliation-note');
+    const noteError = document.getElementById('reconciliation-error');
+    method?.addEventListener('change', () => {
+        const transfer = method.value === 'BankTransfer';
+        noteBox.hidden = !transfer;
+        if (!transfer) { note.value = ''; noteError.textContent = ''; }
+    });
+    document.getElementById('pay-form')?.addEventListener('submit', event => {
+        if (method.value === 'BankTransfer' && !note.value.trim()) {
+            event.preventDefault(); noteError.textContent = 'Hãy nhập ghi chú đối soát.'; note.focus();
+        }
+    });
+
+    document.addEventListener('submit', async event => {
+        const form = event.target.closest('.invoice-ajax-form');
+        if (!form) return;
+        event.preventDefault();
+        const response = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'Accept': 'application/json' } });
+        if (!response.ok) { window.location.reload(); return; }
+        const result = await response.json();
+        if (form.id === 'add-service-form') {
+            document.querySelector('.empty-lines')?.remove();
+            const row = document.createElement('tr'); row.dataset.lineId = result.lineId;
+            row.innerHTML = `<td></td><td></td><td class="text-end"></td><td class="text-end"></td><td class="text-end"></td>`;
+            row.children[0].textContent = result.serviceName;
+            row.children[1].textContent = result.stylistName;
+            row.children[2].textContent = result.formattedUnitPrice;
+            row.children[3].textContent = result.formattedCollectedAmount;
+            row.children[4].innerHTML = '<form method="post" class="invoice-ajax-form"><input type="hidden" name="id" value="@invoice.InvoiceId" /><input type="hidden" name="lineId" value="' + result.lineId + '" /><input name="__RequestVerificationToken" type="hidden" value="' + form.querySelector('[name="__RequestVerificationToken"]').value + '" /><button class="btn btn-sm btn-link text-danger" type="submit">Xóa</button></form>';
+            document.querySelector('#invoice-lines tbody').append(row);
+            form.querySelector('select').value = '';
+        } else {
+            form.closest('tr').remove();
+            if (!document.querySelector('#invoice-lines tbody tr[data-line-id]')) document.querySelector('#invoice-lines tbody').innerHTML = '<tr class="empty-lines"><td colspan="5" class="text-center text-secondary py-4">Phiếu chưa có dịch vụ.</td></tr>';
+        }
+        document.getElementById('invoice-total').textContent = result.formattedTotal;
+        document.getElementById('invoice-subtotal').textContent = result.formattedSubtotal;
+        document.getElementById('invoice-discount').textContent = result.formattedDiscount;
+        document.getElementById('payment-total').textContent = result.formattedTotal;
+    });
+})();
+</script>
+}

@@ -1,0 +1,47 @@
+@using SalonManagement.Models
+@using SalonManagement.Services
+@model List<Appointment>
+@{
+    ViewData["Title"] = "Tiếp nhận khách";
+    DateTime day = ViewBag.Day;
+    DateTimeOffset now = ViewBag.Now;
+    string Label(string status) => status switch { "Pending" => "Chờ xác nhận", "Confirmed" => "Đã xác nhận", "Arrived" => "Đã đến", "NoShow" => "Không đến", "Cancelled" => "Đã huỷ", "Completed" => "Hoàn tất", _ => status };
+}
+<div class="attendance-page">
+@await Html.PartialAsync("_AttendanceStyles")
+<div class="attendance-heading"><div><span class="attendance-kicker">LUMINOL · LỄ TÂN</span><h1>Tiếp nhận khách</h1></div><span class="attendance-total">@Model.Count lịch hẹn</span></div>
+@if (TempData["Error"] is string error) { <div class="alert alert-danger" role="alert">@error</div> }
+@if (TempData["Success"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+<form method="get" class="attendance-toolbar"><label for="date">Ngày xem lịch</label> <input class="form-control" type="date" id="date" name="date" value="@day.ToString("yyyy-MM-dd")" required /> <button class="btn btn-primary">Xem lịch</button></form>
+
+@if (Model.Count == 0) { <div class="attendance-empty"><h2>Chưa có lịch hẹn</h2><p>Chọn ngày khác để xem lịch của khách.</p></div> }
+@foreach (var a in Model) {
+    <article class="card attendance-card mb-3"><div class="card-body">
+        <h2 class="h5">@a.StartTime.ToString(@"hh\:mm") – @a.EndTime.ToString(@"hh\:mm") · @a.Customer.FullName</h2>
+        <p>@a.Customer.Phone · Thợ: @a.Stylist.FullName · <strong class="attendance-status attendance-status-@a.Status.ToLowerInvariant()">@Label(a.Status)</strong></p>
+        @if (a.CheckedInAt.HasValue) {
+            var checkedInAt = a.CheckedInAt.Value.ToOffset(TimeSpan.FromHours(7));
+            var offsetMinutes = (checkedInAt - CheckInService.StartsAt(a)).TotalMinutes;
+            <p>Giờ đến: @checkedInAt.ToString("HH:mm 'ngày' dd/MM/yyyy")</p>
+            @if (offsetMinutes < 0) {
+                <p class="text-info">Khách đến sớm @Math.Ceiling(Math.Abs(offsetMinutes)) phút. Giữ nguyên khung giờ đã đặt; lễ tân có thể mời khách chờ hoặc hỏi thợ nếu có thể phục vụ sớm.</p>
+            } else if (offsetMinutes > 0 && a.LateMinutes == 0) {
+                <p class="text-warning">Khách đến muộn @Math.Ceiling(offsetMinutes) phút, trong ngưỡng 15 phút. Giữ nguyên giờ kết thúc và báo thợ để xác nhận khả năng phục vụ.</p>
+            } else if (a.LateMinutes > 0) {
+                <p class="text-danger">Đến muộn @a.LateMinutes phút. Giữ nguyên khung giờ; báo thợ và trao đổi với khách nếu cần đổi lịch.</p>
+            } else {
+                <p class="text-success">Khách đến đúng giờ.</p>
+            }
+        }
+        <form asp-action="Change" method="post" class="d-flex flex-wrap gap-2">
+            <input type="hidden" name="id" value="@a.AppointmentId" /><input type="hidden" name="date" value="@day.ToString("yyyy-MM-dd")" />
+            <button class="btn btn-success" name="operation" value="check-in" disabled="@(!CheckInService.CanCheckIn(a, now))">Check-in</button>
+        </form>
+    </div></article>
+}
+</div>
+@section Scripts {
+<script>
+setTimeout(() => { if (!document.querySelector('input:focus')) location.reload(); }, 30000);
+</script>
+}

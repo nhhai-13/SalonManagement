@@ -1,0 +1,65 @@
+@model IReadOnlyList<Appointment>
+@{
+    ViewData["Title"] = "Lập phiếu trong ngày";
+    var selectedDate = (string)ViewBag.SelectedDate;
+}
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+        <div><p class="text-uppercase text-secondary small mb-1">Quầy lễ tân</p><h1 class="h3 mb-0">Lịch hẹn trong ngày</h1></div>
+        <form method="get" class="d-flex gap-2 align-items-end">
+            <label class="form-label mb-0">Ngày<input class="form-control" type="date" name="date" value="@selectedDate" /></label>
+            <button class="btn btn-outline-secondary" type="submit">Xem</button>
+        </form>
+    </div>
+
+    @if (TempData["Error"] is string error) { <div class="alert alert-danger">@error</div> }
+    @if (TempData["Success"] is string success) { <div class="alert alert-success">@success</div> }
+
+    <div class="table-responsive bg-white border rounded-3">
+        <table class="table align-middle mb-0">
+            <thead><tr><th>Giờ</th><th>Khách hàng</th><th>Thợ</th><th>Lịch hẹn</th><th>Phiếu</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var appointment in Model)
+            {
+                <tr>
+                    <td>@appointment.StartTime.ToString(@"hh\:mm")</td>
+                    <td>@appointment.Customer.FullName <span class="text-secondary small d-block">@appointment.Customer.Phone</span></td>
+                    <td>@appointment.Stylist.FullName</td>
+                    <td>@appointment.Status</td>
+                    <td>@(appointment.Invoice is null ? "Chưa lập" : appointment.Invoice.ClosedAt is not null ? "Đã đóng" : appointment.Invoice.Status == "Paid" ? "Đã thanh toán" : "Chưa thanh toán")</td>
+                    <td class="text-end">
+                    @if (appointment.Invoice is not null)
+                    {
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@appointment.Invoice.InvoiceId">Mở phiếu</a>
+                        @if (appointment.Invoice.ClosedAt is null)
+                        {
+                            var servicesComplete = appointment.AppointmentServices.Count > 0 && appointment.AppointmentServices.All(item => item.IsCompleted);
+                            var canClose = appointment.Invoice.Status == "Paid" && servicesComplete;
+                            var blockers = new List<string>();
+                            if (!servicesComplete) blockers.Add("Thợ chưa hoàn tất dịch vụ");
+                            if (appointment.Invoice.Status != "Paid") blockers.Add("Phiếu chưa thanh toán");
+                            <form asp-action="Close" method="post" class="d-inline ms-1">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@appointment.Invoice.InvoiceId" /><button class="btn btn-sm btn-outline-secondary" type="submit" disabled="@(!canClose)">Đóng lịch</button></form>
+                            @if (!canClose) { <span class="d-block small text-secondary mt-1">@string.Join("; ", blockers)</span> }
+                        }
+                    }
+                    else if (appointment.Status == "Completed")
+                    {
+                        <form asp-action="CreateFromAppointment" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="appointmentId" value="@appointment.AppointmentId" />
+                            <button class="btn btn-sm btn-primary" type="submit">Lập phiếu</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <span class="small text-secondary">Chờ thợ hoàn tất</span>
+                    }
+                    </td>
+                </tr>
+            }
+            @if (Model.Count == 0) { <tr><td colspan="6" class="text-center text-secondary py-5">Không có lịch hẹn trong ngày này.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

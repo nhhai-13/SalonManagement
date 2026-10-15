@@ -1,3 +1,4 @@
+@inject IWebHostEnvironment HostEnvironment
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -9,11 +10,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/salon-design.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/SalonManagement.styles.css" asp-append-version="true" />
 </head>
 <body>
+    @if (HostEnvironment.IsStaging())
+    {
+        var assembly = System.Reflection.Assembly.GetEntryAssembly();
+        <div class="bg-warning text-dark text-center fw-bold py-1" role="status">STAGING · Bản @assembly?.GetName().Version · triển khai @(assembly is null ? "không rõ" : System.IO.File.GetLastWriteTimeUtc(assembly.Location).ToString("yyyy-MM-dd HH:mm 'UTC'"))</div>
+    }
     @{ var isHome = ViewContext.RouteData.Values["controller"]?.ToString() == "Home" && ViewContext.RouteData.Values["action"]?.ToString() == "Index"; }
     @if (!isHome)
     {
@@ -55,6 +61,9 @@
                             </a>
                         </li>
 
+                        @await Html.PartialAsync("_S303Nav")
+                        @await Html.PartialAsync("_S306Nav")
+                        @await Html.PartialAsync("_S305Nav")
                         <!-- Menu Dịch vụ -->
                         <li class="nav-item">
                             <a class="nav-link text-dark"
@@ -72,7 +81,35 @@
                                 <i class="bi bi-calendar-check me-1"></i>Đặt lịch
                             </a>
                         </li>
-
+                        @if (User.Identity?.IsAuthenticated == true &&
+                             (User.IsInRole(UserRoles.Stylist) || User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Appointments" asp-action="Index">Lịch hẹn</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true &&
+                             (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Phiếu tính tiền</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && (User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="DiscountCoupons" asp-action="Index">Mã giảm giá</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Owner))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Index">Báo cáo lịch hẹn</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Revenue">Doanh thu</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Today">Tổng quan hôm nay</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="StylistReviews" asp-action="Index">Đánh giá thợ</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="PermissionAudit" asp-action="Index">Đối chiếu phân quyền</a></li>
+                        }
+                        @if (HostEnvironment.IsStaging() && User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Sprint4Staging" asp-action="Index">Kịch bản demo</a></li>
+                        }
                     </ul>
 
                     <partial name="_LoginPartial" />
@@ -107,3 +144,4 @@
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
+

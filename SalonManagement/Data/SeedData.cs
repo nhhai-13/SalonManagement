@@ -8,7 +8,8 @@ public static class SeedData
 {
     public static async Task SeedAsync(
         ApplicationDbContext context,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        bool seedDemoAccounts = true)
     {
         // =========================
         // 1. SERVICE GROUPS
@@ -257,6 +258,8 @@ public static class SeedData
         // 4. SAMPLE USERS
         // =========================
 
+        if (!seedDemoAccounts) return;
+
         var sampleUsers = new[]
         {
             new
@@ -316,6 +319,14 @@ public static class SeedData
                     throw new InvalidOperationException(
                         $"Không thể tạo tài khoản {item.Email}: {errors}");
                 }
+            }
+
+            if (item.Role == UserRoles.Stylist && user.StylistId == null)
+            {
+                user.StylistId = await context.Stylists.Where(s => s.Email == "minhanh@salon.local")
+                    .Select(s => (int?)s.StylistId).SingleOrDefaultAsync();
+                var linked = await userManager.UpdateAsync(user);
+                if (!linked.Succeeded) throw new InvalidOperationException("Không thể liên kết tài khoản thợ mẫu.");
             }
 
             // Kiểm tra role trước khi gán để chạy seed nhiều lần

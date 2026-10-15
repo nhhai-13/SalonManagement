@@ -1,0 +1,70 @@
+@model SalonManagement.Models.DeskBookingRequest
+@{ ViewData["Title"] = "Đặt lịch tại quầy"; List<SalonManagement.Models.Stylist> stylists = ViewBag.Stylists; List<SalonManagement.Models.Service> services = ViewBag.Services; }
+<div class="attendance-page">
+@await Html.PartialAsync("_AttendanceStyles")
+<div class="attendance-heading"><div><span class="attendance-kicker">LUMINOL · LỄ TÂN</span><h1>Đặt lịch tại quầy</h1></div></div>
+<form asp-action="Create" method="post" class="card card-body attendance-booking">
+<div asp-validation-summary="All" class="text-danger" role="alert"></div>
+<label asp-for="FullName">Tên khách</label><input asp-for="FullName" class="form-control mb-2" required maxlength="150" />
+<label asp-for="Phone">Số điện thoại</label><input asp-for="Phone" class="form-control mb-2" type="tel" pattern="0[0-9]{9}" required />
+<p id="booking-warning" role="status" class="text-danger"></p>
+<div id="customer-profile" class="alert alert-info d-none" role="status"></div>
+<label id="confirm-name-wrap" class="mb-2 d-none"><input asp-for="ConfirmExistingName" /> Dùng hồ sơ khách đã có; không thay đổi tên trong hồ sơ.</label>
+<label class="mb-2"><input asp-for="AcknowledgeNoShow" /> Tôi đã xem cảnh báo khách không đến (nếu có).</label>
+<label asp-for="StylistId">Thợ phụ trách</label><select asp-for="StylistId" class="form-select mb-2" required><option value="">Chọn thợ</option>@foreach (var stylist in stylists) { <option value="@stylist.StylistId">@stylist.FullName</option> }</select>
+<label asp-for="ServiceId">Dịch vụ</label><select asp-for="ServiceId" class="form-select mb-2" required><option value="">Chọn dịch vụ</option>@foreach (var service in services) { <option value="@service.ServiceId">@service.ServiceName (@service.DurationMinutes phút)</option> }</select>
+<label asp-for="StartsAt">Ngày giờ hẹn</label><input asp-for="StartsAt" type="datetime-local" class="form-control mb-2" required />
+
+<button class="btn btn-primary">Đặt lịch</button><a asp-action="Index" class="mt-2">Về lịch ngày</a>
+</form>
+</div>
+@section Scripts {
+<script src="~/js/auth.js" asp-append-version="true"></script>
+<script>
+const phone = document.getElementById('Phone');
+let requestNumber = 0;
+let existingProfileName = null;
+let lastProfilePhone = phone.value;
+const fullName = document.getElementById('FullName');
+const profileBox = document.getElementById('customer-profile');
+fullName.addEventListener('input', () => {
+    const changed = existingProfileName && fullName.value.trim().toLocaleLowerCase() !== existingProfileName.trim().toLocaleLowerCase();
+    document.getElementById('ConfirmExistingName').checked = false;
+    if (changed) profileBox.textContent = `Tên nhập khác hồ sơ “${existingProfileName}”. Xác nhận bên dưới để dùng hồ sơ cũ; tên hồ sơ sẽ không bị thay đổi.`;
+});
+async function checkWarning() {
+    const current = ++requestNumber;
+    document.getElementById('AcknowledgeNoShow').checked = false;
+    const output = document.getElementById('booking-warning');
+    if (!phone.checkValidity()) { output.textContent = ''; return; }
+    try {
+        const profileResponse = await SalonAuth.authenticatedFetch('/api/reception/customers/lookup?phone=' + encodeURIComponent(phone.value));
+        const profile = profileResponse.ok ? await profileResponse.json() : null;
+        const confirmName = document.getElementById('confirm-name-wrap');
+        if (current !== requestNumber) return;
+        const nameInput = fullName;
+        document.getElementById('ConfirmExistingName').checked = false;
+        confirmName.classList.add('d-none');
+        if (profile?.found) {
+            existingProfileName = profile.fullName;
+            if (!nameInput.value || lastProfilePhone !== phone.value) nameInput.value = profile.fullName;
+            lastProfilePhone = phone.value;
+            profileBox.classList.remove('d-none');
+            const history = profile.history?.map(item => `${new Date(item.appointmentDate).toLocaleDateString('vi-VN')}: ${item.services.join(', ')} (${item.fullName})`).join(' · ') || 'Chưa có lịch sử hoàn tất.';
+            profileBox.textContent = `Hồ sơ khách quen · ${profile.totalVisits} lần đến · ${profile.noShowCount} lần không đến. ${history}`;
+            confirmName.classList.remove('d-none');
+        } else {
+            existingProfileName = null;
+            lastProfilePhone = phone.value;
+            profileBox.classList.add('d-none');
+            profileBox.textContent = '';
+        }
+        const response = await fetch('@Url.Action("CustomerWarning")?phone=' + encodeURIComponent(phone.value));
+        const result = await response.json();
+        if (current === requestNumber) output.textContent = result.message || 'Không thể kiểm tra khách.';
+    } catch { if (current === requestNumber) output.textContent = 'Không thể kiểm tra. Hệ thống sẽ kiểm tra lại khi lưu.'; }
+}
+phone.addEventListener('input', checkWarning);
+if (phone.value) checkWarning();
+</script>
+}
