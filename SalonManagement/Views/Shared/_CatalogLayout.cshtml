@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - Luminol Salon &amp; Spa</title>
+    <link rel="stylesheet" href="~/css/catalog.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="catalog-header">
+        <nav aria-label="Điều hướng chính" class="catalog-nav">
+            <a class="brand" asp-controller="Home" asp-action="Index">Luminol</a>
+            <a asp-controller="Services" asp-action="Public">Dịch vụ</a>
+            <partial name="_LoginPartial" />
+        </nav>
+    </header>
+    <main id="catalog">@RenderBody()</main>
+    <footer class="container">&copy; 2026 - Luminol Salon &amp; Spa · <a asp-controller="Home" asp-action="Privacy">Quyền riêng tư</a></footer>
+</body>
+</html>

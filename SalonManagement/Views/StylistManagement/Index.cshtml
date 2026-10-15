@@ -1,0 +1,65 @@
+@model IReadOnlyList<SalonManagement.Models.Stylist>
+@{
+    ViewData["Title"] = "Quản lý hồ sơ thợ";
+}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div><h1 class="h2 mb-1">Hồ sơ thợ</h1><p class="text-muted mb-0">Quản lý dịch vụ đảm nhận và trạng thái làm việc.</p></div>
+        <a asp-action="Create" class="btn btn-primary">Tạo hồ sơ thợ</a>
+    </div>
+
+    @if (TempData["Success"] is string success)
+    {
+        <div class="alert alert-success" role="status">@success</div>
+    }
+
+    <div class="card shadow-sm"><div class="table-responsive">
+        <table class="table table-striped mb-0 align-middle">
+            <thead><tr><th>Ảnh</th><th>Họ tên</th><th>Số điện thoại</th><th>Dịch vụ đảm nhận</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+            <tbody>
+            @if (Model.Count == 0)
+            {
+                <tr><td colspan="6" class="text-center text-muted py-4">Chưa có hồ sơ thợ.</td></tr>
+            }
+            else
+            {
+                @foreach (var stylist in Model)
+                {
+                    <tr>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(stylist.ProfileImagePath))
+                            {
+                                <img src="~/@stylist.ProfileImagePath" alt="Ảnh @stylist.FullName" width="56" height="56" class="rounded-circle object-fit-cover" />
+                            }
+                            else
+                            {
+                                <span class="d-inline-flex rounded-circle bg-light align-items-center justify-content-center" style="width:56px;height:56px"><i class="bi bi-person"></i></span>
+                            }
+                        </td>
+                        <td><strong>@stylist.FullName</strong><div class="small text-muted">@stylist.Description</div></td>
+                        <td>@stylist.Phone</td>
+                        <td>@string.Join(", ", stylist.Services.Select(item => item.Service.ServiceName))</td>
+                        <td><span class="badge @(stylist.IsActive ? "bg-success" : "bg-secondary")">@(stylist.IsActive ? "Đang làm việc" : "Nghỉ việc")</span></td>
+                        <td><div class="d-flex flex-wrap gap-2">
+                            <a asp-action="Edit" asp-route-id="@stylist.StylistId" class="btn btn-sm btn-outline-primary">Sửa hồ sơ</a>
+                            @if (stylist.IsActive)
+                            {
+                                <form asp-action="Resign" asp-route-id="@stylist.StylistId" method="post" onsubmit="return confirm('Bạn có chắc muốn chuyển thợ này sang trạng thái nghỉ việc?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Cho nghỉ việc</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form asp-action="Reinstate" asp-route-id="@stylist.StylistId" method="post" onsubmit="return confirm('Bạn có chắc muốn cho thợ này làm việc trở lại?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Cho làm việc lại</button>
+                                </form>
+                            }
+                        </div></td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div></div>
+</div>
