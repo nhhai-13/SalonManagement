@@ -1,14 +1,21 @@
-﻿@model IEnumerable<SalonManagement.Models.Service>
+@model IEnumerable<SalonManagement.Models.Service>
 @{
     ViewData["Title"] = "Danh sách dịch vụ";
 }
 
 <div class="container mt-4">
+    @if (User.IsInRole(UserRoles.Owner))
+    {
+        <div class="mb-3"><a href="/owner" class="text-decoration-none">← Về khu vực chủ tiệm</a></div>
+    }
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1>Quản lý dịch vụ</h1>
-        <a asp-action="Create" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> + Thêm dịch vụ
-        </a>
+        @if (User.IsInRole(UserRoles.Owner))
+        {
+            <a asp-controller="ServiceGroups" asp-action="Index" class="btn btn-outline-primary">Quản lý nhóm</a><a asp-action="Create" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> + Thêm dịch vụ
+            </a>
+        }
     </div>
 
     @if (TempData["Success"] != null)
@@ -54,10 +61,10 @@
                         @foreach (var item in Model)
                         {
                             <tr>
-                                <td><strong>@item.ServiceName</strong></td>
+                                <td><strong>@item.ServiceName</strong>@if (!item.Stylists.Any(s => s.Stylist.IsActive)) { <small class="d-block text-warning">Chưa có thợ đang làm việc đảm nhận</small> }</td>
                                 <td>@(item.ServiceGroup?.GroupName ?? "—")</td>
                                 <td>@item.DurationMinutes phút</td>
-                                <td>@item.Price.ToString("N0") đ</td>
+                                <td>@item.Price.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) đ</td>
                                 <td>
                                     @if (item.IsActive)
                                     {
@@ -69,21 +76,28 @@
                                     }
                                 </td>
                                 <td>
-                                    <a asp-action="Edit" asp-route-id="@item.ServiceId"
-                                       class="btn btn-sm btn-warning">Sửa</a>
+                                    @if (User.IsInRole(UserRoles.Owner))
+                                    {
+                                        <a asp-action="Edit" asp-route-id="@item.ServiceId"
+                                           class="btn btn-sm btn-warning">Sửa</a>
 
-                                    <form asp-action="ToggleStatus" asp-route-id="@item.ServiceId"
-                                          method="post" style="display:inline">
-                                        <button type="submit" class="btn btn-sm btn-info">
-                                            @(item.IsActive ? "Ngừng bán" : "Mở bán")
-                                        </button>
-                                    </form>
+                                        <form asp-action="ToggleStatus" asp-route-id="@item.ServiceId"
+                                              method="post" style="display:inline">
+                                            <button type="submit" class="btn btn-sm btn-info">
+                                                @(item.IsActive ? "Ngừng bán" : "Mở bán")
+                                            </button>
+                                        </form>
 
-                                    <form asp-action="Delete" asp-route-id="@item.ServiceId"
-                                          method="post" style="display:inline"
-                                          onsubmit="return confirm('Bạn chắc chắn muốn xoá dịch vụ này?');">
-                                        <button type="submit" class="btn btn-sm btn-danger">Xoá</button>
-                                    </form>
+                                        <form asp-action="Delete" asp-route-id="@item.ServiceId"
+                                              method="post" style="display:inline"
+                                              onsubmit="return confirm('Bạn chắc chắn muốn xoá dịch vụ này?');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Xoá</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Chỉ xem</span>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -93,3 +107,6 @@
         </div>
     </div>
 </div>
+
+
+

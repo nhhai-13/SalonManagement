@@ -1,0 +1,20 @@
+@{ ViewData["Title"] = "Khu vực chủ tiệm"; }
+
+<div id="owner-content" class="portal-page d-none">
+    <header class="portal-hero portal-hero-owner">
+        <div><span class="portal-kicker">Sprint 1 · Vận hành salon</span><h1>Khu vực chủ tiệm</h1><p>Thiết lập danh mục nền tảng để salon sẵn sàng phục vụ khách hàng.</p></div>
+        <div class="portal-identity"><span class="portal-role">Owner</span><strong data-session-email></strong><button id="logout" class="btn btn-sm btn-light" type="button">Đăng xuất</button></div>
+    </header>
+
+    <section class="portal-module-grid" aria-label="Chức năng chủ tiệm Sprint 1">
+        <article class="portal-module"><span class="portal-module-icon"><i class="bi bi-scissors"></i></span><span class="portal-status portal-status-ready">Sẵn sàng</span><small>S1-05</small><h2>Danh mục dịch vụ</h2><p>Khai báo tên, nhóm, thời lượng, giá, mô tả và trạng thái đang bán.</p><a class="btn btn-primary" asp-controller="Services" asp-action="Index">Quản lý dịch vụ</a></article>
+        <article class="portal-module"><span class="portal-module-icon"><i class="bi bi-collection"></i></span><span class="portal-status portal-status-ready">Sẵn sàng</span><small>S1-06</small><h2>Nhóm dịch vụ</h2><p>Thêm, sửa, xoá nhóm và sắp xếp thứ tự hiển thị trên trang công khai.</p><a class="btn btn-outline-primary" asp-controller="ServiceGroups" asp-action="Index">Quản lý nhóm</a></article>
+        <article class="portal-module"><span class="portal-module-icon"><i class="bi bi-person-badge"></i></span><span class="portal-status portal-status-ready">Sẵn sàng</span><small>S1-07</small><h2>Hồ sơ thợ</h2><p>Quản lý ảnh đại diện, mô tả, dịch vụ đảm nhận và trạng thái làm việc của thợ.</p><a class="btn btn-primary" asp-controller="StylistManagement" asp-action="Index">Quản lý hồ sơ thợ</a></article>
+        <article class="portal-module"><span class="portal-module-icon"><i class="bi bi-calendar-week"></i></span><span class="portal-status portal-status-ready">Sẵn sàng</span><small>S1-08</small><h2>Giờ hoạt động</h2><p>Cấu hình giờ mở, giờ đóng hoặc ngày nghỉ cho từng ngày trong tuần.</p><a class="btn btn-primary" href="/owner/business-hours">Thiết lập giờ mở cửa</a></article>
+    </section>
+
+    <section class="portal-scope-note"><i class="bi bi-shield-check"></i><div><strong>Bảo mật tài khoản</strong><p>Owner được đổi mật khẩu nhưng không được quản trị tài khoản, vai trò hoặc audit log.</p><a asp-controller="Account" asp-action="ChangePassword">Đổi mật khẩu</a></div></section>
+</div>
+
+@section Scripts { <script src="~/js/auth.js" asp-append-version="true"></script><script>SalonAuth.requireSession({ endpoint: "/api/owner/session", contentId: "owner-content" });</script> }
+

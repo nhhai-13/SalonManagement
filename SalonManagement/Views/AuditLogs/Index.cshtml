@@ -1,0 +1,192 @@
+@model IEnumerable<SalonManagement.Models.AuditLog>
+
+@{
+    ViewData["Title"] = "Audit Logs";
+
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    int totalPages = ViewBag.TotalPages ?? 1;
+    string? fromDate = ViewBag.FromDate;
+    string? toDate = ViewBag.ToDate;
+    string? selectedUser = ViewBag.UserName;
+    var userNames = ViewBag.UserNames as List<string> ?? new List<string>();
+}
+
+<div class="container mt-4">
+
+    <h2 class="mb-4">Audit Logs</h2>
+
+    <!-- Bộ lọc -->
+    <form method="get" asp-action="Index" class="row g-3 mb-4">
+
+        <div class="col-md-3">
+            <label class="form-label">Từ ngày</label>
+            <input type="date"
+                   name="fromDate"
+                   value="@fromDate"
+                   class="form-control" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Đến ngày</label>
+            <input type="date"
+                   name="toDate"
+                   value="@toDate"
+                   class="form-control" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Tài khoản</label>
+
+            <select name="userName" class="form-select">
+                <option value="">-- Tất cả tài khoản --</option>
+
+                @foreach (var user in userNames)
+                {
+                    if (user == selectedUser)
+                    {
+                        <option value="@user" selected>@user</option>
+                    }
+                    else
+                    {
+                        <option value="@user">@user</option>
+                    }
+                }
+            </select>
+        </div>
+
+        <div class="col-md-3 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary me-2">
+                Lọc
+            </button>
+
+            <a asp-action="Index" class="btn btn-secondary">
+                Xóa lọc
+            </a>
+        </div>
+
+    </form>
+
+    <!-- Bảng Audit Log -->
+    <div class="table-responsive">
+
+        <table class="table table-bordered table-striped">
+
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Thời gian</th>
+                    <th>Tài khoản</th>
+                    <th>Hành động</th>
+                    <th>Loại đối tượng</th>
+                    <th>ID đối tượng</th>
+                    <th>Thay đổi</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="7" class="text-center">
+                            Không có dữ liệu
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var log in Model)
+                    {
+                        <tr>
+                            <td>@log.AuditLogId</td>
+
+                            <td>
+                                @log.Timestamp.ToLocalTime()
+                            </td>
+
+                            <td>
+                                @(string.IsNullOrEmpty(log.UserName)
+                                    ? "System"
+                                    : log.UserName)
+                            </td>
+
+                            <td>
+                                @log.Action
+                            </td>
+
+                            <td>
+                                @log.EntityType
+                            </td>
+
+                            <td>
+                                @log.EntityId
+                            </td>
+
+                            <td>
+                                <details>
+                                    <summary>Xem</summary>
+                                    <pre class="mt-2"
+                                         style="white-space: pre-wrap; max-width: 500px;">@log.Changes</pre>
+                                </details>
+                            </td>
+                        </tr>
+                    }
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <!-- Phân trang -->
+    @if (totalPages > 1)
+    {
+        <nav aria-label="Audit log pagination">
+
+            <ul class="pagination">
+
+                @if (currentPage > 1)
+                {
+                    <li class="page-item">
+                        <a class="page-link"
+                           asp-action="Index"
+                           asp-route-page="@(currentPage - 1)"
+                           asp-route-fromDate="@fromDate"
+                           asp-route-toDate="@toDate"
+                           asp-route-userName="@selectedUser">
+                            Trước
+                        </a>
+                    </li>
+                }
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        Trang @currentPage / @totalPages
+                    </span>
+                </li>
+
+                @if (currentPage < totalPages)
+                {
+                    <li class="page-item">
+                        <a class="page-link"
+                           asp-action="Index"
+                           asp-route-page="@(currentPage + 1)"
+                           asp-route-fromDate="@fromDate"
+                           asp-route-toDate="@toDate"
+                           asp-route-userName="@selectedUser">
+                            Sau
+                        </a>
+                    </li>
+                }
+
+            </ul>
+
+        </nav>
+    }
+
+    <p class="text-muted">
+        Chỉ xem nhật ký hoạt động. Không thể chỉnh sửa hoặc xóa.
+    </p>
+
+</div>
