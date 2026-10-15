@@ -19,7 +19,7 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
         {
             optionsBuilder.UseSqlServer(connectionString);
         }
-        var options = optionsBuilder.Options;
-        return new ApplicationDbContext(options, new Microsoft.AspNetCore.Http.HttpContextAccessor());
+
+        return new ApplicationDbContext(optionsBuilder.Options, new HttpContextAccessor());
     }
 }

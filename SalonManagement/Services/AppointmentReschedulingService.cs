@@ -12,7 +12,7 @@ public sealed record RescheduleAppointmentResult(bool Succeeded, string? ErrorCo
     public static RescheduleAppointmentResult Success(Appointment appointment) => new(true, null, null, appointment);
 }
 
-public sealed class AppointmentReschedulingService(ApplicationDbContext db, TimeProvider timeProvider)
+public sealed class AppointmentReschedulingService(ApplicationDbContext db, TimeProvider timeProvider, AppointmentNotificationBus? notifications = null)
 {
     private static readonly string[] UnavailableStatuses = ["Cancelled", "Rejected", "NoShow", "Completed", "InProgress"];
 
@@ -93,6 +93,16 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
             EmailStatus = HasValidEmail(appointment.Customer.Email) ? "Queued" : "NotRequired"
         };
         db.AppointmentChangeLogs.Add(changeLog);
+        var notification = new StylistNotification { StylistId = stylist.StylistId, AppointmentId = appointment.AppointmentId,
+            Message = $"Lịch #{appointment.AppointmentId} đã được đổi sang {appointment.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM/yyyy}.", CreatedAt = timeProvider.GetUtcNow() };
+        db.StylistNotifications.Add(notification);
+        StylistNotification? previousStylistNotification = null;
+        if (oldStylistId != stylist.StylistId)
+        {
+            previousStylistNotification = new StylistNotification { StylistId = oldStylistId, AppointmentId = appointment.AppointmentId,
+                Message = $"Lịch #{appointment.AppointmentId} đã được chuyển sang thợ khác.", CreatedAt = timeProvider.GetUtcNow() };
+            db.StylistNotifications.Add(previousStylistNotification);
+        }
         if (HasValidEmail(appointment.Customer.Email))
         {
             db.AppointmentChangeEmails.Add(new AppointmentChangeEmail
@@ -105,9 +115,21 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
                 NextAttemptAt = changedAt
             });
         }
+        var reminder = await db.AppointmentEmailDeliveries.FirstOrDefaultAsync(item =>
+            item.AppointmentId == appointment.AppointmentId && item.Kind == AppointmentEmailKinds.Reminder);
+        if (reminder is not null && reminder.Status is not AppointmentEmailStatuses.Sent and not AppointmentEmailStatuses.Failed)
+        {
+            var newStart = CheckInService.StartsAt(appointment);
+            reminder.AppointmentStartAt = newStart;
+            var reminderTime = newStart.AddHours(-24);
+            reminder.NextAttemptAt = reminderTime > timeProvider.GetUtcNow() ? reminderTime : timeProvider.GetUtcNow();
+            if (reminder.Status != AppointmentEmailStatuses.NoEmail) reminder.Status = AppointmentEmailStatuses.Queued;
+        }
         try
         {
             await db.SaveChangesAsync();
+            notifications?.Publish(notification);
+            if (previousStylistNotification is not null) notifications?.Publish(previousStylistNotification);
             return RescheduleAppointmentResult.Success(appointment);
         }
         catch (DbUpdateException)

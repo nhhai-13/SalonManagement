@@ -38,6 +38,7 @@ public ApplicationDbContext(
 
         public DbSet<AppointmentChangeLog> AppointmentChangeLogs => Set<AppointmentChangeLog>();
         public DbSet<AppointmentChangeEmail> AppointmentChangeEmails => Set<AppointmentChangeEmail>();
+        public DbSet<AppointmentEmailDelivery> AppointmentEmailDeliveries => Set<AppointmentEmailDelivery>();
 
         public DbSet<AppointmentService> AppointmentServices => Set<AppointmentService>();
 
@@ -410,6 +411,19 @@ private class AuditEntry
                 entity.Property(email => email.Status).HasMaxLength(20).IsRequired();
                 entity.Property(email => email.LastError).HasMaxLength(1000);
                 entity.HasIndex(email => new { email.Status, email.NextAttemptAt });
+            });
+
+            builder.Entity<AppointmentEmailDelivery>(entity =>
+            {
+                entity.HasKey(delivery => delivery.AppointmentEmailDeliveryId);
+                entity.Property(delivery => delivery.Kind).HasMaxLength(20).IsRequired();
+                entity.Property(delivery => delivery.RecipientEmail).HasMaxLength(256);
+                entity.Property(delivery => delivery.Status).HasMaxLength(20).IsRequired();
+                entity.Property(delivery => delivery.LastError).HasMaxLength(1000);
+                entity.HasIndex(delivery => new { delivery.AppointmentId, delivery.Kind }).IsUnique();
+                entity.HasIndex(delivery => new { delivery.Status, delivery.NextAttemptAt });
+                entity.HasOne(delivery => delivery.Appointment).WithMany(appointment => appointment.EmailDeliveries)
+                    .HasForeignKey(delivery => delivery.AppointmentId).OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<AppointmentService>(entity =>

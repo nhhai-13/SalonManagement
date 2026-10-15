@@ -36,7 +36,12 @@ public class StylistNotificationsController(ApplicationDbContext db, Appointment
                 {
                     var notification = await subscription.Reader.ReadAsync(heartbeat.Token);
                     if (!await CanReceive(userId, stylistId.Value, token)) break;
-                    await Response.WriteAsync("data: " + JsonSerializer.Serialize(new { notification.Id, notification.Message, notification.CreatedAt }) + "\n\n", token);
+                    var reference = await db.Appointments.AsNoTracking().Where(appointment => appointment.AppointmentId == notification.AppointmentId)
+                        .Select(appointment => appointment.BookingReference).SingleOrDefaultAsync(token);
+                    var url = string.IsNullOrWhiteSpace(reference)
+                        ? Url.Action("Index", "StylistNotifications")
+                        : Url.Action("Index", "AppointmentLookup", new { reference });
+                    await Response.WriteAsync("data: " + JsonSerializer.Serialize(new { notification.Id, notification.Message, notification.CreatedAt, notification.IsRead, notification.AppointmentId, Url = url }) + "\n\n", token);
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested) { await Response.WriteAsync(": heartbeat\n\n", token); }
                 await Response.Body.FlushAsync(token);
@@ -62,9 +67,16 @@ public class StylistNotificationsController(ApplicationDbContext db, Appointment
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var stylistId = await db.Users.Where(u => u.Id == userId).Select(u => u.StylistId).SingleOrDefaultAsync();
         if (!stylistId.HasValue) return Conflict(new { message = "Tài khoản chưa liên kết hồ sơ thợ." });
-        var items = await db.StylistNotifications.AsNoTracking().Where(n => n.StylistId == stylistId)
-            .OrderByDescending(n => n.Id).Take(100).Select(n => new { n.Id, n.Message, n.CreatedAt }).ToListAsync();
-        return Json(items);
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-30);
+        var items = await db.StylistNotifications.AsNoTracking().Where(n => n.StylistId == stylistId && n.CreatedAt >= cutoff)
+            .OrderByDescending(n => n.Id).Take(100).Select(n => new { n.Id, n.Message, n.CreatedAt, n.IsRead, n.AppointmentId }).ToListAsync();
+        var references = await db.Appointments.AsNoTracking().Where(appointment => items.Select(item => item.AppointmentId).Contains(appointment.AppointmentId))
+            .Select(appointment => new { appointment.AppointmentId, appointment.BookingReference }).ToDictionaryAsync(item => item.AppointmentId, item => item.BookingReference);
+        return Json(new { unreadCount = items.Count(item => !item.IsRead), items = items.Select(item => new {
+            item.Id, item.Message, item.CreatedAt, item.IsRead, item.AppointmentId,
+            Url = references.TryGetValue(item.AppointmentId, out var reference) && !string.IsNullOrWhiteSpace(reference)
+                ? Url.Action("Index", "AppointmentLookup", new { reference }) : Url.Action("Index", "StylistNotifications")
+        }) });
     }
 
     public async Task<IActionResult> Index()
@@ -72,7 +84,26 @@ public class StylistNotificationsController(ApplicationDbContext db, Appointment
         var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var stylistId = await db.Users.Where(u => u.Id == id).Select(u => u.StylistId).SingleOrDefaultAsync();
         if (stylistId == null) return View(new List<StylistNotification>());
-        return View(await db.StylistNotifications.AsNoTracking().Where(n => n.StylistId == stylistId)
-            .OrderByDescending(n => n.Id).Take(100).ToListAsync());
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-30);
+        var items = await db.StylistNotifications.AsNoTracking().Where(n => n.StylistId == stylistId && n.CreatedAt >= cutoff)
+            .OrderByDescending(n => n.Id).Take(100).ToListAsync();
+        ViewBag.AppointmentReferences = await db.Appointments.AsNoTracking()
+            .Where(appointment => items.Select(item => item.AppointmentId).Contains(appointment.AppointmentId))
+            .Select(appointment => new { appointment.AppointmentId, appointment.BookingReference })
+            .ToDictionaryAsync(item => item.AppointmentId, item => item.BookingReference);
+        ViewBag.UnreadCount = items.Count(item => !item.IsRead);
+        return View(items);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MarkRead(int id)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var stylistId = await db.Users.Where(user => user.Id == userId).Select(user => user.StylistId).SingleOrDefaultAsync();
+        if (!stylistId.HasValue) return Conflict();
+        await db.StylistNotifications.Where(item => item.Id == id && item.StylistId == stylistId.Value && !item.IsRead)
+            .ExecuteUpdateAsync(update => update.SetProperty(item => item.IsRead, true));
+        return NoContent();
     }
 }

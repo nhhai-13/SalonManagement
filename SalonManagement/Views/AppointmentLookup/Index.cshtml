@@ -92,6 +92,8 @@
         (function () {
             const form = document.getElementById('lookup-form');
             const queryInput = document.getElementById('lookup-query');
+            const initialReference = new URLSearchParams(window.location.search).get('reference');
+            if (initialReference) { queryInput.value = initialReference; document.getElementById('lookup-form').dispatchEvent(new Event('submit')); }
             const message = document.getElementById('lookup-message');
             const list = document.getElementById('lookup-list');
             const loading = document.getElementById('lookup-loading');

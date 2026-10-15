@@ -41,5 +41,6 @@ namespace SalonManagement.Models
         public Invoice? Invoice { get; set; }
         public ScheduleContactFollowUp? ScheduleContactFollowUp { get; set; }
         public ICollection<ScheduleChangeNotification> ScheduleChangeNotifications { get; set; } = new List<ScheduleChangeNotification>();
+        public ICollection<AppointmentEmailDelivery> EmailDeliveries { get; set; } = new List<AppointmentEmailDelivery>();
     }
 }

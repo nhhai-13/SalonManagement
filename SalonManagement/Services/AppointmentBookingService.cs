@@ -13,7 +13,7 @@ public sealed record BookingCreationResult(BookingConfirmation? Confirmation, st
     public static BookingCreationResult Invalid(IReadOnlyDictionary<string, string> errors) => new(null, "invalid_details", "Vui lòng kiểm tra lại thông tin đã nhập.", errors);
 }
 
-public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvider timeProvider)
+public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvider timeProvider, AppointmentNotificationBus? notifications = null)
 {
     private const string ReferenceAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static readonly SemaphoreSlim ConfirmationLock = new(1, 1);
@@ -68,8 +68,24 @@ public sealed class AppointmentBookingService(ApplicationDbContext db, TimeProvi
             var reference = await CreateReferenceAsync();
             // Bookings submitted from the public site must be reviewed by reception.
             // Staff-created appointments continue to use their existing workflow/statuses.
-            db.Appointments.Add(new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "PendingConfirmation", Source = "Online", BookingReference = reference, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() });
+            var now = timeProvider.GetUtcNow();
+            var appointment = new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "PendingConfirmation", Source = "Online", BookingReference = reference, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() };
+            appointment.EmailDeliveries.Add(new AppointmentEmailDelivery
+            {
+                Kind = AppointmentEmailKinds.Confirmation,
+                RecipientEmail = string.IsNullOrWhiteSpace(customer.Email) ? null : customer.Email.Trim(),
+                Status = string.IsNullOrWhiteSpace(customer.Email) ? AppointmentEmailStatuses.NoEmail : AppointmentEmailStatuses.Queued,
+                AppointmentStartAt = CheckInService.StartsAt(appointment),
+                NextAttemptAt = now,
+                CreatedAt = now
+            });
+            db.Appointments.Add(appointment);
             try { await db.SaveChangesAsync(); } catch (DbUpdateException) { return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác."); }
+            var notification = new StylistNotification { StylistId = stylist.StylistId, AppointmentId = appointment.AppointmentId,
+                Message = $"Lịch mới #{appointment.AppointmentId} được phân công cho bạn.", CreatedAt = timeProvider.GetUtcNow() };
+            db.StylistNotifications.Add(notification);
+            await db.SaveChangesAsync();
+            notifications?.Publish(notification);
             return new(new(reference, stylist.FullName, services.Select(item => item.ServiceName).ToList(), request.Date.Date, request.StartTime, endTime), null, null);
         }
         finally { ConfirmationLock.Release(); }
