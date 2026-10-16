@@ -36,6 +36,20 @@ public sealed class StylistNotificationsController(ApplicationDbContext db, Time
         return NoContent();
     }
 
+    [HttpPost("read-all")]
+    public async Task<IActionResult> ReadAll()
+    {
+        var email = CurrentUserEmail();
+        if (string.IsNullOrWhiteSpace(email)) return Unauthorized();
+        var now = SalonClock.GetLocalNow(timeProvider).ToUniversalTime();
+        var unread = await db.StaffNotifications
+            .Where(notification => notification.RecipientEmail == email && notification.ReadAt == null)
+            .ToListAsync();
+        foreach (var item in unread) item.ReadAt = now;
+        await db.SaveChangesAsync();
+        return Ok(new { markedRead = unread.Count });
+    }
+
     private string? CurrentUserEmail() =>
         User.FindFirstValue(JwtRegisteredClaimNames.Email) ?? User.FindFirstValue(ClaimTypes.Email);
 }

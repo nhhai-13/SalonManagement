@@ -3,65 +3,54 @@
     var selectedDate = ViewData["SelectedDate"] is DateTime configuredDate ? configuredDate : DateTime.Today;
 }
 
-<div id="absence-appointments-page" class="container py-4 d-none">
-    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+<div id="absence-appointments-page" class="container py-4 absence-workspace d-none">
+    <header class="absence-page-heading">
         <div>
-            <span class="text-uppercase text-muted small fw-semibold">Lễ tân</span>
-            <h1 class="h2 mb-1">Lịch cần xử lý khi thợ nghỉ</h1>
-            <p class="text-muted mb-0">Chọn thợ và ngày nghỉ để xem các lịch chưa hoàn tất cần chuyển xử lý.</p>
+            <span class="absence-role-badge">LỄ TÂN</span>
+            <h1>Lịch cần xử lý khi thợ nghỉ</h1>
+            <p>Chọn thợ và ngày nghỉ để xem các lịch chưa hoàn tất cần chuyển thợ hoặc đổi giờ cho khách hàng.</p>
         </div>
-        <a class="btn btn-outline-secondary" href="/reception">Quay lại không gian lễ tân</a>
-    </div>
+        <a class="btn absence-back-button" href="/reception"><i class="bi bi-arrow-counterclockwise"></i> Quay lại không gian lễ tân</a>
+    </header>
 
-    <section class="card shadow-sm border-0">
-        <div class="card-body p-4">
-            <form id="absence-appointments-form" class="row g-3 align-items-end">
-                <div class="col-md-6">
-                    <label class="form-label" for="absent-stylist">Thợ nghỉ</label>
+    <section class="absence-filter-card">
+        <form id="absence-appointments-form" class="absence-filter-form">
+            <div>
+                <label class="form-label" for="absent-stylist">Thợ nghỉ <span>*</span></label>
                     <select class="form-select" id="absent-stylist" required><option value="">Đang tải danh sách thợ…</option></select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="absence-date">Ngày cần xử lý</label>
-                    <input class="form-control" id="absence-date" type="date" required value="@selectedDate.ToString("yyyy-MM-dd")" />
-                </div>
-                <div class="col-md-2 d-grid"><button class="btn btn-primary" type="submit">Xem lịch</button></div>
-            </form>
-            <div id="absence-appointments-error" class="alert alert-danger mt-3 d-none" role="alert"></div>
-        </div>
-    </section>
-
-    <section class="card shadow-sm border-0 mt-4 d-none" id="absence-appointments-results">
-        <div class="card-header bg-warning-subtle d-flex flex-wrap align-items-center justify-content-between gap-2 py-3">
-            <h2 class="h5 mb-0">Lịch chưa hoàn tất của <span id="absence-appointments-stylist"></span></h2>
-            <div class="d-flex align-items-center gap-2"><span id="absence-appointments-count" class="badge text-bg-warning">0 lịch cần chuyển</span><button id="batch-reschedule-confirm" class="btn btn-sm btn-primary" type="button" disabled>Xác nhận chuyển đã chọn</button></div>
-        </div>
-        <div class="card-body p-0">
-            <div class="p-4 text-muted d-none" id="absence-appointments-empty">Thợ này không có lịch chưa hoàn tất trong ngày đã chọn.</div>
-            <div class="table-responsive d-none" id="absence-appointments-table-wrap">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light"><tr><th><input id="batch-reschedule-select-all" type="checkbox" aria-label="Chọn tất cả lịch có phương án"></th><th>Khách hàng</th><th>Dịch vụ</th><th>Thời gian cũ</th><th>Trạng thái</th><th>Đề xuất thay thế</th></tr></thead>
-                    <tbody id="absence-appointments-list"></tbody>
-                </table>
             </div>
-        </div>
+            <div>
+                    <label class="form-label" for="absence-date">Ngày cần xử lý <span>*</span></label>
+                    <input class="form-control" id="absence-date" type="date" required value="@selectedDate.ToString("yyyy-MM-dd")" />
+            </div>
+            <button class="btn absence-load-button" type="submit"><i class="bi bi-search"></i> Xem lịch</button>
+        </form>
+        <div id="absence-appointments-error" class="alert alert-danger mt-3 mb-0 d-none" role="alert"></div>
     </section>
 
-    <section class="card shadow-sm border-0 mt-4 d-none" id="batch-reschedule-results">
-        <div class="card-header bg-primary-subtle"><h2 class="h5 mb-0">Kết quả chuyển lịch</h2></div>
-        <div class="card-body"><div id="batch-reschedule-success" class="d-none"></div><div id="batch-reschedule-failed" class="d-none mt-3"></div></div>
+    <section class="absence-kpis d-none" id="absence-appointments-metrics" aria-label="Tổng quan điều phối">
+        <article class="absence-kpi total"><i class="bi bi-exclamation-triangle-fill"></i><div><span>Tổng lịch<br />bị ảnh hưởng</span><strong id="absence-metric-total">0 lịch hẹn</strong></div></article>
+        <article class="absence-kpi urgent"><i class="bi bi-clock-fill"></i><div><span>Cần chuyển<br />thợ gấp</span><strong id="absence-metric-ready">0 lịch</strong></div></article>
+        <article class="absence-kpi available"><i class="bi bi-check-circle-fill"></i><div><span>Thợ rảnh<br />trong ca</span><strong id="absence-metric-stylists">0 thợ sẵn sàng</strong></div></article>
+        <article class="absence-kpi notified"><i class="bi bi-chat-dots-fill"></i><div><span>Sẽ báo<br />khách hàng</span><strong id="absence-metric-notify">0 / 0 khách</strong></div></article>
     </section>
 
-    <section class="card shadow-sm border-danger border-2 mt-4 d-none" id="call-customer-results">
-        <div class="card-header bg-danger-subtle d-flex align-items-center justify-content-between gap-2 py-3">
-            <div><span class="text-uppercase small fw-semibold text-danger-emphasis">Cần liên hệ</span><h2 class="h5 mb-0">Cần gọi khách</h2></div>
-            <span id="call-customer-count" class="badge text-bg-danger">0 lịch</span>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive"><table class="table table-hover align-middle mb-0">
-                <thead class="table-light"><tr><th>Khách hàng</th><th>Số điện thoại</th><th>Dịch vụ</th><th>Thời gian</th><th>Lý do</th></tr></thead>
-                <tbody id="call-customer-list"></tbody>
-            </table></div>
-        </div>
+    <section class="absence-results d-none" id="absence-appointments-results">
+        <header class="absence-results-heading">
+            <div><span>ĐIỀU PHỐI LỊCH BỊ ẢNH HƯỞNG</span><h2>Lịch của <b id="absence-appointments-stylist"></b></h2></div>
+            <div class="absence-selection-tools"><label><input id="batch-reschedule-select-all" type="checkbox" /> Chọn tất cả phương án</label><button id="batch-reschedule-confirm" class="btn absence-batch-button" type="button" disabled><i class="bi bi-arrow-left-right"></i> Xác nhận chuyển đã chọn</button></div>
+        </header>
+        <div class="absence-empty d-none" id="absence-appointments-empty"><i class="bi bi-calendar-check"></i><strong>Không có lịch cần xử lý</strong><span>Thợ này không có lịch chưa hoàn tất trong ngày đã chọn.</span></div>
+        <div id="absence-appointments-list" class="absence-appointment-list"></div>
+    </section>
+
+    <section class="absence-callout d-none" id="call-customer-results">
+        <div><i class="bi bi-telephone-outbound"></i><strong>Cần liên hệ trực tiếp</strong><span id="call-customer-count">0 lịch</span></div>
+        <div id="call-customer-list"></div>
+    </section>
+
+    <section class="absence-result-toast d-none" id="batch-reschedule-results">
+        <div id="batch-reschedule-success" class="d-none"></div><div id="batch-reschedule-failed" class="d-none"></div>
     </section>
 </div>
 

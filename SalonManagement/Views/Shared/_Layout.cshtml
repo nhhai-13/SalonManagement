@@ -112,6 +112,10 @@ else
                 {
                     <div class="sl-nav-section">
                         <div class="sl-nav-label">Quản lý salon</div>
+                        <a class="sl-nav-link @(NavActive("OwnerOperationsDashboardPage") ? "active" : "")"
+                           href="/owner/operations-dashboard">
+                            <i class="bi bi-speedometer2"></i> Trang tổng quan
+                        </a>
                         <a class="sl-nav-link @(NavActive("Services","Index") ? "active" : "")"
                            asp-controller="Services" asp-action="Index">
                             <i class="bi bi-bag"></i> Dịch vụ
@@ -139,6 +143,22 @@ else
                         <a class="sl-nav-link @(NavActive("TimeOff") ? "active" : "")"
                            href="/owner/time-off">
                             <i class="bi bi-calendar-x"></i> Ngày nghỉ
+                        </a>
+                        <a class="sl-nav-link @(NavActive("PromotionCodesPage") ? "active" : "")"
+                           href="/owner/promotions">
+                            <i class="bi bi-ticket-perforated"></i> Mã giảm giá
+                        </a>
+                        <a class="sl-nav-link @(NavActive("ServiceReviewReportsPage") ? "active" : "")"
+                           href="/owner/reviews">
+                            <i class="bi bi-star"></i> Đánh giá thợ
+                        </a>
+                        <a class="sl-nav-link @(NavActive("RevenueReportPage") ? "active" : "")"
+                           href="/owner/revenue-report">
+                            <i class="bi bi-bar-chart-line"></i> Báo cáo doanh thu
+                        </a>
+                        <a class="sl-nav-link @(NavActive("PeakHoursReportPage") ? "active" : "")"
+                           href="/owner/peak-hours-report">
+                            <i class="bi bi-graph-up-arrow"></i> Phân tích khung giờ
                         </a>
                         <a class="sl-nav-link @(NavActive("OwnerAppointments") ? "active" : "")"
                            href="/owner/appointments">
@@ -171,6 +191,10 @@ else
                         <a class="sl-nav-link @(NavActive("ReceptionAbsenceAppointmentsPage") ? "active" : "")"
                            href="/reception/absence-appointments">
                             <i class="bi bi-person-dash"></i> Xử lý thợ nghỉ
+                        </a>
+                        <a class="sl-nav-link @(NavActive("AppointmentEmailNotificationsPage") ? "active" : "")"
+                           href="/reception/email-notifications">
+                            <i class="bi bi-envelope-check"></i> Trạng thái Email &amp; Nhắc lịch
                         </a>
                         <a class="sl-nav-link @(NavActive("CustomerProfileSearch") ? "active" : "")"
                            href="/reception/customer-search">

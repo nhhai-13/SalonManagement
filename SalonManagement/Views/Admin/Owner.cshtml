@@ -20,6 +20,7 @@
     </header>
 
     <section class="sl-module-grid" aria-label="Chức năng chủ tiệm">
+        <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-speedometer2"></i></span><h2>Trang tổng quan vận hành</h2><p>Xem nhanh lịch hẹn, doanh thu và quân số thợ trong ngày theo thời gian thực.</p><a class="btn btn-primary" href="/owner/operations-dashboard">Mở tổng quan</a></article>
         <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-scissors"></i></span><h2>Danh mục dịch vụ</h2><p>Khai báo tên, nhóm, thời lượng, giá, mô tả và trạng thái đang bán.</p><a class="btn btn-primary" asp-controller="Services" asp-action="Index">Quản lý dịch vụ</a></article>
         <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-collection"></i></span><h2>Nhóm dịch vụ</h2><p>Thêm, sửa, xoá nhóm và sắp xếp thứ tự hiển thị trên trang công khai.</p><a class="btn btn-primary" asp-controller="ServiceGroups" asp-action="Index">Quản lý nhóm</a></article>
         <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-person-badge"></i></span><h2>Hồ sơ thợ</h2><p>Quản lý ảnh đại diện, mô tả, dịch vụ đảm nhận và trạng thái làm việc của thợ.</p><a class="btn btn-primary" asp-controller="StylistManagement" asp-action="Index">Quản lý hồ sơ thợ</a></article>
@@ -28,6 +29,9 @@
         <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-people"></i></span><h2>Lịch nhân viên</h2><p>Theo dõi ca làm của toàn bộ Lễ tân và Thợ trong cùng một lịch tuần.</p><a class="btn btn-primary" href="/management/staff-schedules">Xem lịch nhân viên</a></article>
         <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-person-check"></i></span><h2>Yêu cầu cấp quyền</h2><p>Duyệt tài khoản Lễ tân và Thợ sau khi họ đã xác minh địa chỉ email.</p><a class="btn btn-primary" href="/management/access-requests">Xem yêu cầu</a></article>
         <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-bell"></i></span><h2>Thông báo lịch hẹn</h2><p>Khách đặt lịch thành công sẽ xuất hiện tại đây để Chủ tiệm kiểm tra.</p><a class="btn btn-primary" href="/owner/appointments">Kiểm tra lịch hẹn</a></article>
+        <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-bar-chart-line"></i></span><h2>Báo cáo doanh thu</h2><p>Theo dõi doanh thu thực thu theo thợ và dịch vụ, chỉ tính phiếu đã thanh toán.</p><a class="btn btn-primary" href="/owner/revenue-report">Mở báo cáo</a></article>
+        <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-graph-up-arrow"></i></span><h2>Phân tích khung giờ</h2><p>So sánh tải lịch ngày thường và cuối tuần, theo dõi tỉ lệ hủy và không đến.</p><a class="btn btn-primary" href="/owner/peak-hours-report">Mở phân tích</a></article>
+        <article class="sl-module-card"><span class="portal-module-icon"><i class="bi bi-ticket-perforated"></i></span><h2>Mã giảm giá</h2><p>Tạo ưu đãi giảm theo phần trăm hoặc số tiền, thiết lập thời gian hiệu lực rõ ràng.</p><a class="btn btn-primary" href="/owner/promotions">Quản lý mã giảm giá</a></article>
     </section>
 
     <section class="sl-info-note"><i class="bi bi-shield-check"></i><div><strong>Bảo mật tài khoản</strong><p>Owner được đổi mật khẩu nhưng không được quản trị tài khoản, vai trò hoặc audit log.</p><a asp-controller="Account" asp-action="ChangePassword">Đổi mật khẩu</a></div></section>

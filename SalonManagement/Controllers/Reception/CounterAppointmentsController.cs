@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SalonManagement.Data;
 using SalonManagement.Models;
 using SalonManagement.Services;
@@ -9,8 +10,26 @@ namespace SalonManagement.Controllers.Reception;
 
 [Authorize(Roles = UserRoles.Receptionist)]
 [Route("reception/counter-appointments")]
-public sealed class CounterAppointmentsController(ApplicationDbContext db, CustomerProfileService profiles) : Controller
+public sealed class CounterAppointmentsController : Controller
 {
+    private readonly ApplicationDbContext db;
+    private readonly CustomerProfileService profiles;
+    private readonly AppointmentEmailNotificationService emailNotifications;
+    private readonly StylistInAppNotificationService notifications;
+
+    [ActivatorUtilitiesConstructor]
+    public CounterAppointmentsController(ApplicationDbContext db, CustomerProfileService profiles, AppointmentEmailNotificationService emailNotifications, StylistInAppNotificationService notifications)
+    {
+        this.db = db;
+        this.profiles = profiles;
+        this.emailNotifications = emailNotifications;
+        this.notifications = notifications;
+    }
+
+    // Convenience constructor for isolated controller tests.
+    public CounterAppointmentsController(ApplicationDbContext db, CustomerProfileService profiles)
+        : this(db, profiles, new AppointmentEmailNotificationService(db, TimeProvider.System), new StylistInAppNotificationService(db, TimeProvider.System)) { }
+
     [HttpGet("")]
     public async Task<IActionResult> Index(bool embed = false)
     {
@@ -48,7 +67,11 @@ public sealed class CounterAppointmentsController(ApplicationDbContext db, Custo
         var endTime = request.StartTime.Add(TimeSpan.FromMinutes(duration));
         var overlaps = await db.Appointments.AnyAsync(item => item.StylistId == request.StylistId && item.AppointmentDate == request.Date.Date && item.Status != "Cancelled" && item.Status != "Rejected" && item.Status != "NoShow" && item.StartTime < endTime && request.StartTime < item.EndTime);
         if (overlaps) return BadRequest(new { error = "Khung giờ đã chồng lấn với lịch khác của thợ." });
-        db.Appointments.Add(new Appointment { Customer = customer, StylistId = request.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "Confirmed", BookingReference = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(), BookingSource = request.InstantStart ? "CounterWalkIn" : "Counter", CustomerNameOverride = resolution == "UseForThisAppointment" ? name : null, NameConflictResolution = resolution, AppointmentServices = services.Select(item => new AppointmentService { ServiceId = item.ServiceId, Price = item.Price, DurationMinutes = item.DurationMinutes }).ToList() });
+        var appointment = new Appointment { Customer = customer, Stylist = stylist, StylistId = request.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "Confirmed", BookingReference = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(), BookingSource = request.InstantStart ? "CounterWalkIn" : "Counter", CustomerNameOverride = resolution == "UseForThisAppointment" ? name : null, NameConflictResolution = resolution, AppointmentServices = services.Select(item => new AppointmentService { ServiceId = item.ServiceId, Price = item.Price, DurationMinutes = item.DurationMinutes, Service = item }).ToList() };
+        db.Appointments.Add(appointment);
+        await db.SaveChangesAsync();
+        notifications.Add(stylist.Email, appointment.AppointmentId, "AppointmentAssigned", $"Bạn được gán lịch hẹn mới của {appointment.CustomerNameOverride ?? customer.FullName} lúc {appointment.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM}.");
+        await emailNotifications.QueueInitialNotificationsAsync(appointment);
         await db.SaveChangesAsync();
         return Ok(new { message = "Đã tạo lịch hẹn tại quầy.", redirect = "/reception/daily-schedule?date=" + request.Date.ToString("yyyy-MM-dd") });
     }

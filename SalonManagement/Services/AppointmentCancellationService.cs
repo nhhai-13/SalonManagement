@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SalonManagement.Data;
 
 namespace SalonManagement.Services;
@@ -9,15 +10,33 @@ public sealed record AppointmentCancellationResult(bool Succeeded, string? Error
     public static AppointmentCancellationResult Success() => new(true, null, null);
 }
 
-public sealed class AppointmentCancellationService(ApplicationDbContext db, TimeProvider timeProvider)
+public sealed class AppointmentCancellationService
 {
+    private readonly ApplicationDbContext db;
+    private readonly TimeProvider timeProvider;
+    private readonly AppointmentEmailNotificationService emailNotifications;
+    private readonly StylistInAppNotificationService notifications;
+
+    [ActivatorUtilitiesConstructor]
+    public AppointmentCancellationService(ApplicationDbContext db, TimeProvider timeProvider, AppointmentEmailNotificationService emailNotifications, StylistInAppNotificationService notifications)
+    {
+        this.db = db;
+        this.timeProvider = timeProvider;
+        this.emailNotifications = emailNotifications;
+        this.notifications = notifications;
+    }
+
+    // Keeps existing isolated tests and maintenance tools source-compatible.
+    public AppointmentCancellationService(ApplicationDbContext db, TimeProvider timeProvider)
+        : this(db, timeProvider, new AppointmentEmailNotificationService(db, timeProvider), new StylistInAppNotificationService(db, timeProvider)) { }
+
     private static readonly TimeSpan MinimumNotice = TimeSpan.FromMinutes(120);
 
     public async Task<AppointmentCancellationResult> CancelAsync(string? reference)
     {
         var normalizedReference = reference?.Trim().ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(normalizedReference)) return AppointmentCancellationResult.Rejected("invalid_reference", "Mã lịch hẹn không hợp lệ.");
-        var appointment = await db.Appointments.SingleOrDefaultAsync(item => item.BookingReference == normalizedReference);
+        var appointment = await db.Appointments.Include(item => item.Customer).Include(item => item.Stylist).SingleOrDefaultAsync(item => item.BookingReference == normalizedReference);
         if (appointment is null) return AppointmentCancellationResult.Rejected("not_found", "Không tìm thấy lịch hẹn.");
         if (appointment.Status == "Cancelled") return AppointmentCancellationResult.Rejected("already_cancelled", "Lịch hẹn này đã được huỷ.");
 
@@ -30,6 +49,8 @@ public sealed class AppointmentCancellationService(ApplicationDbContext db, Time
         appointment.CancelledAt = cancelledAt;
         appointment.CancelledBy = "Khách hàng";
         appointment.UpdatedAt = cancelledAt;
+        await emailNotifications.CancelPendingRemindersAsync(appointment.AppointmentId, "Lịch hẹn đã hủy; đã hủy email nhắc lịch.");
+        notifications.Add(appointment.Stylist?.Email, appointment.AppointmentId, "AppointmentCancelled", $"Khách {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã hủy lịch {appointment.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM}.");
         await db.SaveChangesAsync();
         return AppointmentCancellationResult.Success();
     }

@@ -154,6 +154,8 @@ public sealed class BatchAppointmentReschedulingTests
         public Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword) => Task.CompletedTask;
         public Task SendPasswordResetEmailAsync(string toEmail, string resetLink) => Task.CompletedTask;
         public Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode) => Task.CompletedTask;
+        public Task SendServiceReviewEmailAsync(string toEmail, string customerName, string reviewLink, DateTime expiresAt) => Task.CompletedTask;
+        public Task SendAppointmentNotificationEmailAsync(string toEmail, string customerName, string reference, string services, string stylistName, DateTime appointmentDate, TimeSpan startTime, bool isReminder) => Task.CompletedTask;
         public Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
         {
             if (throwOnSend) throw new InvalidOperationException("Máy chủ email tạm thời không phản hồi.");

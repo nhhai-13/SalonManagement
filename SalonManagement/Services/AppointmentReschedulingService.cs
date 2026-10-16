@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SalonManagement.Data;
 using SalonManagement.Models;
 
@@ -12,8 +13,26 @@ public sealed record RescheduleAppointmentResult(bool Succeeded, string? ErrorCo
     public static RescheduleAppointmentResult Success(Appointment appointment, string? notificationStatus = null) => new(true, null, null, appointment, notificationStatus);
 }
 
-public sealed class AppointmentReschedulingService(ApplicationDbContext db, TimeProvider timeProvider)
+public sealed class AppointmentReschedulingService
 {
+    private readonly ApplicationDbContext db;
+    private readonly TimeProvider timeProvider;
+    private readonly AppointmentEmailNotificationService emailNotifications;
+    private readonly StylistInAppNotificationService notifications;
+
+    [ActivatorUtilitiesConstructor]
+    public AppointmentReschedulingService(ApplicationDbContext db, TimeProvider timeProvider, AppointmentEmailNotificationService emailNotifications, StylistInAppNotificationService notifications)
+    {
+        this.db = db;
+        this.timeProvider = timeProvider;
+        this.emailNotifications = emailNotifications;
+        this.notifications = notifications;
+    }
+
+    // Keeps existing isolated tests and maintenance tools source-compatible.
+    public AppointmentReschedulingService(ApplicationDbContext db, TimeProvider timeProvider)
+        : this(db, timeProvider, new AppointmentEmailNotificationService(db, timeProvider), new StylistInAppNotificationService(db, timeProvider)) { }
+
     private static readonly string[] UnavailableStatuses = ["Cancelled", "Rejected", "NoShow", "Completed", "InProgress"];
 
     public async Task<RescheduleAppointmentResult> RescheduleAsync(int appointmentId, RescheduleAppointmentRequest request, AppointmentChangeActor? actor = null, bool queueCustomerEmail = true)
@@ -97,21 +116,17 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
                 NextAttemptAt = changedAt
             });
         }
-        if (!string.IsNullOrWhiteSpace(stylist.Email))
-        {
-            db.StaffNotifications.Add(new StaffNotification
-            {
-                RecipientEmail = stylist.Email,
-                AppointmentId = appointment.AppointmentId,
-                Type = "AppointmentRescheduled",
-                Message = $"Lịch của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã được điều chỉnh sang {request.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM}."
-            });
-        }
+        await emailNotifications.CancelPendingRemindersAsync(appointment.AppointmentId, "Lịch hẹn đã đổi giờ hoặc đổi thợ; đã hủy email nhắc cũ.");
+        await emailNotifications.QueueReminderForRescheduledAppointmentAsync(appointment);
+        notifications.Add(stylist.Email, appointment.AppointmentId,
+            oldStylistId == stylist.StylistId ? "AppointmentRescheduled" : "AppointmentAssigned",
+            oldStylistId == stylist.StylistId
+                ? $"Lịch của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã dời từ {oldStartTime:hh\\:mm} sang {request.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM}."
+                : $"Bạn được gán lịch hẹn mới của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} lúc {request.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM}.");
         if (oldStylistId != stylist.StylistId)
         {
             var oldStylistEmail = await db.Stylists.Where(item => item.StylistId == oldStylistId).Select(item => item.Email).SingleOrDefaultAsync();
-            if (!string.IsNullOrWhiteSpace(oldStylistEmail))
-                db.StaffNotifications.Add(new StaffNotification { RecipientEmail = oldStylistEmail, AppointmentId = appointment.AppointmentId, Type = "AppointmentReassigned", Message = $"Lịch của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã được chuyển sang thợ khác." });
+            notifications.Add(oldStylistEmail, appointment.AppointmentId, "AppointmentCancelled", $"Lịch của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã được chuyển sang thợ khác.");
         }
         try
         {

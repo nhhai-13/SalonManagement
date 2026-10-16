@@ -52,8 +52,8 @@ window.ReceptionOperations = (() => {
         }
         target.innerHTML = items.map(item => `
             <article class="reception-checkout-row">
-                <div><strong>${escapeHtml(item.customerName)}</strong><span>Thợ ${escapeHtml(item.stylistName)} · Đã hoàn tất</span><b>${money(item.totalAmount)}</b></div>
-                <button class="btn btn-success btn-sm" type="button" data-operation-payment="${item.appointmentId}" data-customer="${escapeHtml(item.customerName)}" data-stylist="${escapeHtml(item.stylistName)}" data-services="${escapeHtml(item.services)}" data-total="${item.totalAmount}">Thanh toán</button>
+                <div><strong>${escapeHtml(item.customerName)}</strong><span>Thợ ${escapeHtml(item.stylistName)} · ${item.status === "Completed" ? "Đã hoàn tất" : "Đang phục vụ"}</span><b>${money(item.totalAmount)}</b></div>
+                <button class="btn btn-success btn-sm" type="button" data-operation-payment="${item.appointmentId}" data-customer="${escapeHtml(item.customerName)}" data-stylist="${escapeHtml(item.stylistName)}" data-services="${escapeHtml(item.services)}" data-total="${item.totalAmount}">${item.status === "Completed" ? "Thanh toán" : "Mở hóa đơn"}</button>
             </article>`).join("");
         target.querySelectorAll("[data-operation-payment]").forEach(button => button.addEventListener("click", () => openPayment(button)));
     }
@@ -122,24 +122,92 @@ window.ReceptionOperations = (() => {
         const target = document.getElementById("reception-payment-lines");
         const total = selectedCheckout.lines.reduce((sum, line) => sum + Number(line.price || 0), 0);
         target.innerHTML = selectedCheckout.lines.map((line, index) => `<div class="reception-pos-line"><select class="form-select form-select-sm" data-payment-line="${index}">${selectedCheckout.availableServices.map(service => `<option value="${service.serviceId}" ${service.serviceId === line.serviceId ? "selected" : ""} ${service.serviceId !== line.serviceId && selectedCheckout.lines.some((selected, selectedIndex) => selectedIndex !== index && selected.serviceId === service.serviceId) ? "disabled" : ""}>${escapeHtml(service.serviceName)}</option>`).join("")}</select><strong>${money(line.price)}</strong><button class="btn btn-link text-danger p-0" type="button" data-payment-remove="${index}" aria-label="Bỏ dịch vụ"><i class="bi bi-trash3"></i></button></div>`).join("");
-        document.getElementById("reception-payment-total").textContent = money(total);
+        renderPaymentTotals(total, selectedCheckout.discountAmount || 0);
         document.getElementById("reception-payment-add-service").disabled = selectedCheckout.lines.length >= selectedCheckout.availableServices.length;
         target.querySelectorAll("[data-payment-line]").forEach(select => select.addEventListener("change", () => {
             const service = selectedCheckout.availableServices.find(item => item.serviceId === Number(select.value));
             selectedCheckout.lines[Number(select.dataset.paymentLine)] = service;
+            clearPromotion();
             renderPaymentLines();
         }));
         target.querySelectorAll("[data-payment-remove]").forEach(button => button.addEventListener("click", () => {
             selectedCheckout.lines.splice(Number(button.dataset.paymentRemove), 1);
+            clearPromotion();
             renderPaymentLines();
         }));
+    }
+
+    function renderPaymentTotals(subtotal, discount) {
+        const safeDiscount = Math.min(Math.max(Number(discount || 0), 0), subtotal);
+        document.getElementById("reception-payment-subtotal").textContent = money(subtotal);
+        document.getElementById("reception-payment-discount").textContent = `−${money(safeDiscount)}`;
+        document.getElementById("reception-payment-total").textContent = money(subtotal - safeDiscount);
+    }
+
+    function clearPromotion() {
+        if (!selectedCheckout) return;
+        selectedCheckout.promotionCode = null;
+        selectedCheckout.discountAmount = 0;
+        const message = document.getElementById("reception-promotion-message");
+        message.textContent = "";
+        message.className = "small mt-2 mb-0 d-none";
+    }
+
+    async function applyPromotion() {
+        if (!selectedCheckout) return;
+        const codeInput = document.getElementById("reception-promotion-code");
+        const applyButton = document.getElementById("reception-promotion-apply");
+        const message = document.getElementById("reception-promotion-message");
+        const code = codeInput.value.trim().toUpperCase();
+        const subtotal = selectedCheckout.lines.reduce((sum, line) => sum + Number(line.price || 0), 0);
+        selectedCheckout.promotionCode = null;
+        selectedCheckout.discountAmount = 0;
+        renderPaymentTotals(subtotal, 0);
+        if (!code) {
+            message.textContent = "Đã bỏ mã giảm giá. Tổng tiền gốc được giữ nguyên.";
+            message.className = "small mt-2 mb-0 text-muted";
+            return;
+        }
+        applyButton.disabled = true;
+        try {
+            const response = await SalonAuth.authenticatedFetch(`/api/reception/operations/appointments/${selectedCheckout.appointmentId}/promotion`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ promotionCode: code, services: selectedCheckout.lines.map(line => ({ serviceId: line.serviceId })) })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || "Không thể áp dụng mã giảm giá.");
+            selectedCheckout.promotionCode = result.code;
+            selectedCheckout.discountAmount = Number(result.discountAmount || 0);
+            renderPaymentTotals(Number(result.subtotal || subtotal), selectedCheckout.discountAmount);
+            message.textContent = `✓ Áp dụng thành công: ${result.promotionName} (−${money(selectedCheckout.discountAmount)}).`;
+            message.className = "small mt-2 mb-0 text-success";
+        } catch (error) {
+            message.textContent = error.message || "Mã giảm giá không hợp lệ.";
+            message.className = "small mt-2 mb-0 text-danger";
+        } finally {
+            applyButton.disabled = false;
+        }
     }
 
     function syncPaymentReference() {
         const transfer = document.getElementById("reception-payment-method").value === "Transfer";
         const reference = document.getElementById("reception-payment-reference");
-        reference.required = transfer;
-        document.getElementById("reception-payment-reference-wrap").classList.toggle("is-required", transfer);
+        const label = document.getElementById("reception-payment-reference-label");
+        const help = document.getElementById("reception-payment-reference-help");
+        reference.required = false;
+        reference.readOnly = transfer;
+        document.getElementById("reception-payment-reference-wrap").classList.toggle("is-required", false);
+        if (transfer && !reference.value) reference.value = createTransferReference();
+        label.textContent = transfer ? "Mã giao dịch tự động" : "Mã giao dịch / ghi chú đối soát";
+        help.textContent = transfer ? "Mã được tạo tự động để đối soát chuyển khoản." : "Có thể nhập ghi chú đối soát nếu cần.";
+    }
+
+    function createTransferReference() {
+        const now = new Date();
+        const part = value => String(value).padStart(2, "0");
+        const timestamp = `${String(now.getFullYear()).slice(-2)}${part(now.getMonth() + 1)}${part(now.getDate())}${part(now.getHours())}${part(now.getMinutes())}${part(now.getSeconds())}`;
+        return `FT${timestamp}${String(selectedCheckout?.appointmentId || 0).padStart(5, "0")}`;
     }
 
     async function openPayment(button) {
@@ -148,9 +216,13 @@ window.ReceptionOperations = (() => {
             const response = await SalonAuth.authenticatedFetch(`/api/reception/operations/appointments/${button.dataset.operationPayment}/checkout`);
             const result = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(result.error || "Không thể nạp phiếu thanh toán.");
-            selectedCheckout = { ...result, lines: [...(result.services || [])], availableServices: result.availableServices || [] };
+            selectedCheckout = { ...result, lines: [...(result.services || [])], availableServices: result.availableServices || [], promotionCode: result.promotionCode || null, discountAmount: Number(result.discountAmount || 0) };
             document.getElementById("reception-payment-summary").innerHTML = `<strong>${escapeHtml(selectedCheckout.customerName)} · ${escapeHtml(selectedCheckout.phone)}</strong><span>Thợ ${escapeHtml(selectedCheckout.stylistName)} · Đã hoàn tất dịch vụ</span>`;
             document.getElementById("reception-payment-reference").value = "";
+            document.getElementById("reception-promotion-code").value = selectedCheckout.promotionCode || "";
+            const promotionMessage = document.getElementById("reception-promotion-message");
+            promotionMessage.textContent = selectedCheckout.promotionCode ? `Mã ${selectedCheckout.promotionCode} đã được lưu trên hóa đơn.` : "";
+            promotionMessage.className = selectedCheckout.promotionCode ? "small mt-2 mb-0 text-success" : "small mt-2 mb-0 d-none";
             const message = document.getElementById("reception-payment-message");
             message.className = "small mt-3 mb-0 d-none";
             syncPaymentReference();
@@ -163,6 +235,25 @@ window.ReceptionOperations = (() => {
         }
     }
 
+    function paymentMethodName(method) {
+        return ({ Cash: "Tiền mặt", Transfer: "Chuyển khoản", Card: "Thẻ" })[method] || method;
+    }
+
+    function requestPaymentConfirmation() {
+        if (!selectedCheckout) return;
+        const method = document.getElementById("reception-payment-method").value;
+        const transactionReference = document.getElementById("reception-payment-reference").value.trim();
+        const message = document.getElementById("reception-payment-message");
+        if (!selectedCheckout.lines.length) { message.textContent = "Phiếu thanh toán cần có ít nhất một dịch vụ."; message.className = "small mt-3 mb-0 text-danger"; return; }
+        if (method === "Transfer" && !transactionReference) syncPaymentReference();
+        const subtotal = selectedCheckout.lines.reduce((sum, line) => sum + Number(line.price || 0), 0);
+        const total = subtotal - Number(selectedCheckout.discountAmount || 0);
+        document.querySelector("[data-payment-confirm-customer]").textContent = selectedCheckout.customerName || "—";
+        document.querySelector("[data-payment-confirm-method]").textContent = paymentMethodName(method);
+        document.querySelector("[data-payment-confirm-total]").textContent = money(total);
+        document.getElementById("reception-payment-confirm-dialog").showModal();
+    }
+
     async function pay() {
         if (!selectedCheckout) return;
         const submit = document.getElementById("reception-payment-submit");
@@ -172,8 +263,7 @@ window.ReceptionOperations = (() => {
             const method = document.getElementById("reception-payment-method").value;
             const transactionReference = document.getElementById("reception-payment-reference").value.trim();
             if (!selectedCheckout.lines.length) throw new Error("Phiếu thanh toán cần có ít nhất một dịch vụ.");
-            if (method === "Transfer" && !transactionReference) throw new Error("Vui lòng nhập mã giao dịch hoặc ghi chú đối soát.");
-            const response = await SalonAuth.authenticatedFetch(`/api/reception/operations/appointments/${selectedCheckout.appointmentId}/payment`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method, transactionReference, services: selectedCheckout.lines.map(line => ({ serviceId: line.serviceId })) }) });
+            const response = await SalonAuth.authenticatedFetch(`/api/reception/operations/appointments/${selectedCheckout.appointmentId}/payment`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method, transactionReference, promotionCode: selectedCheckout.promotionCode, services: selectedCheckout.lines.map(line => ({ serviceId: line.serviceId })) }) });
             const result = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(result.error || "Không thể ghi nhận thanh toán.");
             message.textContent = result.message || "Đã ghi nhận thanh toán.";
@@ -185,6 +275,30 @@ window.ReceptionOperations = (() => {
             message.className = "small mt-3 mb-0 text-danger";
         } finally {
             submit.disabled = false;
+        }
+    }
+
+    async function saveInvoice() {
+        if (!selectedCheckout) return;
+        const save = document.getElementById("reception-invoice-save");
+        const message = document.getElementById("reception-payment-message");
+        save.disabled = true;
+        try {
+            if (!selectedCheckout.lines.length) throw new Error("Hóa đơn cần có ít nhất một dịch vụ.");
+            const response = await SalonAuth.authenticatedFetch(`/api/reception/operations/appointments/${selectedCheckout.appointmentId}/invoice`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ promotionCode: selectedCheckout.promotionCode, services: selectedCheckout.lines.map(line => ({ serviceId: line.serviceId })) }) });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || "Không thể lưu hóa đơn.");
+            selectedCheckout.promotionCode = result.promotionCode || null;
+            selectedCheckout.discountAmount = Number(result.discountAmount || 0);
+            renderPaymentTotals(Number(result.subtotal || 0), selectedCheckout.discountAmount);
+            message.textContent = "Đã lưu hóa đơn nháp. Có thể tiếp tục thêm dịch vụ trước khi thanh toán.";
+            message.className = "small mt-3 mb-0 text-success";
+            await load();
+        } catch (error) {
+            message.textContent = error.message || "Không thể lưu hóa đơn.";
+            message.className = "small mt-3 mb-0 text-danger";
+        } finally {
+            save.disabled = false;
         }
     }
 
@@ -223,11 +337,18 @@ window.ReceptionOperations = (() => {
     return {
         start() {
             clearInterval(refreshTimer);
-            document.getElementById("reception-payment-submit")?.addEventListener("click", pay);
+            document.getElementById("reception-payment-submit")?.addEventListener("click", requestPaymentConfirmation);
+            document.getElementById("reception-payment-confirm-submit")?.addEventListener("click", () => {
+                document.getElementById("reception-payment-confirm-dialog")?.close();
+                pay();
+            });
+            document.getElementById("reception-invoice-save")?.addEventListener("click", saveInvoice);
             document.getElementById("reception-payment-add-service")?.addEventListener("click", () => {
                 const available = selectedCheckout?.availableServices.find(service => !selectedCheckout.lines.some(line => line.serviceId === service.serviceId));
-                if (available) { selectedCheckout.lines.push(available); renderPaymentLines(); }
+                if (available) { selectedCheckout.lines.push(available); clearPromotion(); renderPaymentLines(); }
             });
+            document.getElementById("reception-promotion-apply")?.addEventListener("click", applyPromotion);
+            document.getElementById("reception-promotion-code")?.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); applyPromotion(); } });
             document.getElementById("reception-payment-method")?.addEventListener("change", syncPaymentReference);
             document.getElementById("reception-counter-booking")?.addEventListener("click", openCounterBooking);
             document.getElementById("reception-counter-close")?.addEventListener("click", closeCounterBooking);

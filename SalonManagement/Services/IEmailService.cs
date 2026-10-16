@@ -13,4 +13,6 @@ public interface IEmailService
     /// <summary>Gửi mã xác minh email gồm 6 chữ số.</summary>
     Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode);
     Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime);
+    Task SendServiceReviewEmailAsync(string toEmail, string customerName, string reviewLink, DateTime expiresAt);
+    Task SendAppointmentNotificationEmailAsync(string toEmail, string customerName, string reference, string services, string stylistName, DateTime appointmentDate, TimeSpan startTime, bool isReminder);
 }

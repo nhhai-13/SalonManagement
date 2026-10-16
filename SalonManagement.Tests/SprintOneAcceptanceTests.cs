@@ -268,6 +268,8 @@ public sealed class SprintOneAcceptanceTests
         public bool Fail { get; init; }
         public Task SendTemporaryPasswordEmailAsync(string email, string password) { if (Fail) throw new InvalidOperationException("Test delivery failure"); Password = password; return Task.CompletedTask; }
         public Task SendPasswordResetEmailAsync(string email, string link) => Task.CompletedTask;
+        public Task SendServiceReviewEmailAsync(string toEmail, string customerName, string reviewLink, DateTime expiresAt) => Task.CompletedTask;
+        public Task SendAppointmentNotificationEmailAsync(string toEmail, string customerName, string reference, string services, string stylistName, DateTime appointmentDate, TimeSpan startTime, bool isReminder) => Task.CompletedTask;
         public Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime) => Task.CompletedTask;
         public Task SendEmailVerificationCodeAsync(string email, string code) => Task.CompletedTask;
     }

@@ -224,8 +224,13 @@ builder.Services.AddScoped<CustomerProfileSearchService>();
 builder.Services.AddScoped<AppointmentReschedulingService>();
 builder.Services.AddScoped<BatchAppointmentReschedulingService>();
 builder.Services.AddScoped<AppointmentLifecycleService>();
+builder.Services.AddScoped<StylistInAppNotificationService>();
+builder.Services.AddHostedService<StaffNotificationCleanupBackgroundService>();
 builder.Services.AddScoped<AppointmentChangeEmailProcessor>();
 builder.Services.AddHostedService<AppointmentChangeEmailBackgroundService>();
+builder.Services.AddScoped<AppointmentEmailNotificationService>();
+builder.Services.AddScoped<AppointmentEmailNotificationProcessor>();
+builder.Services.AddHostedService<AppointmentEmailNotificationBackgroundService>();
 builder.Services.AddScoped<BookingEmailVerificationService>();
 
 builder.Services.AddScoped<SessionPrincipalValidator>();
@@ -271,6 +276,7 @@ await using (var scope = app.Services.CreateAsyncScope())
         await EnsureSqliteColumnAsync(dbContext, "Appointments", "CustomerNameOverride", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "Appointments", "NameConflictResolution", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "Appointments", "TechnicalNotes", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "Invoices", "PromotionCode", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "Customers", "NormalizedSearchName", "TEXT NOT NULL DEFAULT ''");
         await EnsureSqliteColumnAsync(dbContext, "AspNetUsers", "RequestedRole", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "AspNetUsers", "AccessRequestedAtUtc", "DATETIME");
@@ -280,6 +286,16 @@ await using (var scope = app.Services.CreateAsyncScope())
         await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_StaffNotifications_RecipientEmail_ReadAt_CreatedAt ON StaffNotifications (RecipientEmail, ReadAt, CreatedAt)");
         await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS StylistLeaveRequests (StylistLeaveRequestId INTEGER PRIMARY KEY AUTOINCREMENT, StylistId INTEGER NOT NULL, OffDate TEXT NOT NULL, IsFullDay INTEGER NOT NULL, StartTime TEXT NULL, EndTime TEXT NULL, Reason TEXT NOT NULL, Status TEXT NOT NULL, CreatedAt DATETIME NOT NULL, FOREIGN KEY (StylistId) REFERENCES Stylists(StylistId) ON DELETE CASCADE)");
         await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_StylistLeaveRequests_StylistId_OffDate_Status ON StylistLeaveRequests (StylistId, OffDate, Status)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS PromotionCodes (PromotionCodeId INTEGER PRIMARY KEY AUTOINCREMENT, Code TEXT NOT NULL, Name TEXT NOT NULL, DiscountType TEXT NOT NULL, DiscountValue TEXT NOT NULL, StartsAt DATETIME NOT NULL, EndsAt DATETIME NOT NULL, IsActive INTEGER NOT NULL DEFAULT 1, CreatedAt DATETIME NOT NULL)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_PromotionCodes_Code ON PromotionCodes (Code)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_PromotionCodes_IsActive_StartsAt_EndsAt ON PromotionCodes (IsActive, StartsAt, EndsAt)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS ServiceReviews (ServiceReviewId INTEGER PRIMARY KEY AUTOINCREMENT, AppointmentId INTEGER NOT NULL, TokenHash TEXT NOT NULL, ExpiresAt DATETIME NOT NULL, CreatedAt DATETIME NOT NULL, EmailSentAt DATETIME NULL, SubmittedAt DATETIME NULL, Rating INTEGER NULL, Comment TEXT NULL, FOREIGN KEY (AppointmentId) REFERENCES Appointments(AppointmentId) ON DELETE CASCADE)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_ServiceReviews_AppointmentId ON ServiceReviews (AppointmentId)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_ServiceReviews_TokenHash ON ServiceReviews (TokenHash)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_ServiceReviews_SubmittedAt_ExpiresAt ON ServiceReviews (SubmittedAt, ExpiresAt)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS AppointmentEmailNotifications (AppointmentEmailNotificationId INTEGER PRIMARY KEY AUTOINCREMENT, AppointmentId INTEGER NOT NULL, NotificationType TEXT NOT NULL, RecipientEmail TEXT NULL, Status TEXT NOT NULL, AttemptCount INTEGER NOT NULL DEFAULT 0, ScheduledAt DATETIME NOT NULL, NextAttemptAt DATETIME NOT NULL, SentAt DATETIME NULL, CancelledAt DATETIME NULL, LastError TEXT NULL, FOREIGN KEY (AppointmentId) REFERENCES Appointments(AppointmentId) ON DELETE CASCADE)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_AppointmentEmailNotifications_Status_NextAttemptAt ON AppointmentEmailNotifications (Status, NextAttemptAt)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_AppointmentEmailNotifications_AppointmentId_NotificationType_Status ON AppointmentEmailNotifications (AppointmentId, NotificationType, Status)");
     }
     else
     {
@@ -404,6 +420,11 @@ using (var scope = app.Services.CreateScope())
         dbContext,
         userManager);
     await StylistProfileSynchronizer.EnsureForActiveStylistAccountsAsync(dbContext);
+    if (app.Environment.IsStaging() && builder.Configuration.GetValue<bool>("Seed:StagingDemo"))
+    {
+        var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;
+        await StagingDemoSeed.SeedAsync(dbContext, userManager, now);
+    }
     if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Seed:StylistBookingDemo"))
     {
         var now = services.GetRequiredService<StylistAvailabilityService>().SalonNow;

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using SalonManagement.Data;
@@ -12,8 +13,24 @@ namespace SalonManagement.Controllers.Reception;
 [Authorize(Roles = UserRoles.Receptionist)]
 [ApiController]
 [Route("api/reception/pending-appointments")]
-public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeProvider timeProvider) : ControllerBase
+public sealed class PendingAppointmentsController : ControllerBase
 {
+    private readonly ApplicationDbContext db;
+    private readonly TimeProvider timeProvider;
+    private readonly AppointmentEmailNotificationService emailNotifications;
+
+    [ActivatorUtilitiesConstructor]
+    public PendingAppointmentsController(ApplicationDbContext db, TimeProvider timeProvider, AppointmentEmailNotificationService emailNotifications)
+    {
+        this.db = db;
+        this.timeProvider = timeProvider;
+        this.emailNotifications = emailNotifications;
+    }
+
+    // Convenience constructor for isolated controller tests.
+    public PendingAppointmentsController(ApplicationDbContext db, TimeProvider timeProvider)
+        : this(db, timeProvider, new AppointmentEmailNotificationService(db, timeProvider)) { }
+
     private static readonly string[] RejectionReasons = ["Không còn thợ phù hợp", "Khung giờ không còn trống", "Không liên hệ được khách", "Yêu cầu của khách không phù hợp"];
     private static readonly TimeSpan PendingOverdueAfter = TimeSpan.FromHours(12);
 
@@ -59,7 +76,11 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
     [HttpPost("{appointmentId:int}/confirm")]
     public async Task<IActionResult> Confirm(int appointmentId)
     {
-        var appointment = await db.Appointments.SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
+        var appointment = await db.Appointments
+            .Include(item => item.Customer)
+            .Include(item => item.Stylist)
+            .Include(item => item.AppointmentServices).ThenInclude(item => item.Service)
+            .SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
         if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
         if (appointment.Status != "PendingConfirmation") return Conflict(new { error = "Lịch hẹn này đã được xử lý." });
         if (appointment.NameConflictResolution == "PendingReceptionReview")
@@ -72,6 +93,7 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         appointment.ConfirmedByUserId = userId;
         appointment.ConfirmedAt = SalonClock.GetLocalNow(timeProvider);
         appointment.UpdatedAt = appointment.ConfirmedAt;
+        await emailNotifications.QueueInitialNotificationsAsync(appointment);
         await db.SaveChangesAsync();
         return Ok(new { appointment.AppointmentId, appointment.Status, appointment.ConfirmedByUserId, appointment.ConfirmedAt });
     }

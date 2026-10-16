@@ -40,7 +40,8 @@
                             <form method="post" action="/reception/daily-schedule/@appointment.AppointmentId/check-in">@Html.AntiForgeryToken()<input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-success btn-sm schedule-action"><i class="bi bi-check2-circle"></i> Check-in</button></form>
                             @if (appointment.CanMarkNoShow)
                             {
-                                <form method="post" action="/reception/daily-schedule/@appointment.AppointmentId/no-show" onsubmit="return confirm('Đánh dấu khách không đến? Khung giờ còn lại của thợ sẽ được mở lại.');">@Html.AntiForgeryToken()<input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-outline-danger btn-sm schedule-action"><i class="bi bi-person-x"></i> Không đến</button></form>
+                                var noShowTime = appointment.StartTime.ToString(@"hh\:mm") + "–" + appointment.EndTime.ToString(@"hh\:mm");
+                                <form method="post" action="/reception/daily-schedule/@appointment.AppointmentId/no-show" data-no-show-form>@Html.AntiForgeryToken()<input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-outline-danger btn-sm schedule-action" type="button" data-no-show-trigger data-customer-name="@appointment.CustomerName" data-service-name="@appointment.Services" data-stylist-name="@stylist.StylistName" data-appointment-time="@noShowTime"><i class="bi bi-person-x"></i> Không đến</button></form>
                             }
                             else
                             {
@@ -88,6 +89,33 @@
         </table>
     </div>
 </div>
+<dialog id="no-show-dialog" class="no-show-dialog" aria-labelledby="no-show-dialog-title">
+    <form method="dialog" class="no-show-card">
+        <header class="no-show-card-header">
+            <div class="no-show-icon" aria-hidden="true"><i class="bi bi-person-x"></i></div>
+            <div><span class="no-show-eyebrow">Xác nhận trạng thái</span><h2 id="no-show-dialog-title">Đánh dấu khách không đến</h2></div>
+            <button class="btn-close" value="cancel" aria-label="Đóng"></button>
+        </header>
+        <section class="no-show-card-body">
+            <p class="no-show-intro">Bạn đang xác nhận khách không có mặt sau giờ hẹn tối thiểu 30 phút.</p>
+            <div class="no-show-appointment-summary" aria-label="Thông tin lịch hẹn">
+                <div><span>Khách hàng</span><strong data-no-show-customer></strong></div>
+                <div><span>Dịch vụ</span><strong data-no-show-service></strong></div>
+                <div><span>Thợ phụ trách</span><strong data-no-show-stylist></strong></div>
+                <div><span>Khung giờ</span><strong data-no-show-time></strong></div>
+            </div>
+            <div class="no-show-impact">
+                <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
+                <div><strong>Sau khi xác nhận</strong><span>Khung giờ còn lại của thợ sẽ được mở để nhận khách khác. Lượt không đến được cộng vào hồ sơ khách.</span></div>
+            </div>
+            <div class="no-show-undo-note"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Có thể hoàn tác trong vòng 15 phút sau khi đánh dấu.</div>
+        </section>
+        <footer class="no-show-card-footer">
+            <button class="btn btn-light border" value="cancel">Quay lại</button>
+            <button class="btn btn-danger" type="button" data-no-show-confirm><i class="bi bi-person-x"></i> Xác nhận không đến</button>
+        </footer>
+    </form>
+</dialog>
 <div id="reception-work-drawer" class="reception-work-drawer" aria-hidden="true">
     <button class="reception-work-drawer-backdrop" type="button" data-reception-drawer-close tabindex="-1" aria-label="Đóng bảng điều khiển"></button>
     <aside class="reception-work-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="reception-work-drawer-title" tabindex="-1">
@@ -163,5 +191,33 @@
             button.disabled = false;
         }
     }));
+
+    (() => {
+        const dialog = document.getElementById('no-show-dialog');
+        if (!dialog) return;
+        let selectedForm;
+
+        const setSummary = (selector, value) => {
+            const element = dialog.querySelector(selector);
+            if (element) element.textContent = value || '—';
+        };
+
+        document.querySelectorAll('[data-no-show-trigger]').forEach(button => button.addEventListener('click', () => {
+            selectedForm = button.closest('[data-no-show-form]');
+            setSummary('[data-no-show-customer]', button.dataset.customerName);
+            setSummary('[data-no-show-service]', button.dataset.serviceName);
+            setSummary('[data-no-show-stylist]', button.dataset.stylistName);
+            setSummary('[data-no-show-time]', button.dataset.appointmentTime);
+            dialog.showModal();
+        }));
+
+        dialog.querySelector('[data-no-show-confirm]')?.addEventListener('click', () => {
+            if (!selectedForm) return;
+            dialog.close();
+            selectedForm.requestSubmit();
+        });
+
+        dialog.addEventListener('close', () => { selectedForm = undefined; });
+    })();
 </script>
 }

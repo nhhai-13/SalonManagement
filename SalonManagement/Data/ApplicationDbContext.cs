@@ -44,6 +44,12 @@ public ApplicationDbContext(
 
         public DbSet<Payment> Payments => Set<Payment>();
 
+        public DbSet<PromotionCode> PromotionCodes => Set<PromotionCode>();
+
+        public DbSet<ServiceReview> ServiceReviews => Set<ServiceReview>();
+
+        public DbSet<AppointmentEmailNotification> AppointmentEmailNotifications => Set<AppointmentEmailNotification>();
+
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
 
         public DbSet<ShopHoliday> ShopHolidays => Set<ShopHoliday>();
@@ -459,10 +465,51 @@ private class AuditEntry
                 entity.Property(invoice => invoice.DiscountAmount).HasPrecision(18, 2);
                 entity.Property(invoice => invoice.TotalAmount).HasPrecision(18, 2);
                 entity.Property(invoice => invoice.Status).HasMaxLength(30);
+                entity.Property(invoice => invoice.PromotionCode).HasMaxLength(64);
 
                 entity.HasOne(invoice => invoice.Appointment)
                     .WithOne(appointment => appointment.Invoice)
                     .HasForeignKey<Invoice>(invoice => invoice.AppointmentId);
+            });
+
+            builder.Entity<PromotionCode>(entity =>
+            {
+                entity.HasKey(promotion => promotion.PromotionCodeId);
+                entity.Property(promotion => promotion.Code).HasMaxLength(64).IsRequired();
+                entity.Property(promotion => promotion.Name).HasMaxLength(160).IsRequired();
+                entity.Property(promotion => promotion.DiscountType).HasMaxLength(24).IsRequired();
+                entity.Property(promotion => promotion.DiscountValue).HasPrecision(18, 2);
+                entity.HasIndex(promotion => promotion.Code).IsUnique();
+                entity.HasIndex(promotion => new { promotion.IsActive, promotion.StartsAt, promotion.EndsAt });
+            });
+
+            builder.Entity<ServiceReview>(entity =>
+            {
+                entity.HasKey(review => review.ServiceReviewId);
+                entity.Property(review => review.TokenHash).HasMaxLength(64).IsRequired();
+                entity.Property(review => review.Comment).HasMaxLength(500);
+                entity.HasIndex(review => review.AppointmentId).IsUnique();
+                entity.HasIndex(review => review.TokenHash).IsUnique();
+                entity.HasIndex(review => new { review.SubmittedAt, review.ExpiresAt });
+                entity.HasOne(review => review.Appointment)
+                    .WithOne(appointment => appointment.ServiceReview)
+                    .HasForeignKey<ServiceReview>(review => review.AppointmentId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<AppointmentEmailNotification>(entity =>
+            {
+                entity.HasKey(notification => notification.AppointmentEmailNotificationId);
+                entity.Property(notification => notification.NotificationType).HasMaxLength(32).IsRequired();
+                entity.Property(notification => notification.RecipientEmail).HasMaxLength(256);
+                entity.Property(notification => notification.Status).HasMaxLength(32).IsRequired();
+                entity.Property(notification => notification.LastError).HasMaxLength(1000);
+                entity.HasIndex(notification => new { notification.Status, notification.NextAttemptAt });
+                entity.HasIndex(notification => new { notification.AppointmentId, notification.NotificationType, notification.Status });
+                entity.HasOne(notification => notification.Appointment)
+                    .WithMany(appointment => appointment.EmailNotifications)
+                    .HasForeignKey(notification => notification.AppointmentId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<Payment>(entity =>

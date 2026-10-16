@@ -35,7 +35,9 @@ public sealed class AppointmentLookupController(ApplicationDbContext db, TimePro
     [HttpPost("cancel")]
     public async Task<IActionResult> Cancel([FromBody] CancelAppointmentRequest request)
     {
-        var result = await new AppointmentCancellationService(db, timeProvider).CancelAsync(request.Reference);
+        var emailNotifications = HttpContext.RequestServices.GetRequiredService<AppointmentEmailNotificationService>();
+        var notifications = HttpContext.RequestServices.GetRequiredService<StylistInAppNotificationService>();
+        var result = await new AppointmentCancellationService(db, timeProvider, emailNotifications, notifications).CancelAsync(request.Reference);
         return result.Succeeded ? Ok(new { status = "Cancelled" }) : BadRequest(new { error = result.Error, code = result.ErrorCode });
     }
 }

@@ -67,5 +67,9 @@
             = new List<AppointmentService>();
 
         public Invoice? Invoice { get; set; }
+
+        public ServiceReview? ServiceReview { get; set; }
+
+        public ICollection<AppointmentEmailNotification> EmailNotifications { get; set; } = new List<AppointmentEmailNotification>();
     }
 }

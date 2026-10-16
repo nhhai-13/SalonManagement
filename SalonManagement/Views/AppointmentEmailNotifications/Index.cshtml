@@ -1,0 +1,9 @@
+@{ ViewData["Title"] = "Trạng thái Email & Nhắc lịch"; }
+<main id="email-notification-content" class="container py-4 d-none">
+    <span class="text-uppercase text-primary small fw-bold">S4-05 · Cổng lễ tân</span>
+    <h1 class="h3 mb-1">Theo dõi Nhật ký gửi Email &amp; Cảnh báo gọi xác nhận</h1>
+    <p class="text-muted">Theo dõi trạng thái email xác nhận, nhắc lịch, thử lại và khách chưa có email.</p>
+    <section id="email-notification-manual-calls" class="alert alert-warning d-none"></section>
+    <div class="card shadow-sm border-0"><div class="table-responsive"><table class="table align-middle mb-0 email-notification-table"><thead><tr><th>Mã lịch</th><th>Khách hàng &amp; email</th><th>Loại email</th><th>Trạng thái gửi</th><th>Nhật ký thử lại</th></tr></thead><tbody id="email-notification-list"><tr><td colspan="5" class="py-4 text-center text-muted">Đang tải nhật ký email…</td></tr></tbody></table></div></div>
+</main>
+@section Scripts { <script src="~/js/auth.js" asp-append-version="true"></script><script src="~/js/appointment-email-notifications.js" asp-append-version="true"></script><script>SalonAuth.requireSession({ endpoint: "/api/portal/reception/session", contentId: "email-notification-content" }).then(() => AppointmentEmailNotifications.start());</script> }

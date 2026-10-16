@@ -65,7 +65,36 @@ public sealed class StylistCommandCenterController(ApplicationDbContext db, Time
             .OrderByDescending(item => item.AppointmentDate).ThenByDescending(item => item.StartTime).Take(10)
             .Select(item => new TechnicalHistoryItem(item.AppointmentDate, string.Join(", ", item.AppointmentServices.Select(service => service.Service.ServiceName)), item.Stylist.FullName, item.TechnicalNotes))
             .ToList();
-        return Ok(new TechnicalDetailsResponse(appointment.AppointmentId, appointment.CustomerNameOverride ?? appointment.Customer.FullName, appointment.TechnicalNotes, history));
+        return Ok(new TechnicalDetailsResponse(
+            appointment.AppointmentId,
+            appointment.CustomerNameOverride ?? appointment.Customer.FullName,
+            MaskPhone(appointment.Customer.Phone),
+            appointment.TechnicalNotes,
+            history,
+            history.Count == 0));
+    }
+
+    [HttpGet("appointments/{appointmentId:int}/details")]
+    public async Task<ActionResult<StylistAppointmentDetailsResponse>> AppointmentDetails(int appointmentId)
+    {
+        var stylist = await CurrentStylistAsync();
+        if (stylist is null) return Forbid();
+        var appointment = await db.Appointments.AsNoTracking()
+            .Include(item => item.Customer)
+            .Include(item => item.AppointmentServices).ThenInclude(item => item.Service)
+            .SingleOrDefaultAsync(item => item.AppointmentId == appointmentId && item.StylistId == stylist.StylistId);
+        if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn của bạn." });
+        return Ok(new StylistAppointmentDetailsResponse(
+            appointment.AppointmentId,
+            appointment.BookingReference,
+            appointment.CustomerNameOverride ?? appointment.Customer.FullName,
+            MaskPhone(appointment.Customer.Phone),
+            string.Join(", ", appointment.AppointmentServices.Select(item => item.Service.ServiceName)),
+            appointment.AppointmentDate,
+            appointment.StartTime,
+            appointment.EndTime,
+            appointment.Status,
+            appointment.Notes));
     }
 
     [HttpPost("appointments/{appointmentId:int}/technical")]
@@ -113,5 +142,12 @@ public sealed record StylistCommandSnapshot(DateTime GeneratedAt, string Stylist
 public sealed record StylistShift(TimeSpan StartTime, TimeSpan EndTime, string? BreakNotes);
 public sealed record StylistAppointmentItem(int AppointmentId, string CustomerName, string MaskedPhone, string Services, int StandardMinutes, TimeSpan StartTime, TimeSpan EndTime, string Status, DateTime? ArrivedAt, DateTime? ActualStartedAt, string? CustomerNote);
 public sealed record TechnicalHistoryItem(DateTime AppointmentDate, string Services, string StylistName, string? TechnicalNotes);
-public sealed record TechnicalDetailsResponse(int AppointmentId, string CustomerName, string? CurrentTechnicalNotes, IReadOnlyList<TechnicalHistoryItem> History);
+public sealed record TechnicalDetailsResponse(
+    int AppointmentId,
+    string CustomerName,
+    string MaskedPhone,
+    string? CurrentTechnicalNotes,
+    IReadOnlyList<TechnicalHistoryItem> History,
+    bool IsNewCustomer);
+public sealed record StylistAppointmentDetailsResponse(int AppointmentId, string Reference, string CustomerName, string MaskedPhone, string Services, DateTime AppointmentDate, TimeSpan StartTime, TimeSpan EndTime, string Status, string? CustomerNote);
 public sealed record SaveTechnicalNotesRequest(string? Notes);

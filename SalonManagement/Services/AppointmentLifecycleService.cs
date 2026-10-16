@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SalonManagement.Data;
 using SalonManagement.Models;
 
@@ -11,11 +12,27 @@ public sealed record AppointmentLifecycleResult(bool Succeeded, string? Error)
 }
 
 /// <summary>Applies reception-controlled appointment state changes with the time limits from Sprint 3.</summary>
-public sealed class AppointmentLifecycleService(ApplicationDbContext db, TimeProvider timeProvider)
+public sealed class AppointmentLifecycleService
 {
+    private readonly ApplicationDbContext db;
+    private readonly TimeProvider timeProvider;
+    private readonly StylistInAppNotificationService notifications;
+
+    [ActivatorUtilitiesConstructor]
+    public AppointmentLifecycleService(ApplicationDbContext db, TimeProvider timeProvider, StylistInAppNotificationService notifications)
+    {
+        this.db = db;
+        this.timeProvider = timeProvider;
+        this.notifications = notifications;
+    }
+
+    // Keeps existing isolated tests and maintenance tools source-compatible.
+    public AppointmentLifecycleService(ApplicationDbContext db, TimeProvider timeProvider)
+        : this(db, timeProvider, new StylistInAppNotificationService(db, timeProvider)) { }
+
     public async Task<AppointmentLifecycleResult> CheckInAsync(int appointmentId)
     {
-        var appointment = await db.Appointments.Include(item => item.Customer).SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
+        var appointment = await db.Appointments.Include(item => item.Customer).Include(item => item.Invoice).SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
         if (appointment is null) return AppointmentLifecycleResult.Rejected("Không tìm thấy lịch hẹn.");
         if (appointment.Status != "Confirmed") return AppointmentLifecycleResult.Rejected("Chỉ có thể check-in lịch đã xác nhận.");
 
@@ -30,17 +47,22 @@ public sealed class AppointmentLifecycleService(ApplicationDbContext db, TimePro
         appointment.IsLate = lateMinutes > 15;
         appointment.LateMinutes = appointment.IsLate ? lateMinutes : null;
         appointment.UpdatedAt = now;
-        var stylistEmail = await db.Stylists.Where(item => item.StylistId == appointment.StylistId).Select(item => item.Email).SingleOrDefaultAsync();
-        if (!string.IsNullOrWhiteSpace(stylistEmail))
+        // A bill starts at check-in so reception can add walk-in services while the client is being served.
+        if (appointment.Invoice is null)
         {
-            db.StaffNotifications.Add(new StaffNotification
+            var subtotal = await db.AppointmentServices.Where(item => item.AppointmentId == appointmentId).SumAsync(item => item.Price);
+            db.Invoices.Add(new Invoice
             {
-                RecipientEmail = stylistEmail,
                 AppointmentId = appointment.AppointmentId,
-                Type = "CheckIn",
-                Message = $"Khách {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã check-in cho lịch {appointment.StartTime:hh\\:mm}."
+                Subtotal = subtotal,
+                DiscountAmount = 0,
+                TotalAmount = subtotal,
+                Status = "Unpaid",
+                CreatedAt = now
             });
         }
+        var stylistEmail = await db.Stylists.Where(item => item.StylistId == appointment.StylistId).Select(item => item.Email).SingleOrDefaultAsync();
+        notifications.Add(stylistEmail, appointment.AppointmentId, "CheckIn", $"Khách {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã check-in cho lịch {appointment.StartTime:hh\\:mm}.");
         await db.SaveChangesAsync();
         return AppointmentLifecycleResult.Success();
     }

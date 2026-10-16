@@ -20,8 +20,38 @@
     </section>
 </main>
 
-<div id="stylist-technical-drawer" class="stylist-technical-drawer" aria-hidden="true"><button type="button" class="stylist-drawer-backdrop" data-stylist-drawer-close aria-label="Đóng"></button><aside class="stylist-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="stylist-technical-title"><header><div><span class="stylist-command-eyebrow">S4-03 · Nội bộ</span><h2 id="stylist-technical-title">Ghi chú kỹ thuật</h2></div><button type="button" class="btn-close" data-stylist-drawer-close aria-label="Đóng"></button></header><div class="stylist-drawer-body"><p class="stylist-internal-badge"><i class="bi bi-lock-fill"></i> Chỉ Thợ, Lễ tân và Chủ tiệm có thể xem ghi chú này.</p><label class="form-label" for="stylist-technical-notes">Ghi chú của lượt hiện tại</label><textarea id="stylist-technical-notes" class="form-control" maxlength="500" rows="5" placeholder="Ví dụ: Mã màu 5/77 + Oxy 6%, ủ 30 phút."></textarea><div class="d-flex justify-content-between align-items-center mt-1"><small id="stylist-technical-count" class="text-muted">0/500</small><button id="stylist-technical-save" class="btn btn-primary btn-sm" type="button">Lưu ghi chú</button></div><hr /><h3>Lịch sử kỹ thuật gần đây</h3><div id="stylist-technical-history" class="stylist-technical-history"><div class="text-muted small">Đang tải…</div></div></div></aside></div>
+<div id="stylist-technical-drawer" class="stylist-technical-drawer" aria-hidden="true">
+    <button type="button" class="stylist-drawer-backdrop" data-stylist-drawer-close aria-label="Đóng"></button>
+    <aside class="stylist-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="stylist-technical-title">
+        <header>
+            <div>
+                <span class="stylist-command-eyebrow">S4-03 · Nội bộ</span>
+                <h2 id="stylist-technical-title">Lịch sử dịch vụ &amp; ghi chú kỹ thuật</h2>
+            </div>
+            <button type="button" class="btn-close" data-stylist-drawer-close aria-label="Đóng"></button>
+        </header>
+        <div class="stylist-drawer-body">
+            <div class="stylist-technical-customer">
+                <span>Khách đang phục vụ</span>
+                <strong id="stylist-technical-customer-name">Đang tải…</strong>
+                <small id="stylist-technical-phone"></small>
+                <span id="stylist-technical-new-customer" class="stylist-new-customer-badge d-none"><i class="bi bi-stars"></i> Khách mới</span>
+            </div>
+            <p class="stylist-internal-badge"><i class="bi bi-lock-fill"></i> Ghi chú nội bộ · Chỉ Thợ, Lễ tân và Chủ tiệm xem được.</p>
+            <label class="form-label" for="stylist-technical-notes">Ghi chú kỹ thuật lượt hôm nay <span>(tối đa 500 ký tự)</span></label>
+            <textarea id="stylist-technical-notes" class="form-control" maxlength="500" rows="5" placeholder="Nhập công thức màu, nồng độ oxy, thời gian ủ hoặc lưu ý da đầu…"></textarea>
+            <div class="stylist-technical-note-actions">
+                <small id="stylist-technical-count" class="text-muted">0 / 500 ký tự</small>
+                <button id="stylist-technical-save" class="btn btn-primary btn-sm" type="button"><i class="bi bi-save"></i> Lưu ghi chú</button>
+            </div>
+            <hr />
+            <h3>10 lượt dịch vụ gần nhất của khách</h3>
+            <div id="stylist-technical-history" class="stylist-technical-history"><div class="text-muted small">Đang tải…</div></div>
+        </div>
+    </aside>
+</div>
 <dialog id="stylist-notification-dialog" class="stylist-notification-dialog"><section><header><h2>Thông báo lịch hẹn</h2><button class="btn-close" type="button" data-stylist-notification-close aria-label="Đóng"></button></header><div id="stylist-notification-list"></div></section></dialog>
+<dialog id="stylist-appointment-detail-dialog" class="stylist-appointment-detail-dialog"><section><header><div><span class="stylist-command-eyebrow">Chi tiết lịch hẹn</span><h2 id="stylist-appointment-detail-title">Lịch hẹn của khách</h2></div><button class="btn-close" type="button" data-stylist-detail-close aria-label="Đóng"></button></header><div class="stylist-detail-body"><p id="stylist-appointment-detail-source" class="stylist-detail-source d-none"></p><dl><dt>Mã lịch hẹn</dt><dd id="stylist-appointment-detail-reference">—</dd><dt>Khách hàng</dt><dd id="stylist-appointment-detail-customer">—</dd><dt>Dịch vụ</dt><dd id="stylist-appointment-detail-services">—</dd><dt>Giờ hẹn</dt><dd id="stylist-appointment-detail-time">—</dd><dt>Trạng thái</dt><dd id="stylist-appointment-detail-status">—</dd></dl><div id="stylist-appointment-detail-note" class="stylist-customer-note d-none"></div><div class="stylist-detail-actions"><button id="stylist-appointment-detail-start" class="btn btn-primary d-none" type="button"><i class="bi bi-play-fill"></i> Bắt đầu phục vụ ngay</button><button id="stylist-appointment-detail-technical" class="btn btn-outline-primary" type="button"><i class="bi bi-journal-text"></i> Lịch sử &amp; ghi chú KT</button></div></div></section></dialog>
 
 @section Scripts {
     <script src="~/js/auth.js" asp-append-version="true"></script>
