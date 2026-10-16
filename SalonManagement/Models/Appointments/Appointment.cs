@@ -29,11 +29,16 @@ namespace SalonManagement.Models
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; }
+ codex/sprint-4-todo
+        public DateTime? ClosedAt { get; set; }
+        public string? ClosedByUserId { get; set; }
+
 
         public DateTime? ClosedAt { get; set; }
 
         public string? ClosedByUserId { get; set; }
 
+ develop
         public string? ClosedByName { get; set; }
         public Customer Customer { get; set; } = null!;
         public Stylist Stylist { get; set; } = null!;

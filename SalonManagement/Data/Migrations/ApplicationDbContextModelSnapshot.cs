@@ -284,6 +284,15 @@ namespace SalonManagement.Data.Migrations
                     b.Property<DateTimeOffset?>("CheckedInAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ClosedByName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClosedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("datetime2");
 

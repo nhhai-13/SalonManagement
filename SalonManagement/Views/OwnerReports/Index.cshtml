@@ -13,7 +13,11 @@
     @if (Model.Error is not null) { <div class="alert alert-danger">@Model.Error</div> }
     else
     {
+ codex/sprint-4-todo
+        <div class="row g-3 mb-4"><div class="col-md-4"><div class="card card-body"><span>Tổng lượt hẹn</span><strong class="fs-4">@Model.TotalAppointments</strong></div></div><div class="col-md-4"><div class="card card-body"><span>Tỉ lệ không đến</span><strong class="fs-4">@(Model.TotalAppointments == 0 ? 0 : 100d * Model.NoShows / Model.TotalAppointments).ToString("N1")%</strong></div></div><div class="col-md-4"><div class="card card-body"><span>Tỉ lệ hủy</span><strong class="fs-4">@(Model.TotalAppointments == 0 ? 0 : 100d * Model.Cancellations / Model.TotalAppointments).ToString("N1")%</strong></div></div></div>
+
         <div class="row g-3 mb-4"><div class="col-md-3"><div class="card card-body"><span>Tổng lượt hẹn</span><strong class="fs-4">@Model.TotalAppointments</strong></div></div><div class="col-md-3"><div class="card card-body"><span>Tỉ lệ không đến</span><strong class="fs-4">@(Model.TotalAppointments == 0 ? 0 : 100d * Model.NoShows / Model.TotalAppointments).ToString("N1")%</strong></div></div><div class="col-md-3"><div class="card card-body"><span>Tỉ lệ hủy</span><strong class="fs-4">@(Model.TotalAppointments == 0 ? 0 : 100d * Model.Cancellations / Model.TotalAppointments).ToString("N1")%</strong></div></div><div class="col-md-3"><div class="card card-body"><span>Đánh giá trung bình</span>@if (Model.AverageRating.HasValue) { <strong class="fs-4">@Model.AverageRating.Value.ToString("N1") / 5</strong><span class="small text-secondary">@Model.ReviewCount đánh giá</span> } else { <strong class="fs-6">Chưa đủ dữ liệu (cần 5 đánh giá)</strong><span class="small text-secondary">Hiện có @Model.ReviewCount đánh giá</span> }</div></div></div>
+ develop
         <section class="card border-0 shadow-sm mb-4"><div class="card-body"><h2 class="h5">Lượt hẹn theo khung giờ</h2><p class="small text-secondary">Đếm mỗi lịch theo giờ bắt đầu trong dải 09:00–20:59; lịch ngoài dải vẫn nằm trong tổng lượt và tỉ lệ, không vào biểu đồ theo giờ.</p>
             @if (Model.TotalAppointments == 0) { <p class="text-secondary mb-0">Không có lịch hẹn trong khoảng ngày này.</p> }
             else { <div class="d-flex align-items-end gap-2" style="height:240px" role="img" aria-label="Biểu đồ số lượt hẹn theo khung giờ">
