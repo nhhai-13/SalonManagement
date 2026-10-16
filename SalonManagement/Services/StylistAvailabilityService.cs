@@ -65,13 +65,17 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     }
 
     // Read-only assignment decision. The eventual appointment writer must revalidate under its transaction.
-    public async Task<StylistAssignment?> AssignAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date, TimeOnly start)
+    public async Task<StylistAssignment?> AssignAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date, TimeOnly start, int? excludedStylistId = null)
     {
         var startText = start.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerMinute != 0) return null;
         var candidates = (await GetStylistSlotsAsync(serviceIds, stylistId, date)).Where(s => s.Start == startText).ToList();
         if (candidates.Count == 0) return null;
-        var candidateIds = candidates.Select(s => s.StylistId).Distinct().ToArray();
+        var candidateIds = candidates.Select(s => s.StylistId)
+            .Where(id => id != excludedStylistId)
+            .Distinct()
+            .ToArray();
+        if (candidateIds.Length == 0) return null;
         var day = date.ToDateTime(TimeOnly.MinValue);
         var nextDay = day.AddDays(1);
         // Proposed PO policy: appointment count, Pending + Confirmed, stable ID tie-break.
@@ -112,35 +116,16 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var open = hours.OpensAt.Value.ToTimeSpan();
         var close = hours.ClosesAt.Value.ToTimeSpan();
         if (open >= close) return [];
-        var shifts = await db.WorkSchedules.AsNoTracking().Where(s => qualifiedIds.Contains(s.StylistId) &&
+        // SQLite cannot translate ORDER BY for TimeSpan. Load the small set of daily shifts
+        // first, then sort in memory before building the working windows below.
+        var shifts = (await db.WorkSchedules.AsNoTracking().Where(s => qualifiedIds.Contains(s.StylistId) &&
             s.WorkDate >= day && s.WorkDate < nextDay && s.Status == "Working")
-            .OrderBy(s => s.StartTime).Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync();
+            .Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync())
+            .OrderBy(s => s.StartTime).ToList();
         var busy = await db.Appointments.AsNoTracking().Where(a => qualifiedIds.Contains(a.StylistId) &&
-            a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled" &&
-            a.Status != AppointmentStatuses.NoShow && a.Status != "Rejected")
+            a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
- feature/s2-02-stylist-time-off-warning
- feature/s2-02-stylist-time-off-warning
-
- feature/s2-02-stylist-time-off-booking
- develop
-        var timeOffs = await db.StylistTimeOffs.AsNoTracking()
-            .Where(t => qualifiedIds.Contains(t.StylistId) &&
-                t.OffDate == date)
-            .Select(t => new
-            {
-                t.StylistId,
-                t.IsFullDay,
-                t.StartTime,
-                t.EndTime
-           })
-           .ToListAsync();
-
- feature/s2-02-stylist-time-off-warning
         var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
-
-var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
- develop
                 qualifiedIds.Contains(timeOff.StylistId) && timeOff.OffDate == date)
             .Select(timeOff => new
             {
@@ -150,39 +135,20 @@ var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
                 timeOff.EndTime
             }).ToListAsync();
 
- develop
         var duration = services.Sum(s => (long)s.DurationMinutes);
         if (duration > 24 * 60) return [];
         var length = TimeSpan.FromMinutes(duration);
         var busyByStylist = busy.ToLookup(a => a.StylistId);
- feature/s2-02-stylist-time-off-warning
-feature/s2-02-stylist-time-off-warning
-
- feature/s2-02-stylist-time-off-booking
- develop
-        var timeOffByStylist = timeOffs.ToLookup(t => t.StylistId);
-        var slots = new HashSet<StylistSlot>();
-
         var timeOffByStylist = timeOffs.ToLookup(timeOff => timeOff.StylistId);
         var slots = new HashSet<AvailableStylistSlot>();
- develop
         // Calculate each stylist independently: never stitch two people's free time together.
         foreach (var stylistShifts in shifts.GroupBy(s => s.StylistId))
         {
             var stylistBusy = busyByStylist[stylistShifts.Key].ToList();
             var stylistTimeOffs = timeOffByStylist[stylistShifts.Key].ToList();
- feature/s2-02-stylist-time-off-warning
- feature/s2-02-stylist-time-off-warning
-
- feature/s2-02-stylist-time-off-booking
- develop
-
 
             if (stylistTimeOffs.Any(timeOff => timeOff.IsFullDay)) continue;
- develop
 
-            if (stylistTimeOffs.Any(t => t.IsFullDay))
-                continue;
             // Union overlapping/adjacent shifts, but never bridge a break.
             var windows = new List<(TimeSpan Start, TimeSpan End)>();
             foreach (var shift in stylistShifts)
@@ -201,23 +167,6 @@ feature/s2-02-stylist-time-off-warning
                 for (var start = first; start + length <= window.End; start += TimeSpan.FromMinutes(15))
                 {
                     var end = start + length;
- feature/s2-02-stylist-time-off-warning
- feature/s2-02-stylist-time-off-warning
-
- feature/s2-02-stylist-time-off-booking
- develop
-                    var overlapsTimeOff = stylistTimeOffs.Any(t =>
-                        !t.IsFullDay &&
-                        t.StartTime.HasValue &&
-                        t.EndTime.HasValue &&
-                        start < t.EndTime.Value.ToTimeSpan() &&
-                        end > t.StartTime.Value.ToTimeSpan());
-                   if (day + start <= now ||
-                       stylistBusy.Any(a => start < a.EndTime && end > a.StartTime) ||
-                       overlapsTimeOff)
-                       continue;
-                    slots.Add(new(start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
-
                     var overlapsTimeOff = stylistTimeOffs.Any(timeOff =>
                         !timeOff.IsFullDay &&
                         timeOff.StartTime.HasValue &&
@@ -228,7 +177,6 @@ feature/s2-02-stylist-time-off-warning
                         stylistBusy.Any(a => start < a.EndTime && end > a.StartTime) ||
                         overlapsTimeOff) continue;
                     slots.Add(new(stylistShifts.Key, start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
- develop
                 }
             }
         }

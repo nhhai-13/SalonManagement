@@ -1,6 +1,6 @@
 /* ============================================================
    LUMINOL SALON – Design System v2.0
-   Màu chủ đạo: Indigo / Champagne / Trắng / Xám nhạt
+   Màu chủ đạo: Chrome Violet / Glass Blue / Trắng
    ============================================================ */
 
 /* ── Google Fonts ────────────────────────────────────────── */
@@ -9,29 +9,29 @@
 /* ── Design Tokens ───────────────────────────────────────── */
 :root {
   /* Màu chính */
-  --sl-primary:        #3B5BDB;
-  --sl-primary-dark:   #2F4AC7;
-  --sl-primary-light:  #EEF2FF;
-  --sl-primary-border: #C5D0FA;
+  --sl-primary:        #5F2CFF;
+  --sl-primary-dark:   #4520C7;
+  --sl-primary-light:  #DFF6FF;
+  --sl-primary-border: #B6DEFF;
 
   /* Champagne (điểm nhấn vàng) */
-  --sl-gold:           #D4A843;
-  --sl-gold-light:     #FDF6E3;
-  --sl-gold-dark:      #A87D2A;
+  --sl-gold:           #5F2CFF;
+  --sl-gold-light:     #DFF6FF;
+  --sl-gold-dark:      #4520C7;
 
   /* Nền & Surface */
-  --sl-bg:             #F4F6FB;
+  --sl-bg:             #F4FBFF;
   --sl-surface:        #FFFFFF;
-  --sl-surface-alt:    #F8F9FE;
+  --sl-surface-alt:    #EFF9FF;
 
   /* Chữ */
-  --sl-text:           #1A1A2E;
-  --sl-text-secondary: #6B7280;
-  --sl-text-muted:     #9CA3AF;
+  --sl-text:           #18113D;
+  --sl-text-secondary: #575B78;
+  --sl-text-muted:     #7E85A1;
 
   /* Đường viền */
-  --sl-border:         #E5E7EB;
-  --sl-border-strong:  #D1D5DB;
+  --sl-border:         #CDE7F5;
+  --sl-border-strong:  #A8D7EF;
 
   /* Trạng thái */
   --sl-success:        #059669;
@@ -43,9 +43,9 @@
   --sl-danger:         #DC2626;
   --sl-danger-bg:      #FEF2F2;
   --sl-danger-border:  #FECACA;
-  --sl-info:           #0284C7;
-  --sl-info-bg:        #F0F9FF;
-  --sl-info-border:    #BAE6FD;
+  --sl-info:           #4520C7;
+  --sl-info-bg:        #DFF6FF;
+  --sl-info-border:    #B6DEFF;
 
   /* Typography */
   --sl-font-body:      'Inter', 'DM Sans', system-ui, sans-serif;
@@ -59,10 +59,10 @@
   --sl-radius-full:    9999px;
 
   /* Bóng đổ */
-  --sl-shadow-xs:      0 1px 2px rgba(30,41,59,.06);
-  --sl-shadow-sm:      0 2px 8px rgba(30,41,59,.08);
-  --sl-shadow:         0 4px 16px rgba(30,41,59,.10);
-  --sl-shadow-lg:      0 8px 32px rgba(30,41,59,.13);
+  --sl-shadow-xs:      0 1px 2px rgba(69,32,199,.07);
+  --sl-shadow-sm:      0 3px 12px rgba(69,32,199,.10);
+  --sl-shadow:         0 6px 20px rgba(69,32,199,.12);
+  --sl-shadow-lg:      0 12px 34px rgba(69,32,199,.16);
 
   /* Transition */
   --sl-transition:     all .2s ease;
@@ -127,7 +127,7 @@ body.sl-body {
   width: var(--sl-sidebar-w);
   flex-direction: column;
   overflow-y: auto;
-  background: #1e2847;
+  background: linear-gradient(180deg, #28106E 0%, #5F2CFF 100%);
   transition: transform .25s ease;
 }
 
@@ -208,9 +208,35 @@ body.sl-body {
 }
 
 .sl-nav-link.active {
-  color: #fff;
-  background: var(--sl-primary);
-  box-shadow: 0 2px 10px rgba(59,91,219,.4);
+  color: var(--sl-primary-dark);
+  background: var(--sl-primary-light);
+  box-shadow: 0 3px 12px rgba(22, 93, 150, .22);
+}
+
+/* Keep every sidebar entry legible on the violet surface.  Some legacy
+   Bootstrap link utilities otherwise override individual owner-menu links. */
+body.sl-body .sl-sidebar .sl-nav-link,
+body.sl-body .sl-sidebar .sl-nav-link:visited {
+  color: rgba(255, 255, 255, .88) !important;
+}
+
+body.sl-body .sl-sidebar .sl-nav-link i {
+  color: rgba(223, 246, 255, .9) !important;
+}
+
+body.sl-body .sl-sidebar .sl-nav-label {
+  color: rgba(223, 246, 255, .72);
+}
+
+body.sl-body .sl-sidebar .sl-nav-link:hover,
+body.sl-body .sl-sidebar .sl-nav-link:focus-visible {
+  color: #fff !important;
+  background: rgba(255, 255, 255, .14);
+}
+
+body.sl-body .sl-sidebar .sl-nav-link.active,
+body.sl-body .sl-sidebar .sl-nav-link.active i {
+  color: var(--sl-primary-dark) !important;
 }
 
 .sl-sidebar-footer {
@@ -537,12 +563,12 @@ body.sl-body {
   flex-wrap: wrap;
 }
 
-.sl-hero-admin { background: linear-gradient(135deg, #1e2847, #3B5BDB); }
+.sl-hero-admin { background: linear-gradient(135deg, #321584, #5F2CFF 62%, #786BFF); }
 .sl-hero-owner {
-  background: linear-gradient(135deg, #183d35 0%, #176b57 58%, #0f8a69 100%);
-  box-shadow: 0 14px 32px rgba(19, 91, 71, .18);
+  background: linear-gradient(135deg, #321584 0%, #5F2CFF 58%, #76CFFF 100%);
+  box-shadow: 0 14px 32px rgba(69, 32, 199, .22);
 }
-.sl-hero-staff { background: linear-gradient(135deg, #2d1f47, #7c3aed); }
+.sl-hero-staff { background: linear-gradient(135deg, #321584, #5F2CFF 60%, #76CFFF); }
 
 .sl-hero-card h1 {
   margin: 8px 0 6px;
@@ -598,7 +624,7 @@ body.sl-body {
   padding: 10px 12px;
   border: 1px solid rgba(255,255,255,.18);
   border-radius: var(--sl-radius);
-  background: rgba(8, 47, 38, .18);
+  background: rgba(45, 18, 130, .18);
   text-align: left;
 }
 
@@ -753,7 +779,7 @@ body.sl-body {
 
 .sl-input:focus, .sl-select:focus, .sl-textarea:focus {
   border-color: var(--sl-primary);
-  box-shadow: 0 0 0 3px rgba(59,91,219,.12);
+  box-shadow: 0 0 0 3px rgba(95,44,255,.16);
 }
 
 .sl-input.is-invalid, .sl-select.is-invalid, .sl-textarea.is-invalid {
@@ -873,11 +899,11 @@ body.sl-body .sl-table.table > :not(caption) > * > * {
 }
 
 body.sl-body .sl-table tbody tr:nth-child(even) td {
-  background: #FBFCFF;
+  background: #F7FCFF;
 }
 
 body.sl-body .sl-table tbody tr:hover td {
-  background: #F2F5FF;
+  background: var(--sl-primary-light);
 }
 
 .sl-table-actions {
@@ -1116,6 +1142,27 @@ body.sl-body .sl-table tbody tr:hover td {
   line-height: 1.5;
 }
 
+.admin-temp-password {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px dashed currentColor;
+  border-radius: var(--sl-radius-sm);
+}
+
+.admin-temp-password code {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--sl-text-primary);
+  background: var(--sl-surface);
+  font-weight: 700;
+}
+
 .admin-list-section { border-top: 1px solid var(--sl-border); }
 
 .admin-list-heading {
@@ -1208,23 +1255,21 @@ body.sl-body .sl-table tbody tr:hover td {
 /* ── Schedule / Week cards ───────────────────────────────── */
 .sl-week-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(210px, 1fr));
+  grid-template-columns: 1fr;
   gap: 14px;
-  min-width: 100%;
 }
 
-.sl-week-scroll {
-  overflow-x: auto;
-  padding: 2px 2px 12px;
-  scrollbar-color: var(--sl-primary-border) transparent;
+.sl-week-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  padding: 2px;
 }
 
 .sl-week-day { min-width: 0; }
 
-.sl-week-scroll:focus-visible {
-  outline: 3px solid var(--sl-primary);
-  outline-offset: 3px;
-  border-radius: var(--sl-radius);
+.sl-week-list .sl-day-card {
+  min-height: 0;
 }
 
 .sl-day-card {
@@ -1404,6 +1449,17 @@ body.sl-body .sl-table tbody tr:hover td {
   border-top: 1px solid var(--sl-border);
 }
 
+/* Keep the duration and price consistently at the bottom of every service card. */
+.service-item-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.service-item-card .sl-service-meta {
+  margin-top: auto;
+}
+
 .sl-service-price {
   font: 700 17px var(--sl-font-body);
   color: var(--sl-primary);
@@ -1433,14 +1489,14 @@ body.sl-body .sl-table tbody tr:hover td {
 /* ── Booking Wizard ──────────────────────────────────────── */
 .sl-booking-layout {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
   align-items: start;
 }
 
 .sl-booking-summary {
-  position: sticky;
-  top: 80px;
+  position: static;
+  width: 100%;
   background: var(--sl-surface);
   border: 1px solid var(--sl-border);
   border-radius: var(--sl-radius-xl);
@@ -1457,6 +1513,54 @@ body.sl-body .sl-table tbody tr:hover td {
 }
 
 .sl-booking-summary-body { padding: 18px 20px; }
+
+/* Booking opens above the current salon screen so visitors can return without losing context. */
+.booking-overlay[hidden] { display: none; }
+.booking-overlay {
+  position: fixed;
+  z-index: 2200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(14, 10, 45, .56);
+  backdrop-filter: blur(4px);
+}
+.booking-overlay-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(1320px, 100%);
+  height: min(900px, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid var(--sl-border);
+  border-radius: var(--sl-radius-xl);
+  background: var(--sl-surface);
+  box-shadow: 0 24px 60px rgba(13, 7, 45, .35);
+}
+.booking-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  min-height: 58px;
+  padding: 0 18px 0 22px;
+  border-bottom: 1px solid var(--sl-border);
+}
+.booking-overlay-header h2 { margin: 0; font-size: 18px; color: var(--sl-text); }
+.booking-overlay-close {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--sl-text);
+  background: var(--sl-surface-alt);
+  font-size: 19px;
+}
+.booking-overlay-close:hover { color: #fff; background: var(--sl-primary); }
+.booking-overlay iframe { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; background: var(--sl-surface-alt); }
+body.booking-overlay-open { overflow: hidden; }
 
 .sl-summary-totals {
   padding: 14px 16px;
@@ -1534,9 +1638,9 @@ body.sl-body .sl-table tbody tr:hover td {
   padding: clamp(32px,5vw,68px);
   color: #fff;
   background:
-    linear-gradient(155deg, rgba(30,40,71,.25), rgba(30,40,71,.85)),
-    radial-gradient(circle at 70% 22%, rgba(212,168,67,.35), transparent 30%),
-    linear-gradient(145deg, #3B5BDB, #1e2847 70%);
+    linear-gradient(155deg, rgba(50,21,132,.22), rgba(50,21,132,.86)),
+    radial-gradient(circle at 70% 22%, rgba(223,246,255,.48), transparent 30%),
+    linear-gradient(145deg, #786BFF, #5F2CFF 55%, #321584 100%);
 }
 
 .sl-auth-showcase::before,
@@ -1652,7 +1756,7 @@ body.sl-body .sl-table tbody tr:hover td {
   .sl-stat-grid { grid-template-columns: 1fr 1fr; }
   .sl-hero-card { flex-direction: column; }
   .sl-hero-meta { align-items: flex-start; }
-  .sl-week-grid { grid-template-columns: repeat(7, minmax(210px, 1fr)); }
+  .sl-week-grid { grid-template-columns: 1fr; }
   .sl-auth-page { grid-template-columns: 1fr; }
   .sl-auth-showcase { display: none; }
   .sl-auth-panel { min-height: 100vh; padding: 100px 24px 60px; }
@@ -1669,7 +1773,7 @@ body.sl-body .sl-table tbody tr:hover td {
   .sl-stat-grid { grid-template-columns: 1fr; }
   .admin-filter-form { grid-template-columns: 1fr; }
   .admin-list-heading { align-items: flex-start; flex-direction: column; }
-  .sl-week-grid { grid-template-columns: repeat(7, minmax(210px, 1fr)); }
+  .sl-week-grid { grid-template-columns: 1fr; }
   .sl-page-header { flex-direction: column; align-items: flex-start; }
 }
 
@@ -1717,7 +1821,51 @@ body.sl-body .sl-table tbody tr:hover td {
 .sl-divider { border: 0; border-top: 1px solid var(--sl-border); margin: 22px 0; }
 
 /* Overrides to prevent Bootstrap from clashing */
+body.sl-body {
+  --bs-primary: #5F2CFF;
+  --bs-primary-rgb: 95, 44, 255;
+  --bs-link-color: #5F2CFF;
+  --bs-link-hover-color: #4520C7;
+  --bs-focus-ring-color: rgba(95, 44, 255, .25);
+}
+
 body.sl-body .btn { border-radius: var(--sl-radius); }
+
+/* Bootstrap controls remain in a few staff pages.  Keep them on the same
+   Chrome Violet / Glass Blue palette as the design-system controls. */
+body.sl-body .btn-primary {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--sl-primary);
+  --bs-btn-border-color: var(--sl-primary);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--sl-primary-dark);
+  --bs-btn-hover-border-color: var(--sl-primary-dark);
+  --bs-btn-focus-shadow-rgb: 95, 44, 255;
+  --bs-btn-active-bg: #35179F;
+  --bs-btn-active-border-color: #35179F;
+}
+
+body.sl-body .btn-outline-primary {
+  --bs-btn-color: var(--sl-primary);
+  --bs-btn-border-color: var(--sl-primary-border);
+  --bs-btn-hover-color: var(--sl-primary-dark);
+  --bs-btn-hover-bg: var(--sl-primary-light);
+  --bs-btn-hover-border-color: var(--sl-primary-border);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--sl-primary);
+  --bs-btn-active-border-color: var(--sl-primary);
+}
+
+body.sl-body .form-control:focus,
+body.sl-body .form-select:focus {
+  border-color: var(--sl-primary);
+  box-shadow: 0 0 0 .25rem rgba(95, 44, 255, .16);
+}
+
+body.sl-body .card,
+body.sl-body dialog {
+  border-color: var(--sl-border);
+}
 body.sl-body .form-control, body.sl-body .form-select {
   border-radius: var(--sl-radius);
   border-color: var(--sl-border);

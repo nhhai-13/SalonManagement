@@ -1,0 +1,9 @@
+@{ ViewData["Title"] = "Đánh giá thợ"; }
+<main id="service-review-report-content" class="container py-4 d-none">
+    <span class="text-uppercase text-primary small fw-bold">S4-04 · Quản lý chất lượng</span>
+    <h1 class="h3 mb-1">Báo cáo Đánh giá &amp; Điểm trung bình Thợ</h1>
+    <p class="text-muted">Điểm trung bình chỉ hiển thị khi thợ có tối thiểu 5 lượt đánh giá.</p>
+    <div class="alert alert-primary"><i class="bi bi-info-circle"></i> Quy tắc hiển thị: Điểm trung bình = Tổng điểm / số lượt. Dưới 5 lượt đánh giá sẽ hiển thị “Chưa đủ dữ liệu”.</div>
+    <div class="card shadow-sm border-0"><div class="table-responsive"><table class="table align-middle mb-0 service-review-report-table"><thead><tr><th>Tên thợ / kỹ thuật viên</th><th>Chuyên môn</th><th>Số lượt đánh giá</th><th>Điểm trung bình</th><th>Trạng thái</th></tr></thead><tbody id="service-review-report-list"><tr><td colspan="5" class="text-center text-muted py-4">Đang tải báo cáo…</td></tr></tbody></table></div></div>
+</main>
+@section Scripts { <script src="~/js/auth.js" asp-append-version="true"></script><script src="~/js/service-review-report.js" asp-append-version="true"></script><script>SalonAuth.requireSession({ endpoint: "/api/owner/session", contentId: "service-review-report-content" }).then(() => ServiceReviewReport.start());</script> }

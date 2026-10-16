@@ -19,6 +19,10 @@
     {
         <div class="sl-alert sl-alert-success alert alert-success" role="status">@success</div>
     }
+    @if (TempData["Error"] is string error)
+    {
+        <div class="sl-alert sl-alert-danger alert alert-danger" role="alert">@error</div>
+    }
 
     <div class="sl-card card shadow-sm">
         <div class="table-responsive">
@@ -76,6 +80,9 @@
                                             <button type="submit" class="sl-btn sl-btn-success sl-btn-sm btn btn-sm btn-outline-success">Cho làm việc lại</button>
                                         </form>
                                     }
+                                    <form asp-action="Delete" asp-route-id="@stylist.StylistId" method="post" data-stylist-delete-form>
+                                        <button type="button" class="sl-btn sl-btn-danger sl-btn-sm btn btn-sm btn-outline-danger" data-stylist-delete-trigger data-stylist-name="@stylist.FullName">Xóa hồ sơ</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -86,3 +93,40 @@
         </div>
     </div>
 </div>
+
+<dialog id="stylist-delete-dialog" class="stylist-delete-dialog" aria-labelledby="stylist-delete-title">
+    <form method="dialog" class="stylist-delete-card">
+        <header>
+            <div class="stylist-delete-icon" aria-hidden="true"><i class="bi bi-person-x-fill"></i></div>
+            <div><span class="stylist-delete-eyebrow">Thao tác không thể hoàn tác</span><h2 id="stylist-delete-title">Xóa vĩnh viễn hồ sơ thợ</h2></div>
+            <button class="btn-close" value="cancel" aria-label="Đóng"></button>
+        </header>
+        <div class="stylist-delete-body">
+            <p>Bạn sắp xóa hồ sơ của <strong data-stylist-delete-name>—</strong>.</p>
+            <div class="stylist-delete-warning"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i><div><strong>Dữ liệu sẽ bị xóa</strong><span>Các ca làm việc, ngày nghỉ và thông tin cấu hình gắn với hồ sơ này sẽ không thể khôi phục.</span></div></div>
+            <p class="stylist-delete-note"><i class="bi bi-shield-check" aria-hidden="true"></i> Nếu thợ đã có lịch hẹn, hệ thống sẽ chặn xóa để bảo toàn lịch sử khách hàng. Hãy chuyển thợ sang trạng thái nghỉ việc thay thế.</p>
+        </div>
+        <footer><button class="btn btn-light border" value="cancel">Quay lại</button><button id="stylist-delete-confirm" type="button" class="btn btn-danger"><i class="bi bi-trash3"></i> Xóa vĩnh viễn</button></footer>
+    </form>
+</dialog>
+
+@section Scripts {
+<script>
+    (() => {
+        const dialog = document.getElementById('stylist-delete-dialog');
+        if (!dialog) return;
+        let selectedForm;
+        document.querySelectorAll('[data-stylist-delete-trigger]').forEach(button => button.addEventListener('click', () => {
+            selectedForm = button.closest('[data-stylist-delete-form]');
+            dialog.querySelector('[data-stylist-delete-name]').textContent = button.dataset.stylistName || 'thợ này';
+            dialog.showModal();
+        }));
+        dialog.querySelector('#stylist-delete-confirm')?.addEventListener('click', () => {
+            if (!selectedForm) return;
+            dialog.close();
+            selectedForm.requestSubmit();
+        });
+        dialog.addEventListener('close', () => { selectedForm = undefined; });
+    })();
+</script>
+}

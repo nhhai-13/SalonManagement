@@ -1,46 +1,31 @@
 @{ Layout = "_AuthLayout"; ViewData["Title"] = "Đăng nhập"; }
 
-<div class="sl-auth-page">
-
-  @* ── Left: Showcase ────────────────────────────────── *@
-  <div class="sl-auth-showcase">
-    <a class="brand" href="/" style="z-index:1;position:relative;">
-      <span class="brand-mark" style="border-color:rgba(255,255,255,.55);">L</span>
-      <span>
-        <strong>Luminol</strong>
-        <small>Salon &amp; Spa</small>
-      </span>
-    </a>
-
-    <div class="showcase-copy" style="position:relative;z-index:1;">
-      <span class="eyebrow" style="color:#c5d0fa;">Cổng nhân viên</span>
-      <h1>Chào mừng<br/>trở lại.</h1>
-      <p>Quản lý lịch hẹn, dịch vụ và đội ngũ của salon một cách hiệu quả và dễ dàng.</p>
-    </div>
-
-    <div class="showcase-footer" style="position:relative;z-index:1;">
-      <span class="divider"></span>
-      <span>Luminol Salon Management</span>
-    </div>
-  </div>
-
-  @* ── Right: Form ───────────────────────────────────── *@
-  <div class="sl-auth-panel">
-    @* Mobile brand *@
-    <a class="sl-auth-logo-mobile brand mobile-brand" href="/">
-      <span class="brand-mark" style="width:38px;height:38px;font-size:20px;">L</span>
-      <span>
-        <strong style="font-size:18px;">Luminol</strong>
-        <small>Salon &amp; Spa</small>
-      </span>
-    </a>
-
-    <div class="sl-auth-card">
-      <div class="sl-auth-heading login-heading">
-        <span class="sl-eyebrow eyebrow">Cổng nhân viên</span>
-        <h2>Đăng nhập</h2>
-        <p>Nhập thông tin tài khoản của bạn để tiếp tục.</p>
+<div class="login-compact-page">
+  <main class="login-compact-shell">
+    <section class="login-story" aria-label="Giới thiệu Luminol Salon">
+      <a class="login-brand" href="/" aria-label="Về trang chủ Luminol">
+        <span class="login-brand-mark">L</span>
+        <span><strong>Luminol</strong><small>Salon &amp; Spa</small></span>
+      </a>
+      <div class="login-orbit login-orbit-large" aria-hidden="true"></div>
+      <div class="login-orbit login-orbit-small" aria-hidden="true"></div>
+      <div class="login-story-copy">
+        <span>Cổng vận hành salon</span>
+        <h1>Không gian<br />của bạn</h1>
+        <p>Đăng nhập để quản lý công việc, theo dõi lịch hẹn và phục vụ khách hàng hiệu quả.</p>
       </div>
+      <p class="login-story-footer">Luminol Salon Management</p>
+    </section>
+
+    <section class="login-form-pane" aria-labelledby="login-title">
+      <a class="login-mobile-brand" href="/" aria-label="Về trang chủ Luminol">
+        <span class="login-brand-mark">L</span><strong>Luminol</strong>
+      </a>
+      <div class="login-form-card">
+        <div class="login-heading">
+          <h2 id="login-title">Đăng nhập</h2>
+          <p>Chào mừng bạn quay trở lại.</p>
+        </div>
 
       @if (TempData["SuccessMessage"] != null)
       {
@@ -71,7 +56,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <input id="password" name="password" type="password" class="sl-input"
                    placeholder="Nhập mật khẩu" autocomplete="current-password" required />
-            <button class="password-toggle" type="button" aria-label="Hiện/Ẩn mật khẩu" aria-pressed="false">
+            <button id="toggle-password" class="password-toggle" type="button" aria-label="Hiện/Ẩn mật khẩu" aria-pressed="false">
               <svg class="eye-open" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg class="eye-closed" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
             </button>
@@ -86,7 +71,7 @@
         <button id="login-submit" type="submit" class="login-button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
           <div class="button-spinner"></div>
-          Đăng nhập
+          <span class="button-label">Đăng nhập</span>
         </button>
       </form>
 
@@ -97,11 +82,10 @@
         </p>
       </div>
 
-      <p class="copyright">
-        &copy; @DateTime.Now.Year Luminol Salon &amp; Spa
-      </p>
-    </div>
-  </div>
+        <p class="copyright">&copy; @DateTime.Now.Year Luminol Salon &amp; Spa</p>
+      </div>
+    </section>
+  </main>
 
 </div>
 
