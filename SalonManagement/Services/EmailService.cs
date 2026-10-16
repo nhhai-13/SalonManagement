@@ -92,19 +92,106 @@ public sealed class EmailService(
         await client.SendMailAsync(message);
     }
 
+    public async Task SendServiceReviewEmailAsync(string toEmail, string customerName, string reviewLink, DateTime expiresAt)
+    {
+        var smtp = configuration.GetSection("SmtpSettings");
+        var server = smtp["Server"];
+        var senderEmail = smtp["SenderEmail"];
+        var senderName = smtp["SenderName"] ?? "Luminol Salon & Spa";
+        var username = smtp["Username"];
+        var password = smtp["Password"];
+        var port = smtp.GetValue<int>("Port", 587);
+        var hasSmtpConfig = !string.IsNullOrWhiteSpace(server)
+            && !string.IsNullOrWhiteSpace(senderEmail)
+            && !string.IsNullOrWhiteSpace(username)
+            && !string.IsNullOrWhiteSpace(password);
+
+        if (hasSmtpConfig)
+        {
+            using var client = new SmtpClient(server, port)
+            {
+                EnableSsl = true,
+                UseDefaultCredentials = false,
+                Credentials = new NetworkCredential(username, password),
+                DeliveryMethod = SmtpDeliveryMethod.Network,
+                Timeout = 15000
+            };
+            using var message = new MailMessage
+            {
+                From = new MailAddress(senderEmail!, senderName),
+                Subject = "Luminol Salon: mời bạn đánh giá dịch vụ",
+                IsBodyHtml = true,
+                Body = BuildServiceReviewHtmlBody(customerName, reviewLink, expiresAt)
+            };
+            message.To.Add(toEmail);
+            await client.SendMailAsync(message);
+            logger.LogInformation("Đã gửi liên kết đánh giá dịch vụ tới {Email}", toEmail);
+            return;
+        }
+
+        logger.LogWarning("[FALLBACK EMAIL] Mời {Email} đánh giá dịch vụ trước {ExpiresAt:dd/MM/yyyy}: {ReviewLink}", toEmail, expiresAt, reviewLink);
+        if (env.IsDevelopment() || env.IsStaging())
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"[FALLBACK EMAIL] Đánh giá dịch vụ cho {toEmail}: {reviewLink}");
+            Console.ResetColor();
+        }
+    }
+
+    public async Task SendAppointmentNotificationEmailAsync(string toEmail, string customerName, string reference, string services, string stylistName, DateTime appointmentDate, TimeSpan startTime, bool isReminder)
+    {
+        var smtp = configuration.GetSection("SmtpSettings");
+        var server = smtp["Server"];
+        var senderEmail = smtp["SenderEmail"];
+        var senderName = smtp["SenderName"] ?? "Luminol Salon & Spa";
+        var username = smtp["Username"];
+        var password = smtp["Password"];
+        var hasSmtpConfig = !string.IsNullOrWhiteSpace(server) && !string.IsNullOrWhiteSpace(senderEmail) && !string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password);
+        if (!hasSmtpConfig)
+        {
+            logger.LogWarning("[FALLBACK EMAIL] {Kind} lịch {Reference} gửi tới {Email}", isReminder ? "Nhắc" : "Xác nhận", reference, toEmail);
+            return;
+        }
+
+        using var client = new SmtpClient(server, smtp.GetValue<int>("Port", 587))
+        {
+            EnableSsl = true,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(username, password),
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            Timeout = 15000
+        };
+        using var message = new MailMessage
+        {
+            From = new MailAddress(senderEmail!, senderName),
+            Subject = $"[Luminol Salon] {(isReminder ? "Nhắc lịch hẹn" : "Xác nhận lịch hẹn")} #{reference}",
+            IsBodyHtml = true,
+            Body = BuildAppointmentNotificationHtmlBody(customerName, reference, services, stylistName, appointmentDate, startTime, isReminder)
+        };
+        message.To.Add(toEmail);
+        await client.SendMailAsync(message);
+    }
+
     public async Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword)
     {
         if (await LogStagingDelivery(toEmail, "temporary-password")) return;
         var smtp = configuration.GetSection("SmtpSettings");
-        if (string.IsNullOrWhiteSpace(smtp["Server"]) || string.IsNullOrWhiteSpace(smtp["SenderEmail"]))
-            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi mật khẩu tạm.");
+        var server = smtp["Server"];
+        var senderEmail = smtp["SenderEmail"];
+        var username = smtp["Username"];
+        var password = smtp["Password"];
+        if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(senderEmail) ||
+            string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            throw new InvalidOperationException("Cấu hình Gmail chưa đầy đủ. Hãy thêm SenderEmail, Username và App Password vào User Secrets.");
         using var client = new SmtpClient(smtp["Server"], smtp.GetValue<int>("Port", 587))
         {
             EnableSsl = true,
-            Credentials = new NetworkCredential(smtp["Username"], smtp["Password"]),
+            UseDefaultCredentials = false,
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            Credentials = new NetworkCredential(username, password),
             Timeout = 15000
         };
-        using var message = new MailMessage(smtp["SenderEmail"]!, toEmail)
+        using var message = new MailMessage(senderEmail, toEmail)
         {
             Subject = "Tài khoản Salon Management của bạn",
             Body = $"Tài khoản: {toEmail}\nMật khẩu tạm: {temporaryPassword}\nĐăng nhập tại trang đăng nhập nội bộ của salon. Bạn phải đổi mật khẩu ngay lần đăng nhập đầu tiên."
@@ -325,6 +412,35 @@ public sealed class EmailService(
 </html>
 """;
     }
+
+    private static string BuildServiceReviewHtmlBody(string customerName, string reviewLink, DateTime expiresAt) => $"""
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Đánh giá dịch vụ</title></head>
+<body style="margin:0;padding:32px 14px;background:#f5f8fc;font-family:Arial,sans-serif;color:#1d2a44">
+  <div style="max-width:560px;margin:auto;background:#fff;border:1px solid #dbe5f1;border-radius:14px;overflow:hidden">
+    <div style="padding:26px 30px;background:#2864df;color:#fff"><h1 style="margin:0;font-size:23px">Luminol Salon &amp; Spa</h1><p style="margin:7px 0 0;color:#dbe8ff">Cảm ơn bạn đã sử dụng dịch vụ</p></div>
+    <div style="padding:28px 30px"><p>Xin chào <strong>{WebUtility.HtmlEncode(customerName)}</strong>,</p><p>Chỉ mất khoảng 10 giây để chấm điểm và góp ý cho thợ đã phục vụ bạn. Phản hồi của bạn giúp tiệm cải thiện mỗi ngày.</p>
+      <p style="margin:24px 0;text-align:center"><a href="{WebUtility.HtmlEncode(reviewLink)}" style="display:inline-block;padding:13px 22px;border-radius:8px;background:#2864df;color:#fff;text-decoration:none;font-weight:bold">Đánh giá dịch vụ</a></p>
+      <p style="padding:12px 14px;border-radius:8px;background:#fff4cf;color:#8b6100;font-size:13px">⏳ Liên kết dùng một lần và có hiệu lực đến hết ngày {expiresAt:dd/MM/yyyy}.</p>
+    </div>
+  </div>
+</body></html>
+""";
+
+    private static string BuildAppointmentNotificationHtmlBody(string customerName, string reference, string services, string stylistName, DateTime appointmentDate, TimeSpan startTime, bool isReminder) => $"""
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Lịch hẹn Luminol Salon</title></head>
+<body style="margin:0;padding:32px 14px;background:#f3f6fb;font-family:Arial,sans-serif;color:#202f49">
+  <div style="max-width:600px;margin:auto;background:#fff;border:1px solid #d6e0ed;border-radius:14px;overflow:hidden">
+    <div style="padding:26px 30px;background:#1f2d45;color:#fff"><h1 style="margin:0;font-size:22px">Luminol Salon &amp; Spa</h1><p style="margin:7px 0 0;color:#9ec8ff;font-size:13px">{(isReminder ? "NHẮC LỊCH HẸN TỰ ĐỘNG" : "XÁC NHẬN LỊCH HẸN")}</p></div>
+    <div style="padding:26px 30px"><p>Xin chào <strong>{WebUtility.HtmlEncode(customerName)}</strong>,</p><p>{(isReminder ? "Luminol Salon xin nhắc bạn về lịch hẹn sắp tới." : "Lịch hẹn của bạn đã được tiệm xác nhận thành công.")}</p>
+      <div style="margin:20px 0;padding:14px 16px;border-radius:8px;background:#dbeafe;color:#173b88"><strong>MÃ TRA CỨU LỊCH HẸN: #{WebUtility.HtmlEncode(reference)}</strong></div>
+      <table style="width:100%;border-collapse:collapse;font-size:14px"><tr><td style="padding:8px 0;color:#64748b">Dịch vụ đăng ký</td><td style="padding:8px 0;font-weight:bold">{WebUtility.HtmlEncode(services)}</td></tr><tr><td style="padding:8px 0;color:#64748b">Thợ phụ trách</td><td style="padding:8px 0;font-weight:bold">{WebUtility.HtmlEncode(stylistName)}</td></tr><tr><td style="padding:8px 0;color:#64748b">Giờ bắt đầu</td><td style="padding:8px 0;font-weight:bold">{appointmentDate:dd/MM/yyyy} lúc {startTime:hh\\:mm}</td></tr><tr><td style="padding:8px 0;color:#64748b">Địa chỉ tiệm</td><td style="padding:8px 0;font-weight:bold">Luminol Salon &amp; Spa · TP. Hồ Chí Minh</td></tr></table>
+      <div style="margin-top:18px;padding:12px 14px;border-radius:8px;background:#fff3cd;color:#8a5a00;font-size:13px">⏳ Hệ thống nhắc lịch trước 24 giờ; nếu lịch hẹn bị hủy hoặc đổi giờ, lời nhắc cũ sẽ tự động được hủy.</div>
+    </div>
+  </div>
+</body></html>
+""";
 
     private static string BuildEmailVerificationHtmlBody(string recipientEmail, string verificationCode) => $"""
 <!DOCTYPE html>

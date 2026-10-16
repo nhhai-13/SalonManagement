@@ -1,0 +1,42 @@
+@model SalonManagement.Models.ViewModels.StylistWorkScheduleViewModel
+@{
+    ViewData["Title"] = "Ca làm của tôi";
+}
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <a class="btn btn-outline-primary" href="/stylist/work-schedule?date=@Model.Date.AddDays(-1).ToString("yyyy-MM-dd")">← Hôm trước</a>
+        <div class="text-center">
+            <h1 class="h3 mb-1">Ca làm của tôi</h1>
+            <p class="text-muted mb-0">@Model.StylistName · @Model.Date.ToString("dd/MM/yyyy")</p>
+        </div>
+        <a class="btn btn-outline-primary" href="/stylist/work-schedule?date=@Model.Date.AddDays(1).ToString("yyyy-MM-dd")">Hôm sau →</a>
+    </div>
+
+    <div class="mb-4">
+        <label class="form-label" for="work-schedule-date">Chọn ngày</label>
+        <input id="work-schedule-date" class="form-control w-auto" type="date" value="@Model.Date.ToString("yyyy-MM-dd")" onchange="location='/stylist/work-schedule?date='+this.value" />
+    </div>
+
+    @if (Model.Shifts.Count == 0)
+    {
+        <div class="alert alert-info">Bạn chưa được phân ca làm vào ngày này.</div>
+    }
+    else
+    {
+        <section class="card shadow-sm border-0">
+            <div class="card-body">
+                <h2 class="h5">Các ca được phân công</h2>
+                <div class="list-group list-group-flush">
+                    @foreach (var shift in Model.Shifts)
+                    {
+                        <article class="list-group-item px-0 d-flex justify-content-between align-items-center gap-3">
+                            <strong>@shift.StartTime.ToString(@"hh\:mm") – @shift.EndTime.ToString(@"hh\:mm")</strong>
+                            <span class="text-muted">@(string.IsNullOrWhiteSpace(shift.Notes) ? "Ca làm đã được xác nhận" : shift.Notes)</span>
+                        </article>
+                    }
+                </div>
+            </div>
+        </section>
+    }
+</div>

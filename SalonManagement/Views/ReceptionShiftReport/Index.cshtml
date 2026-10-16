@@ -1,0 +1,10 @@
+@model SalonManagement.Models.ReceptionShiftReportViewModel
+@{
+    ViewData["Title"] = "Báo cáo thu chi ca";
+    string PaymentMethod(string method) => method switch { "Cash" => "Tiền mặt", "Transfer" => "Chuyển khoản", "Card" => "Thẻ", _ => method };
+}
+<div class="container py-4" style="max-width:1100px">
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4"><div><span class="text-uppercase text-muted small fw-semibold">Lễ tân</span><h1 class="h3 mb-1">Báo cáo thu chi ca</h1><p class="text-muted mb-0">Các phiếu đã thu tiền trong ngày.</p></div><form method="get" class="d-flex gap-2"><input class="form-control" type="date" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" /><button class="btn btn-outline-primary">Xem báo cáo</button></form></div>
+    <section class="card border-0 shadow-sm mb-4"><div class="card-body p-4"><span class="text-uppercase text-muted small fw-semibold">Tổng đã thu</span><div class="display-6 fw-bold text-success">@Model.TotalCollected.ToString("N0") đ</div><small class="text-muted">@Model.Payments.Count phiếu thanh toán · @Model.Date.ToString("dd/MM/yyyy")</small></div></section>
+    <section class="card border-0 shadow-sm"><div class="table-responsive"><table class="table align-middle mb-0"><thead class="table-light"><tr><th>Thời gian</th><th>Khách hàng</th><th>Dịch vụ</th><th>Thợ</th><th>Phương thức</th><th class="text-end">Số tiền</th></tr></thead><tbody>@if (Model.Payments.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-5">Chưa có phiếu thanh toán trong ngày này.</td></tr> } @foreach (var payment in Model.Payments) { <tr><td>@payment.PaidAt.ToString("HH:mm")</td><td class="fw-semibold">@payment.CustomerName</td><td>@payment.Services</td><td>@payment.StylistName</td><td>@PaymentMethod(payment.Method)</td><td class="text-end fw-semibold text-success">@payment.Amount.ToString("N0") đ</td></tr> }</tbody></table></div></section>
+</div>

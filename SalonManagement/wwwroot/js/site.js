@@ -23,9 +23,15 @@
             phone.focus();
             return;
         }
-        message.textContent = "Cảm ơn bạn! Luminol đã ghi nhận yêu cầu và sẽ liên hệ để xác nhận lịch hẹn.";
-        message.classList.add("show");
-        bookingForm.reset();
+        const service = document.getElementById("booking-service")?.value;
+        const target = new URL("/booking/select-services", window.location.origin);
+        target.searchParams.set("phone", phone.value.trim());
+        if (service && service !== "consult") target.searchParams.set("serviceId", service);
+        if (typeof window.openBookingOverlay === "function") {
+            window.openBookingOverlay(`${target.pathname}${target.search}`);
+            return;
+        }
+        window.location.assign(`${target.pathname}${target.search}`);
     });
 
     const backToTop = document.getElementById("back-to-top");

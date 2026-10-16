@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Security.Claims;
@@ -135,6 +136,22 @@ public sealed class PendingOnlineAppointmentsTests
     }
 
     [TestMethod]
+    public async Task Confirm_pending_appointment_accepts_the_jwt_sub_claim_for_the_receptionist()
+    {
+        await using var db = CreateDb();
+        var date = new DateTime(2031, 2, 3);
+        await SeedBookableStylistAsync(db, date);
+        var appointment = new Appointment { Customer = new Customer { FullName = "Khách", Phone = "0900000033" }, StylistId = (await db.Stylists.SingleAsync()).StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "PendingConfirmation", BookingReference = "ONLINE33" };
+        db.Appointments.Add(appointment); await db.SaveChangesAsync();
+        var controller = new PendingAppointmentsController(db, TimeProvider.System) { ControllerContext = new ControllerContext { HttpContext = AuthenticatedContext("reception-sub", "sub") } };
+
+        var action = await controller.Confirm(appointment.AppointmentId);
+
+        Assert.IsInstanceOfType<OkObjectResult>(action);
+        Assert.AreEqual("reception-sub", (await db.Appointments.SingleAsync()).ConfirmedByUserId);
+    }
+
+    [TestMethod]
     public async Task Confirm_processed_appointment_is_rejected_without_overwriting_confirmation()
     {
         await using var db = CreateDb();
@@ -177,26 +194,54 @@ public sealed class PendingOnlineAppointmentsTests
     public async Task Pending_endpoint_marks_only_appointments_waiting_at_least_twelve_hours_as_overdue()
     {
         await using var db = CreateDb();
-        var date = DateTime.Today.AddDays(1);
+        var salonNow = new DateTime(2031, 2, 3, 12, 0, 0);
+        var date = salonNow.Date.AddDays(1);
         await SeedBookableStylistAsync(db, date);
         var stylistId = (await db.Stylists.SingleAsync()).StylistId;
         db.Appointments.AddRange(
-            new Appointment { Customer = new Customer { FullName = "Quá hạn", Phone = "0900000006" }, StylistId = stylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "PendingConfirmation", BookingReference = "ONLINE06", CreatedAt = DateTime.Now.AddHours(-12) },
-            new Appointment { Customer = new Customer { FullName = "Còn hạn", Phone = "0900000007" }, StylistId = stylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(10.5), Status = "PendingConfirmation", BookingReference = "ONLINE07", CreatedAt = DateTime.Now.AddHours(-11).AddMinutes(-59) });
+            new Appointment { Customer = new Customer { FullName = "Quá hạn", Phone = "0900000006" }, StylistId = stylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "PendingConfirmation", BookingReference = "ONLINE06", CreatedAt = salonNow.AddHours(-12) },
+            new Appointment { Customer = new Customer { FullName = "Còn hạn", Phone = "0900000007" }, StylistId = stylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(10), EndTime = TimeSpan.FromHours(10.5), Status = "PendingConfirmation", BookingReference = "ONLINE07", CreatedAt = salonNow.AddHours(-11).AddMinutes(-59) });
         await db.SaveChangesAsync();
 
-        var action = await new PendingAppointmentsController(db, TimeProvider.System).Get();
+        var clock = new FixedTimeProvider(new DateTimeOffset(salonNow, TimeSpan.FromHours(7)).ToUniversalTime());
+        var action = await new PendingAppointmentsController(db, clock).Get();
         var response = action.Result as OkObjectResult;
         var items = response!.Value as List<PendingAppointmentResponse>;
+        Assert.IsNotNull(items);
 
-        Assert.IsTrue(items!.Single(item => item.Reference == "ONLINE06").IsOverdue);
+        Assert.IsTrue(items.Single(item => item.Reference == "ONLINE06").IsOverdue);
         Assert.IsFalse(items.Single(item => item.Reference == "ONLINE07").IsOverdue);
     }
 
-    private static DefaultHttpContext AuthenticatedContext(string userId)
+    [TestMethod]
+    public async Task Pending_endpoint_loads_and_orders_appointments_with_sqlite()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(connection).Options;
+        await using var db = new ApplicationDbContext(options, new HttpContextAccessor());
+        await db.Database.EnsureCreatedAsync();
+        var date = new DateTime(2031, 2, 3);
+        var stylist = new Stylist { FullName = "Thợ SQLite", Phone = "0900000008", IsActive = true };
+        db.Add(stylist);
+        await db.SaveChangesAsync();
+        db.Appointments.AddRange(
+            new Appointment { Customer = new Customer { FullName = "Khách muộn", Phone = "0900000009" }, StylistId = stylist.StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(14), EndTime = TimeSpan.FromHours(14.5), Status = "PendingConfirmation", BookingReference = "SQLITE02" },
+            new Appointment { Customer = new Customer { FullName = "Khách sớm", Phone = "0900000010" }, StylistId = stylist.StylistId, AppointmentDate = date, StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(9.5), Status = "PendingConfirmation", BookingReference = "SQLITE01" });
+        await db.SaveChangesAsync();
+
+        var action = await new PendingAppointmentsController(db, TimeProvider.System).Get();
+
+        var response = action.Result as OkObjectResult;
+        var items = response?.Value as List<PendingAppointmentResponse>;
+        Assert.IsNotNull(items);
+        CollectionAssert.AreEqual(new[] { "SQLITE01", "SQLITE02" }, items.Select(item => item.Reference).ToArray());
+    }
+
+    private static DefaultHttpContext AuthenticatedContext(string userId, string claimType = ClaimTypes.NameIdentifier)
     {
         var context = new DefaultHttpContext();
-        context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, userId)], "test"));
+        context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(claimType, userId)], "test"));
         return context;
     }
 
@@ -224,5 +269,10 @@ public sealed class PendingOnlineAppointmentsTests
         await db.SaveChangesAsync();
         db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(18), Status = "Working" });
         await db.SaveChangesAsync();
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 }
