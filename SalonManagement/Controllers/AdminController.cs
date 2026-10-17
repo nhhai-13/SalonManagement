@@ -103,7 +103,7 @@ public class AdminApiController(UserManager<ApplicationUser> userManager) : Cont
 
     [Authorize(Roles = UserRoles.Admin)]
     [HttpPost("staff-accounts")]
-    public async Task<IActionResult> CreateStaffAccount(CreateStaffAccountRequest request)
+    public async Task<IActionResult> CreateStaffAccount(CreatePortalStaffRequest request)
     {
         var role = AuthController.NormalizeStaffRole(request.Role);
         if (role is null)

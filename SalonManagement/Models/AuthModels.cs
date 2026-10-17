@@ -12,7 +12,7 @@ public sealed record RegisterStaffRequest(
     [Required, MinLength(8)] string Password,
     [Required] string Role);
 
-public sealed record CreateStaffAccountRequest(
+public sealed record CreatePortalStaffRequest(
     [Required, EmailAddress] string Email,
     [Required, MinLength(8)] string Password,
     [Required] string Role);
