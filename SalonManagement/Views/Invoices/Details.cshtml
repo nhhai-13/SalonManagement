@@ -103,6 +103,60 @@
 
             @if (invoice.ClosedAt is not null)
             {
+                <section class="card border-0 shadow-sm mb-4">
+                    <div class="card-body p-4">
+                        <h2 class="h5 mb-3">Đánh giá của khách</h2>
+                        @if (Model.ReviewInvitationStatus == "Reviewed")
+                        {
+                            <div class="alert alert-success d-flex align-items-start gap-2 mb-3">
+                                <i class="bi bi-star-fill text-warning fs-5"></i>
+                                <div>
+                                    <div class="fw-bold">Khách đã chấm @Model.StylistReview?.Rating / 5 sao</div>
+                                    @if (!string.IsNullOrWhiteSpace(Model.StylistReview?.Comment))
+                                    {
+                                        <div class="small fst-italic mt-1">"@Model.StylistReview.Comment"</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else if (Model.ReviewInvitationStatus == "EmailSent")
+                        {
+                            <div class="alert alert-info mb-3">
+                                <div class="fw-semibold text-primary d-flex align-items-center gap-1">
+                                    <i class="bi bi-envelope-check"></i> Đã gửi email mời đánh giá
+                                </div>
+                                <small class="text-secondary d-block mt-1">
+                                    Email đã gửi tới <strong>@invoice.Appointment.Customer.Email</strong> (hiệu lực 7 ngày).
+                                </small>
+                            </div>
+                        }
+                        else if (Model.ReviewInvitationStatus == "NoEmail")
+                        {
+                            <div class="alert alert-secondary mb-3">
+                                <div class="fw-semibold d-flex align-items-center gap-1">
+                                    <i class="bi bi-envelope-slash"></i> Không có email, chưa gửi lời mời
+                                </div>
+                                <small class="text-secondary d-block mt-1">
+                                    Khách hàng chưa đăng ký email khi đặt lịch.
+                                </small>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(Model.ReviewLink))
+                        {
+                            <div class="border-top pt-3">
+                                <label class="form-label small text-muted mb-1">Liên kết tra cứu &amp; đánh giá tại quầy:</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" value="@Model.ReviewLink" readonly id="review-link-copy" />
+                                    <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('review-link-copy').value); alert('Đã sao chép liên kết đánh giá!');">
+                                        <i class="bi bi-clipboard me-1"></i>Chép
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </section>
+
                 <section class="card border-0 shadow-sm"><div class="card-body p-4">
                     <h2 class="h5">Phiếu điều chỉnh</h2><p class="small text-secondary">Phiếu gốc được giữ nguyên; mỗi điều chỉnh ghi nhận số chênh lệch và thợ phụ trách.</p>
                     <form asp-action="AddAdjustment" method="post" class="vstack gap-2">
