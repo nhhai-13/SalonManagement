@@ -241,7 +241,20 @@
                                         </button>
                                     </div>
                                 ` : ''}
-                                ${a.reviewUrl ? `<div class="text-end border-top pt-3"><a class="btn btn-primary btn-sm" href="${escapeHtml(a.reviewUrl)}"><i class="bi bi-star me-1"></i>Đánh giá dịch vụ</a></div>` : ''}
+                                ${a.isReviewed ? `
+                                    <div class="text-end border-top pt-3">
+                                        <span class="badge bg-light text-success border border-success px-3 py-2">
+                                            <i class="bi bi-check2-circle me-1"></i>Đã đánh giá dịch vụ
+                                        </span>
+                                    </div>
+                                ` : ''}
+                                ${a.reviewUrl ? `
+                                    <div class="text-end border-top pt-3">
+                                        <a class="btn btn-primary btn-sm px-3" href="${escapeHtml(a.reviewUrl)}">
+                                            <i class="bi bi-star me-1"></i>Đánh giá dịch vụ
+                                        </a>
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>`;
                 }).join('');
