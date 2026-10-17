@@ -1,8 +1,186 @@
 @model SalonManagement.Models.ViewModels.StylistReviewViewModel
-@{ ViewData["Title"] = "Đánh giá dịch vụ"; }
-<div class="container py-5" style="max-width:680px"><div class="card border-0 shadow-sm"><div class="card-body p-4 p-md-5"><p class="text-uppercase text-secondary small">Luminol Salon &amp; Spa</p><h1 class="h3">Đánh giá lần ghé thăm</h1><p class="text-secondary">Cảm ơn @Model.CustomerName đã trải nghiệm dịch vụ với @Model.StylistName. Đánh giá của bạn giúp chúng tôi phục vụ tốt hơn.</p>
-    <form asp-action="Create" method="post" class="vstack gap-3">@Html.AntiForgeryToken()<input asp-for="Token" type="hidden" /><input asp-for="StylistName" type="hidden" /><input asp-for="CustomerName" type="hidden" />
-        <div><label asp-for="Rating" class="form-label">Mức hài lòng (1–5 sao)</label><select asp-for="Rating" class="form-select"><option value="0">Chọn số sao</option><option value="1">1 sao</option><option value="2">2 sao</option><option value="3">3 sao</option><option value="4">4 sao</option><option value="5">5 sao</option></select><span asp-validation-for="Rating" class="text-danger"></span></div>
-        <div><label asp-for="Comment" class="form-label">Chia sẻ thêm (không bắt buộc)</label><textarea asp-for="Comment" class="form-control" rows="4" maxlength="500"></textarea><span asp-validation-for="Comment" class="text-danger"></span></div>
-        <button class="btn btn-primary" type="submit">Gửi đánh giá</button>
-    </form></div></div></div>
+@{
+    ViewData["Title"] = "Đánh giá dịch vụ";
+}
+
+<div class="container py-5" style="max-width: 680px">
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4 p-md-5">
+            <div class="text-center mb-4">
+                <span class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill small fw-semibold text-uppercase mb-2">
+                    Luminol Salon &amp; Spa
+                </span>
+                <h1 class="h3 fw-bold mb-1">Đánh giá chất lượng dịch vụ</h1>
+                <p class="text-secondary small mb-0">
+                    Ý kiến đóng góp của bạn giúp chúng tôi nâng cao chất lượng phục vụ mỗi ngày.
+                </p>
+            </div>
+
+            <!-- APPOINTMENT SUMMARY -->
+            <div class="card bg-light border-0 rounded-3 p-3 mb-4">
+                <div class="row g-2 text-sm">
+                    <div class="col-sm-6">
+                        <span class="text-muted small"><i class="bi bi-calendar-event me-1"></i>Ngày hẹn:</span>
+                        <div class="fw-semibold">@(Model.FormattedDate ?? Model.AppointmentDate?.ToString("dd/MM/yyyy") ?? "—")</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <span class="text-muted small"><i class="bi bi-person me-1"></i>Khách hàng:</span>
+                        <div class="fw-semibold">@(Model.CustomerName ?? "Quý khách")</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <span class="text-muted small"><i class="bi bi-person-badge me-1"></i>Thợ phụ trách:</span>
+                        <div class="fw-semibold text-primary">@(Model.StylistName ?? "Thợ làm tóc")</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <span class="text-muted small"><i class="bi bi-key me-1"></i>Mã lịch hẹn:</span>
+                        <div class="fw-bold font-monospace text-dark">@(Model.Reference ?? "—")</div>
+                    </div>
+                    @if (Model.Services != null && Model.Services.Count > 0)
+                    {
+                        <div class="col-12 mt-2 pt-2 border-top">
+                            <span class="text-muted small"><i class="bi bi-scissors me-1"></i>Dịch vụ đã làm:</span>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                @foreach (var s in Model.Services)
+                                {
+                                    <span class="badge bg-white text-dark border">@s</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <form asp-action="Create" method="post" id="review-form" class="vstack gap-4">
+                @Html.AntiForgeryToken()
+                <input asp-for="Token" type="hidden" />
+                <input asp-for="StylistName" type="hidden" />
+                <input asp-for="CustomerName" type="hidden" />
+
+                <!-- STAR RATING WIDGET -->
+                <div>
+                    <label class="form-label fw-bold mb-1">
+                        Mức độ hài lòng của bạn <span class="text-danger">*</span>
+                    </label>
+                    <div class="star-rating d-flex align-items-center gap-2 my-2" id="star-rating-widget">
+                        @for (int i = 1; i <= 5; i++)
+                        {
+                            <button type="button" class="btn btn-link p-0 text-decoration-none star-btn" data-value="@i" style="font-size: 2.25rem; color: #dee2e6; line-height: 1;">
+                                <i class="bi bi-star-fill"></i>
+                            </button>
+                        }
+                        <span id="star-label" class="ms-2 fw-semibold text-secondary small">Vui lòng chọn số sao</span>
+                    </div>
+                    <input type="hidden" asp-for="Rating" id="rating-value" value="@Model.Rating" />
+                    <span asp-validation-for="Rating" class="text-danger small d-block mt-1"></span>
+                </div>
+
+                <!-- COMMENT BOX -->
+                <div>
+                    <label asp-for="Comment" class="form-label fw-bold mb-1">
+                        Góp ý chi tiết <span class="text-muted fw-normal small">(không bắt buộc)</span>
+                    </label>
+                    <textarea asp-for="Comment" class="form-control" rows="4" maxlength="500" id="comment-input"
+                              placeholder="Chia sẻ cảm nhận của bạn về tay nghề thợ, thái độ phục vụ, không gian..."></textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <span asp-validation-for="Comment" class="text-danger small"></span>
+                        <small id="comment-counter" class="text-muted ms-auto">0/500 ký tự</small>
+                    </div>
+                </div>
+
+                <!-- SUBMIT BUTTON -->
+                <div class="pt-2">
+                    <button class="btn btn-primary btn-lg w-100 fw-semibold shadow-sm" type="submit" id="submit-review-btn" disabled>
+                        <i class="bi bi-send me-1"></i>Gửi đánh giá
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const starBtns = document.querySelectorAll('.star-btn');
+            const ratingInput = document.getElementById('rating-value');
+            const starLabel = document.getElementById('star-label');
+            const submitBtn = document.getElementById('submit-review-btn');
+            const commentInput = document.getElementById('comment-input');
+            const commentCounter = document.getElementById('comment-counter');
+
+            const starTexts = {
+                1: '1 sao - Rất không hài lòng',
+                2: '2 sao - Chưa hài lòng',
+                3: '3 sao - Bình thường',
+                4: '4 sao - Hài lòng',
+                5: '5 sao - Rất hài lòng'
+            };
+
+            function updateStars(val) {
+                starBtns.forEach(btn => {
+                    const btnVal = parseInt(btn.dataset.value);
+                    if (btnVal <= val) {
+                        btn.style.color = '#ffc107';
+                    } else {
+                        btn.style.color = '#dee2e6';
+                    }
+                });
+
+                if (val >= 1 && val <= 5) {
+                    starLabel.textContent = starTexts[val] || `${val} sao`;
+                    starLabel.classList.add('text-warning');
+                    starLabel.classList.remove('text-secondary');
+                    if (submitBtn) submitBtn.disabled = false;
+                } else {
+                    starLabel.textContent = 'Vui lòng chọn số sao';
+                    starLabel.classList.remove('text-warning');
+                    starLabel.classList.add('text-secondary');
+                    if (submitBtn) submitBtn.disabled = true;
+                }
+            }
+
+            starBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const val = parseInt(btn.dataset.value);
+                    ratingInput.value = val;
+                    updateStars(val);
+                });
+
+                btn.addEventListener('mouseenter', () => {
+                    const val = parseInt(btn.dataset.value);
+                    starBtns.forEach(b => {
+                        b.style.color = parseInt(b.dataset.value) <= val ? '#ffc107' : '#dee2e6';
+                    });
+                });
+            });
+
+            const starWidget = document.getElementById('star-rating-widget');
+            if (starWidget) {
+                starWidget.addEventListener('mouseleave', () => {
+                    const currentVal = parseInt(ratingInput.value) || 0;
+                    updateStars(currentVal);
+                });
+            }
+
+            if (commentInput && commentCounter) {
+                const updateCommentCount = () => {
+                    const len = commentInput.value.length;
+                    commentCounter.textContent = `${len}/500 ký tự`;
+                    if (len > 500) {
+                        commentCounter.classList.add('text-danger');
+                        commentCounter.classList.remove('text-muted');
+                    } else {
+                        commentCounter.classList.remove('text-danger');
+                        commentCounter.classList.add('text-muted');
+                    }
+                };
+                commentInput.addEventListener('input', updateCommentCount);
+                updateCommentCount();
+            }
+
+            const initialRating = parseInt(ratingInput.value) || 0;
+            updateStars(initialRating);
+        })();
+    </script>
+}

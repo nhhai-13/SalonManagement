@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
+using SalonManagement.Models;
 using SalonManagement.Services;
 
 namespace SalonManagement.Controllers;
@@ -19,28 +20,51 @@ public sealed class AppointmentLookupController(
     public async Task<IActionResult> Search(string? query)
     {
         var result = await new AppointmentLookupService(db, timeProvider).SearchAsync(query);
-        var references = result.Items.Where(item => item.Status == "Đã đóng").Select(item => item.Reference).ToList();
-        var reviewableReferences = references.Count == 0 ? new List<string>() : await db.StylistReviews.AsNoTracking()
-            .Where(review => references.Contains(review.Appointment.BookingReference) && review.Rating == null && review.ExpiresAt > DateTime.UtcNow)
-            .Select(review => review.Appointment.BookingReference).ToListAsync();
+        var references = result.Items
+            .Where(item => item.Status is "Đã đóng" or "Đã hoàn thành" or "Closed" or "Completed")
+            .Select(item => item.Reference.ToUpperInvariant())
+            .ToList();
+
+        var existingReviews = references.Count == 0
+            ? new List<StylistReview>()
+            : await db.StylistReviews.AsNoTracking()
+                .Include(review => review.Appointment)
+                .Where(review => references.Contains(review.Appointment.BookingReference.ToUpper()))
+                .ToListAsync();
+
+        var reviewedReferences = existingReviews
+            .Where(r => r.Rating.HasValue)
+            .Select(r => r.Appointment.BookingReference.ToUpperInvariant())
+            .ToHashSet();
+
         return Ok(new
         {
             error = result.Error,
-            appointments = result.Items.Select(item => new
+            appointments = result.Items.Select(item =>
             {
-                item.Reference,
-                date = item.Date.ToString("dd/MM/yyyy"),
-                startTime = item.StartTime.ToString(@"hh\:mm"),
-                endTime = item.EndTime.ToString(@"hh\:mm"),
-                item.Services,
-                item.StylistName,
-                item.DurationMinutes,
-                item.CancelledAt,
-                item.CancelledBy,
-                item.Status,
-                reviewUrl = reviewableReferences.Contains(item.Reference)
-                    ? Url.Action("CreateByReference", "Reviews", new { reference = item.Reference }, Request.Scheme)
-                    : null
+                var upperRef = item.Reference.ToUpperInvariant();
+                var isCompletedOrClosed = item.Status is "Đã đóng" or "Đã hoàn thành" or "Closed" or "Completed";
+                var isReviewed = reviewedReferences.Contains(upperRef);
+                var canReview = isCompletedOrClosed && !isReviewed;
+
+                return new
+                {
+                    item.Reference,
+                    date = item.Date.ToString("dd/MM/yyyy"),
+                    startTime = item.StartTime.ToString(@"hh\:mm"),
+                    endTime = item.EndTime.ToString(@"hh\:mm"),
+                    item.Services,
+                    item.StylistName,
+                    item.DurationMinutes,
+                    item.CancelledAt,
+                    item.CancelledBy,
+                    item.Status,
+                    isReviewed,
+                    canReview,
+                    reviewUrl = canReview
+                        ? Url.Action("CreateByReference", "Reviews", new { reference = item.Reference }, Request.Scheme)
+                        : null
+                };
             })
         });
     }

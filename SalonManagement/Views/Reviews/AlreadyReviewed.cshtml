@@ -1,0 +1,55 @@
+@model SalonManagement.Models.ViewModels.StylistReviewViewModel
+@{
+    ViewData["Title"] = "Lịch hẹn đã được đánh giá";
+}
+
+<div class="container py-5" style="max-width:680px">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4 p-md-5 text-center">
+            <div class="mb-3">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+            </div>
+            <h1 class="h4 fw-bold mb-2">Lịch hẹn này đã được gửi đánh giá</h1>
+            <p class="text-secondary mb-3">
+                Cảm ơn <strong>@(Model.CustomerName ?? "quý khách")</strong> đã gửi đánh giá cho thợ <strong>@(Model.StylistName ?? "chính")</strong>.
+            </p>
+            <div class="d-inline-flex align-items-center gap-1 mb-4 px-3 py-1 bg-light rounded-pill border">
+                <span class="text-warning fs-5">
+                    @for (int i = 1; i <= 5; i++)
+                    {
+                        if (i <= Model.Rating)
+                        {
+                            <i class="bi bi-star-fill"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-star text-muted"></i>
+                        }
+                    }
+                </span>
+                <span class="fw-bold ms-1 text-dark">@Model.Rating / 5 sao</span>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Model.Comment))
+            {
+                <div class="bg-light p-3 rounded text-start mb-4 border">
+                    <div class="small text-muted mb-1"><i class="bi bi-chat-left-quote me-1"></i>Góp ý của bạn:</div>
+                    <div class="fst-italic text-dark">"@Model.Comment"</div>
+                </div>
+            }
+
+            <p class="small text-muted mb-4">
+                Mỗi lượt hẹn chỉ cần đánh giá một lần. Ý kiến của bạn đã được ghi nhận trong hệ thống!
+            </p>
+
+            <div class="d-flex justify-content-center gap-2">
+                <a href="/appointments/lookup" class="btn btn-outline-primary">
+                    <i class="bi bi-search me-1"></i>Tra cứu lịch hẹn khác
+                </a>
+                <a href="/" class="btn btn-primary">
+                    <i class="bi bi-house me-1"></i>Về trang chủ
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
