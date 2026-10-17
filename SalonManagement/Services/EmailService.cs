@@ -6,12 +6,13 @@ namespace SalonManagement.Services;
 
 /// <summary>
 /// Dịch vụ gửi email thông báo hệ thống và đặt lại mật khẩu (AC2).
-/// Hỗ trợ gửi qua SMTP (Gmail) khi có cấu hình SmtpSettings, kèm fallback ghi log console.
+/// Hỗ trợ gửi qua SMTP (Gmail) khi có cấu hình SmtpSettings.
 /// </summary>
 public sealed class EmailService(
     ILogger<EmailService> logger,
     IConfiguration configuration,
-    IWebHostEnvironment env) : IEmailService
+    IWebHostEnvironment env,
+    IEmailSenderSettingsStore emailSenderSettings) : IEmailService
 {
     public async Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime)
     {
@@ -148,57 +149,20 @@ public sealed class EmailService(
 
     public async Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode)
     {
-        var smtpSection = configuration.GetSection("SmtpSettings");
-        var server = smtpSection["Server"];
-        var senderEmail = smtpSection["SenderEmail"];
-        var senderName = smtpSection["SenderName"] ?? "Luminol Salon";
-        var username = smtpSection["Username"];
-        var password = smtpSection["Password"];
-        var port = int.TryParse(smtpSection["Port"], out var configuredPort) ? configuredPort : 587;
-        var hasSmtpConfig = !string.IsNullOrWhiteSpace(server)
-            && !string.IsNullOrWhiteSpace(senderEmail)
-            && !string.IsNullOrWhiteSpace(username)
-            && !string.IsNullOrWhiteSpace(password);
+        await SendRequiredHtmlEmailAsync(
+            toEmail,
+            $"{verificationCode} là mã xác minh email Luminol Salon",
+            BuildEmailVerificationHtmlBody(toEmail, verificationCode));
+        logger.LogInformation("Đã gửi mã xác minh email tới {Email}", toEmail);
+    }
 
-        if (hasSmtpConfig)
-        {
-            try
-            {
-                using var client = new SmtpClient(server, port)
-                {
-                    EnableSsl = true,
-                    UseDefaultCredentials = false,
-                    Credentials = new NetworkCredential(username, password),
-                    DeliveryMethod = SmtpDeliveryMethod.Network,
-                    Timeout = 15000
-                };
-                using var message = new MailMessage
-                {
-                    From = new MailAddress(senderEmail!, senderName),
-                    Subject = $"{verificationCode} là mã xác minh email Luminol Salon",
-                    IsBodyHtml = true,
-                    Body = BuildEmailVerificationHtmlBody(toEmail, verificationCode)
-                };
-                message.To.Add(toEmail);
-                await client.SendMailAsync(message);
-                logger.LogInformation("Đã gửi mã xác minh email tới {Email}", toEmail);
-                return;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Không thể gửi mã xác minh email tới {Email}", toEmail);
-                if (!env.IsDevelopment() && !env.IsStaging()) throw;
-            }
-        }
-        else if (!env.IsDevelopment() && !env.IsStaging())
-        {
-            throw new InvalidOperationException("Chưa cấu hình SMTP để gửi mã xác minh email.");
-        }
-
-        logger.LogWarning("[FALLBACK EMAIL] Mã xác minh cho {Email}: {Code}", toEmail, verificationCode);
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[FALLBACK EMAIL] Mã xác minh cho {toEmail}: {verificationCode}");
-        Console.ResetColor();
+    public async Task SendPasswordResetCodeAsync(string toEmail, string resetCode)
+    {
+        await SendRequiredHtmlEmailAsync(
+            toEmail,
+            $"{resetCode} là mã đặt lại mật khẩu Luminol Salon",
+            BuildPasswordResetCodeHtmlBody(toEmail, resetCode));
+        logger.LogInformation("Đã gửi mã đặt lại mật khẩu tới {Email}", toEmail);
     }
 
     public async Task SendPasswordResetEmailAsync(string toEmail, string resetLink)
@@ -269,6 +233,63 @@ public sealed class EmailService(
             Console.ResetColor();
         }
     }
+
+    private async Task SendRequiredHtmlEmailAsync(string toEmail, string subject, string htmlBody)
+    {
+        var configuredSettings = await emailSenderSettings.GetAsync();
+        var smtp = configuration.GetSection("SmtpSettings");
+        var server = configuredSettings?.Server ?? smtp["Server"];
+        var senderEmail = configuredSettings?.SenderEmail ?? smtp["SenderEmail"];
+        var senderName = smtp["SenderName"] ?? "Luminol Salon";
+        var username = configuredSettings?.Username ?? smtp["Username"];
+        var password = configuredSettings?.AppPassword ?? smtp["Password"];
+        var port = configuredSettings?.Port ?? smtp.GetValue<int>("Port", 587);
+
+        if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(senderEmail) ||
+            string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            throw new InvalidOperationException(
+                "Chưa cấu hình SMTP đầy đủ. Hãy thêm SenderEmail, Username và App Password vào User Secrets.");
+        }
+
+        using var client = new SmtpClient(server, port)
+        {
+            EnableSsl = true,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(username, password),
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            Timeout = 15000
+        };
+        using var message = new MailMessage
+        {
+            From = new MailAddress(senderEmail, senderName),
+            Subject = subject,
+            IsBodyHtml = true,
+            Body = htmlBody
+        };
+        message.To.Add(toEmail);
+        await client.SendMailAsync(message);
+    }
+
+    private static string BuildPasswordResetCodeHtmlBody(string recipientEmail, string resetCode) => $"""
+<!DOCTYPE html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Đặt lại mật khẩu</title></head>
+<body style="margin:0;padding:40px 15px;background:#f8f5f0;font-family:Arial,sans-serif;color:#2d2521">
+  <div style="max-width:560px;margin:auto;background:#fffdf9;border:1px solid #ded7cf;border-radius:12px;overflow:hidden">
+    <div style="padding:28px;background:#704a37;color:#fff;text-align:center"><h1 style="margin:0;font-size:24px">Luminol Salon</h1></div>
+    <div style="padding:32px;text-align:center">
+      <h2 style="margin-top:0">Xác nhận đặt lại mật khẩu</h2>
+      <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho <strong>{WebUtility.HtmlEncode(recipientEmail)}</strong>.</p>
+      <p style="margin:24px 0 12px;color:#756b65">Mã xác nhận của bạn là:</p>
+      <div style="margin:0 0 24px;font-size:34px;font-weight:700;letter-spacing:10px;color:#704a37">{resetCode}</div>
+      <p style="color:#756b65">Mã có hiệu lực trong 10 phút và chỉ dùng được một lần. Không chia sẻ mã này với bất kỳ ai.</p>
+      <p style="color:#756b65">Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.</p>
+    </div>
+  </div>
+</body>
+</html>
+""";
 
     private static string BuildPasswordResetHtmlBody(string recipientEmail, string resetLink)
     {

@@ -27,6 +27,7 @@ coverage/
 .env.*
 secrets.json
 appsettings.Local.json
+App_Data/
 
 # Operating system files
 .DS_Store

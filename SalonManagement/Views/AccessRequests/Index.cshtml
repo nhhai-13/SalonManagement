@@ -55,9 +55,13 @@
                             <td><span class="badge text-bg-primary">@RoleLabel(request.RequestedRole)</span></td>
                             <td>@(request.RequestedAtUtc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "—")</td>
                             <td class="text-end">
-                                <form method="post" action="/management/access-requests/@request.Id/approve" class="d-inline">
+                                <form method="post" action="/management/access-requests/@request.Id/approve" class="d-inline" data-access-approval-form>
                                     @Html.AntiForgeryToken()
-                                    <button class="btn btn-success" type="submit" onclick="return confirm('Cấp quyền @RoleLabel(request.RequestedRole) cho @request.Email?');">
+                                    <button class="btn btn-success" type="button"
+                                            data-access-approval-trigger
+                                            data-access-name="@(string.IsNullOrWhiteSpace(request.FullName) ? request.Email : request.FullName)"
+                                            data-access-email="@request.Email"
+                                            data-access-role="@RoleLabel(request.RequestedRole)">
                                         <i class="bi bi-check2-circle"></i> Cấp quyền @RoleLabel(request.RequestedRole)
                                     </button>
                                 </form>
@@ -70,3 +74,66 @@
         </div>
     </div>
 </section>
+
+<dialog id="access-approval-dialog" class="access-approval-dialog" aria-labelledby="access-approval-title" aria-describedby="access-approval-description">
+    <form method="dialog" class="access-approval-card">
+        <header>
+            <div class="access-approval-icon" aria-hidden="true"><i class="bi bi-person-check-fill"></i></div>
+            <div>
+                <span class="access-approval-eyebrow">Xác nhận cấp quyền</span>
+                <h2 id="access-approval-title">Cấp quyền truy cập nhân viên</h2>
+            </div>
+            <button class="btn-close" value="cancel" aria-label="Đóng"></button>
+        </header>
+        <div class="access-approval-body">
+            <p id="access-approval-description">Bạn sắp cấp quyền <strong data-access-approval-role>—</strong> cho tài khoản bên dưới.</p>
+            <section class="access-approval-account" aria-label="Tài khoản được cấp quyền">
+                <span class="access-approval-avatar" aria-hidden="true"><i class="bi bi-person"></i></span>
+                <div>
+                    <strong data-access-approval-name>—</strong>
+                    <span data-access-approval-email>—</span>
+                </div>
+            </section>
+            <div class="access-approval-notice">
+                <i class="bi bi-shield-check" aria-hidden="true"></i>
+                <div>
+                    <strong>Quyền sẽ có hiệu lực ngay</strong>
+                    <span>Người dùng có thể đăng nhập và sử dụng các chức năng dành cho <span data-access-approval-role>—</span> ngay sau khi xác nhận.</span>
+                </div>
+            </div>
+        </div>
+        <footer>
+            <button class="btn btn-light border" value="cancel">Hủy</button>
+            <button id="access-approval-confirm" type="button" class="btn btn-success"><i class="bi bi-check2-circle"></i> Xác nhận cấp quyền</button>
+        </footer>
+    </form>
+</dialog>
+
+@section Scripts {
+<script>
+    (() => {
+        const dialog = document.getElementById('access-approval-dialog');
+        if (!dialog) return;
+
+        let selectedForm;
+        const setText = (selector, value) => dialog.querySelectorAll(selector)
+            .forEach(element => element.textContent = value || '—');
+
+        document.querySelectorAll('[data-access-approval-trigger]').forEach(button => button.addEventListener('click', () => {
+            selectedForm = button.closest('[data-access-approval-form]');
+            setText('[data-access-approval-name]', button.dataset.accessName);
+            setText('[data-access-approval-email]', button.dataset.accessEmail);
+            setText('[data-access-approval-role]', button.dataset.accessRole);
+            dialog.showModal();
+        }));
+
+        dialog.querySelector('#access-approval-confirm')?.addEventListener('click', () => {
+            if (!selectedForm) return;
+            dialog.close();
+            selectedForm.requestSubmit();
+        });
+
+        dialog.addEventListener('close', () => { selectedForm = undefined; });
+    })();
+</script>
+}

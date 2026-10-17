@@ -340,6 +340,7 @@ public sealed class ReceptionOperationsController : ControllerBase
     {
         public Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword) => Task.CompletedTask;
         public Task SendPasswordResetEmailAsync(string toEmail, string resetLink) => Task.CompletedTask;
+        public Task SendPasswordResetCodeAsync(string toEmail, string resetCode) => Task.CompletedTask;
         public Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode) => Task.CompletedTask;
         public Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime) => Task.CompletedTask;
         public Task SendServiceReviewEmailAsync(string toEmail, string customerName, string reviewLink, DateTime expiresAt) => Task.CompletedTask;

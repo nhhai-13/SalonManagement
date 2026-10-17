@@ -1,3 +1,4 @@
+@model SalonManagement.Models.ViewModels.VerifyPasswordResetCodeViewModel
 @{
     Layout = "_AuthLayout";
     ViewData["Title"] = "Kiểm tra email của bạn";
@@ -25,14 +26,24 @@
 
         <div class="alert alert-success border-0 text-start" role="alert">
             <p class="mb-2">
-                Nếu email bạn nhập đã được đăng ký, chúng tôi đã gửi <strong>link đặt lại mật khẩu</strong>
+                Nếu email bạn nhập đã được đăng ký, chúng tôi đã gửi <strong>mã xác nhận 6 số</strong>
                 vào hộp thư của bạn.
             </p>
             <p class="mb-0 small text-muted">
-                ⏱ Link có hiệu lực trong <strong>30 phút</strong> và chỉ sử dụng được <strong>1 lần</strong>.
+                ⏱ Mã có hiệu lực trong <strong>10 phút</strong>, chỉ dùng được <strong>1 lần</strong>.
                 Nếu không thấy email, hãy kiểm tra thư mục Spam/Rác.
             </p>
         </div>
+
+        <form asp-action="VerifyPasswordResetCode" method="post" class="text-start mt-4">
+            <input asp-for="Email" type="hidden" />
+            <div asp-validation-summary="ModelOnly" class="text-danger small mb-2"></div>
+            <label asp-for="Code" class="form-label fw-semibold">Nhập mã xác nhận</label>
+            <input asp-for="Code" class="form-control form-control-lg text-center" inputmode="numeric"
+                   autocomplete="one-time-code" maxlength="6" placeholder="000000" />
+            <span asp-validation-for="Code" class="text-danger small"></span>
+            <button type="submit" class="sl-auth-submit btn btn-primary btn-lg fw-semibold w-100 mt-3">Xác nhận mã</button>
+        </form>
 
         <div class="d-grid gap-2 mt-4">
             <a asp-controller="Account" asp-action="Login" class="sl-auth-submit btn btn-primary btn-lg fw-semibold">Đăng nhập</a>

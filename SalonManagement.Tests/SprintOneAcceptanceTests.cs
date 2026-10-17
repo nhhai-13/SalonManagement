@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using SalonManagement.Controllers;
 using SalonManagement.Data;
@@ -198,7 +199,11 @@ public sealed class SprintOneAcceptanceTests
         var token = await f.Users.GeneratePasswordResetTokenAsync(user);
         var refresh = new RefreshToken { UserId = user.Id, TokenHash = "refresh", ExpiresAtUtc = DateTime.UtcNow.AddDays(1) };
         f.Db.Add(refresh); await f.Db.SaveChangesAsync();
-        var controller = new AccountController(f.Users, null!, f.Db, new CapturingEmail(), null!, TimeProvider.System, NullLogger<AccountController>.Instance)
+        var email = new CapturingEmail();
+        var resetCodes = new PasswordResetCodeService(
+            new MemoryCache(new MemoryCacheOptions()), f.Users, email, TimeProvider.System,
+            NullLogger<PasswordResetCodeService>.Instance);
+        var controller = new AccountController(f.Users, null!, f.Db, resetCodes, null!, TimeProvider.System, NullLogger<AccountController>.Instance)
         { ControllerContext = new() { HttpContext = f.Http } };
         Assert.IsType<RedirectToActionResult>(await controller.ResetPassword(new ResetPasswordViewModel { Email = user.Email!, Token = token, NewPassword = "Newpass123!", ConfirmPassword = "Newpass123!" }));
         Assert.False(user.MustChangePassword);
@@ -268,6 +273,7 @@ public sealed class SprintOneAcceptanceTests
         public bool Fail { get; init; }
         public Task SendTemporaryPasswordEmailAsync(string email, string password) { if (Fail) throw new InvalidOperationException("Test delivery failure"); Password = password; return Task.CompletedTask; }
         public Task SendPasswordResetEmailAsync(string email, string link) => Task.CompletedTask;
+        public Task SendPasswordResetCodeAsync(string email, string resetCode) => Task.CompletedTask;
         public Task SendServiceReviewEmailAsync(string toEmail, string customerName, string reviewLink, DateTime expiresAt) => Task.CompletedTask;
         public Task SendAppointmentNotificationEmailAsync(string toEmail, string customerName, string reference, string services, string stylistName, DateTime appointmentDate, TimeSpan startTime, bool isReminder) => Task.CompletedTask;
         public Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime) => Task.CompletedTask;

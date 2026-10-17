@@ -1,0 +1,20 @@
+@{ ViewData["Title"] = "Cấu hình email gửi"; }
+<main id="email-settings-content" class="container py-4 d-none">
+  <div class="d-flex justify-content-between flex-wrap gap-3 mb-4">
+    <div><span class="text-uppercase text-primary small fw-bold">Thiết lập hệ thống</span><h1 class="h3 mb-1">Cấu hình email gửi mã</h1><p class="text-muted mb-0">Nhập Gmail và Mật khẩu ứng dụng một lần. Mã đăng ký, xác thực email và quên mật khẩu sẽ gửi đến email người dùng nhập.</p></div>
+    <a class="btn btn-outline-secondary align-self-start" href="/owner"><i class="bi bi-arrow-left"></i> Quay lại</a>
+  </div>
+  <div class="row g-4"><section class="col-lg-7"><div class="card shadow-sm border-0"><div class="card-body p-4">
+    <div id="email-settings-status" class="alert alert-warning">Đang kiểm tra cấu hình…</div>
+    <form id="email-settings-form" autocomplete="off">
+      <div class="alert alert-info small"><i class="bi bi-info-circle"></i> Với Gmail: giữ <strong>smtp.gmail.com</strong> và cổng <strong>587</strong>. App Password là mã 16 ký tự tạo trong phần Bảo mật Google, không phải mật khẩu Gmail thông thường.</div>
+      <div class="row g-3"><div class="col-md-8"><label class="form-label" for="smtp-server">Máy chủ SMTP</label><input id="smtp-server" class="form-control" value="smtp.gmail.com" required /></div><div class="col-md-4"><label class="form-label" for="smtp-port">Cổng</label><input id="smtp-port" class="form-control" type="number" min="1" max="65535" value="587" required /></div>
+      <div class="col-12"><label class="form-label" for="smtp-sender">Email gửi</label><input id="smtp-sender" class="form-control" type="email" placeholder="your-email@gmail.com" required /></div>
+      <div class="col-12"><label class="form-label" for="smtp-username">Tài khoản SMTP</label><input id="smtp-username" class="form-control" type="email" placeholder="Thường giống Email gửi" required /></div>
+      <div class="col-12"><label class="form-label" for="smtp-password">Mật khẩu ứng dụng</label><input id="smtp-password" class="form-control" type="password" autocomplete="new-password" placeholder="Mã 16 ký tự từ Google" required /><div class="form-text">Mật khẩu được mã hóa trước khi lưu và không hiển thị lại trên màn hình.</div></div></div>
+      <button id="save-email-settings" class="btn btn-primary mt-4" type="submit"><i class="bi bi-shield-lock"></i> Lưu cấu hình email</button>
+    </form>
+  </div></div></section>
+  <section class="col-lg-5"><div class="card shadow-sm border-0"><div class="card-body p-4"><h2 class="h5">Gửi email thử</h2><p class="text-muted small">Lưu cấu hình trước, rồi gửi mã thử tới chính email của bạn.</p><form id="send-test-email-form"><label class="form-label" for="test-recipient">Email nhận thư thử</label><input id="test-recipient" class="form-control" type="email" required placeholder="email-cua-ban@example.com" /><button id="send-test-email" class="btn btn-outline-primary w-100 mt-3" type="submit"><i class="bi bi-send"></i> Gửi email thử</button></form><p id="email-settings-message" class="small mt-3 mb-0" role="status"></p></div></div></section></div>
+</main>
+@section Scripts { <script src="~/js/auth.js" asp-append-version="true"></script><script src="~/js/email-sender-settings.js" asp-append-version="true"></script><script>SalonAuth.requireSession({ endpoint: "/api/owner/session", contentId: "email-settings-content" }).then(() => EmailSenderSettings.start());</script> }

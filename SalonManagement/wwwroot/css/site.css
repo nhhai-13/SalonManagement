@@ -435,10 +435,36 @@ html { scroll-behavior: smooth; }
 .stylist-delete-note i { margin-top: .1rem; color: #3670bf; }
 .stylist-delete-card>footer { display: flex; justify-content: flex-end; gap: .55rem; padding: .85rem 1.1rem; border-top: 1px solid #e6ebf2; background: #fbfcfe; }
 
+.access-approval-dialog { width: min(510px, calc(100vw - 2rem)); padding: 0; border: 0; border-radius: .9rem; box-shadow: 0 1.5rem 4rem rgba(15, 23, 42, .3); }
+.access-approval-dialog::backdrop { background: rgba(15, 23, 42, .5); backdrop-filter: blur(2px); }
+.access-approval-card { margin: 0; background: #fff; }
+.access-approval-card>header { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: 1rem 1.1rem; border-bottom: 1px solid #e6ebf2; }
+.access-approval-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 50%; color: #08785b; background: #dcfce9; font-size: 1.12rem; }
+.access-approval-eyebrow { display: block; margin-bottom: .1rem; color: #08785b; font-size: .68rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.access-approval-card h2 { margin: 0; color: #17284d; font-size: 1.14rem; font-weight: 800; }
+.access-approval-body { padding: 1rem 1.1rem; }
+.access-approval-body>p { margin: 0 0 .85rem; color: #536782; font-size: .9rem; }
+.access-approval-body>p strong { color: #08785b; }
+.access-approval-account { display: flex; align-items: center; gap: .72rem; padding: .8rem; border: 1px solid #dfe8f3; border-radius: .65rem; background: #f8fbff; }
+.access-approval-avatar { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: #4c2be5; background: #eeeaff; font-size: 1rem; }
+.access-approval-account strong,.access-approval-account span { display: block; }
+.access-approval-account strong { color: #17284d; font-size: .9rem; }
+.access-approval-account div>span { margin-top: .1rem; color: #667994; font-size: .8rem; }
+.access-approval-notice { display: flex; gap: .62rem; margin-top: .85rem; padding: .75rem .8rem; border: 1px solid #a9e9cb; border-radius: .6rem; color: #17634f; background: #edfff5; }
+.access-approval-notice>i { margin-top: .05rem; color: #079669; font-size: 1rem; }
+.access-approval-notice strong,.access-approval-notice span { display: block; }
+.access-approval-notice strong { margin-bottom: .12rem; font-size: .82rem; }
+.access-approval-notice span { font-size: .78rem; line-height: 1.42; }
+.access-approval-card>footer { display: flex; justify-content: flex-end; gap: .55rem; padding: .85rem 1.1rem; border-top: 1px solid #e6ebf2; background: #fbfcfe; }
+.access-approval-card>footer .btn-success { background: #078a67; border-color: #078a67; }
+.access-approval-card>footer .btn-success:hover { background: #057455; border-color: #057455; }
+
 @media (max-width: 430px) {
     .no-show-appointment-summary { grid-template-columns: 1fr; gap: .55rem; }
     .no-show-card-footer { flex-direction: column-reverse; }
     .no-show-card-footer .btn { width: 100%; }
+    .access-approval-card>footer { flex-direction: column-reverse; }
+    .access-approval-card>footer .btn { width: 100%; }
 }
 
 body.reception-drawer-open {

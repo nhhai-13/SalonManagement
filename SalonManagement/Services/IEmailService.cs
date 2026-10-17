@@ -10,6 +10,9 @@ public interface IEmailService
     /// </summary>
     Task SendPasswordResetEmailAsync(string toEmail, string resetLink);
 
+    /// <summary>Gửi mã OTP 6 chữ số để xác nhận yêu cầu đặt lại mật khẩu.</summary>
+    Task SendPasswordResetCodeAsync(string toEmail, string resetCode);
+
     /// <summary>Gửi mã xác minh email gồm 6 chữ số.</summary>
     Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode);
     Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime);

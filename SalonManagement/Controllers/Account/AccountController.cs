@@ -17,7 +17,7 @@ public class AccountController(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
     ApplicationDbContext dbContext,
-    IEmailService emailService,
+    PasswordResetCodeService passwordResetCodes,
     IPasswordResetRateLimiter rateLimiter,
     TimeProvider timeProvider,
     ILogger<AccountController> logger) : Controller
@@ -153,18 +153,17 @@ public class AccountController(
         var user = await userManager.FindByEmailAsync(model.Email);
         if (user is not null && user.IsActive)
         {
-            var token = await userManager.GeneratePasswordResetTokenAsync(user);
-
-            var resetLink = Url.Action(
-                nameof(ResetPassword),
-                "Account",
-                new { email = user.Email, token = token },
-                protocol: Request.Scheme)!;
-
-            await emailService.SendPasswordResetEmailAsync(model.Email, resetLink);
-
-            logger.LogInformation(
-                "Đã gửi link đặt lại mật khẩu tới {Email}.", model.Email);
+            try
+            {
+                await passwordResetCodes.SendAsync(user);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Không thể gửi mã đặt lại mật khẩu tới {Email}.", model.Email);
+                ModelState.AddModelError(string.Empty,
+                    "Hiện chưa thể gửi mã xác nhận. Vui lòng thử lại sau hoặc liên hệ quản trị viên.");
+                return View(ForgotPasswordView, model);
+            }
         }
         else
         {
@@ -174,13 +173,32 @@ public class AccountController(
         }
 
         // Luôn trả về trang xác nhận dù email có tồn tại hay không
-        return RedirectToAction(nameof(ForgotPasswordConfirmation));
+        return RedirectToAction(nameof(ForgotPasswordConfirmation), new { email = model.Email });
     }
 
     [HttpGet]
-    public IActionResult ForgotPasswordConfirmation()
+    public IActionResult ForgotPasswordConfirmation(string? email)
     {
-        return View(ForgotPasswordConfirmationView);
+        return View(ForgotPasswordConfirmationView, new VerifyPasswordResetCodeViewModel { Email = email ?? string.Empty });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult VerifyPasswordResetCode(VerifyPasswordResetCodeViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(ForgotPasswordConfirmationView, model);
+        }
+
+        var result = passwordResetCodes.Verify(model.Email, model.Code);
+        if (!result.Succeeded)
+        {
+            ModelState.AddModelError(nameof(model.Code), result.ErrorMessage!);
+            return View(ForgotPasswordConfirmationView, model);
+        }
+
+        return RedirectToAction(nameof(ResetPassword), new { email = model.Email, token = result.ResetToken });
     }
 
     // ═══════════════════════════════════════════════════════════════

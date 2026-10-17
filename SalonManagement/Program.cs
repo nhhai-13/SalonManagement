@@ -207,9 +207,13 @@ builder.Services.AddScoped<
 
 builder.Services.AddMemoryCache();
 
+builder.Services.AddSingleton<IEmailSenderSettingsStore, EmailSenderSettingsStore>();
+
 builder.Services.AddScoped<
     IEmailService,
     EmailService>();
+
+builder.Services.AddScoped<PasswordResetCodeService>();
 
 builder.Services.AddScoped<IStaffAccountService, StaffAccountService>();
 
@@ -276,6 +280,7 @@ await using (var scope = app.Services.CreateAsyncScope())
         await EnsureSqliteColumnAsync(dbContext, "Appointments", "CustomerNameOverride", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "Appointments", "NameConflictResolution", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "Appointments", "TechnicalNotes", "TEXT");
+        await EnsureSqliteColumnAsync(dbContext, "AppointmentChangeLogs", "EmailStatus", "TEXT NOT NULL DEFAULT 'NotRequired'");
         await EnsureSqliteColumnAsync(dbContext, "Invoices", "PromotionCode", "TEXT");
         await EnsureSqliteColumnAsync(dbContext, "Customers", "NormalizedSearchName", "TEXT NOT NULL DEFAULT ''");
         await EnsureSqliteColumnAsync(dbContext, "AspNetUsers", "RequestedRole", "TEXT");
@@ -293,6 +298,8 @@ await using (var scope = app.Services.CreateAsyncScope())
         await dbContext.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_ServiceReviews_AppointmentId ON ServiceReviews (AppointmentId)");
         await dbContext.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_ServiceReviews_TokenHash ON ServiceReviews (TokenHash)");
         await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_ServiceReviews_SubmittedAt_ExpiresAt ON ServiceReviews (SubmittedAt, ExpiresAt)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS AppointmentChangeEmails (AppointmentChangeEmailId INTEGER PRIMARY KEY AUTOINCREMENT, AppointmentChangeLogId INTEGER NOT NULL, RecipientEmail TEXT NOT NULL, StylistName TEXT NOT NULL, AppointmentDate DATETIME NOT NULL, StartTime TEXT NOT NULL, Status TEXT NOT NULL, AttemptCount INTEGER NOT NULL DEFAULT 0, NextAttemptAt DATETIME NOT NULL, SentAt DATETIME NULL, LastError TEXT NULL)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_AppointmentChangeEmails_Status_NextAttemptAt ON AppointmentChangeEmails (Status, NextAttemptAt)");
         await dbContext.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS AppointmentEmailNotifications (AppointmentEmailNotificationId INTEGER PRIMARY KEY AUTOINCREMENT, AppointmentId INTEGER NOT NULL, NotificationType TEXT NOT NULL, RecipientEmail TEXT NULL, Status TEXT NOT NULL, AttemptCount INTEGER NOT NULL DEFAULT 0, ScheduledAt DATETIME NOT NULL, NextAttemptAt DATETIME NOT NULL, SentAt DATETIME NULL, CancelledAt DATETIME NULL, LastError TEXT NULL, FOREIGN KEY (AppointmentId) REFERENCES Appointments(AppointmentId) ON DELETE CASCADE)");
         await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_AppointmentEmailNotifications_Status_NextAttemptAt ON AppointmentEmailNotifications (Status, NextAttemptAt)");
         await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_AppointmentEmailNotifications_AppointmentId_NotificationType_Status ON AppointmentEmailNotifications (AppointmentId, NotificationType, Status)");
@@ -444,6 +451,17 @@ static async Task EnsureSqliteColumnAsync(ApplicationDbContext dbContext, string
     await dbContext.Database.OpenConnectionAsync();
     try
     {
+        await using var tableCheck = dbContext.Database.GetDbConnection().CreateCommand();
+        tableCheck.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $table";
+        var tableParameter = tableCheck.CreateParameter();
+        tableParameter.ParameterName = "$table";
+        tableParameter.Value = table;
+        tableCheck.Parameters.Add(tableParameter);
+        if (Convert.ToInt32(await tableCheck.ExecuteScalarAsync()) == 0)
+        {
+            return;
+        }
+
         await using var check = dbContext.Database.GetDbConnection().CreateCommand();
         check.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
         var exists = Convert.ToInt32(await check.ExecuteScalarAsync()) > 0;

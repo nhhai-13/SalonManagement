@@ -154,6 +154,7 @@ public sealed class AppointmentReschedulingServiceTests
         public string? StylistName { get; private set; }
         public Task SendTemporaryPasswordEmailAsync(string toEmail, string temporaryPassword) => Task.CompletedTask;
         public Task SendPasswordResetEmailAsync(string toEmail, string resetLink) => Task.CompletedTask;
+        public Task SendPasswordResetCodeAsync(string toEmail, string resetCode) => Task.CompletedTask;
         public Task SendEmailVerificationCodeAsync(string toEmail, string verificationCode) => Task.CompletedTask;
         public Task SendServiceReviewEmailAsync(string toEmail, string customerName, string reviewLink, DateTime expiresAt) => Task.CompletedTask;
         public Task SendAppointmentNotificationEmailAsync(string toEmail, string customerName, string reference, string services, string stylistName, DateTime appointmentDate, TimeSpan startTime, bool isReminder) => Task.CompletedTask;
