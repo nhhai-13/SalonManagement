@@ -12,12 +12,15 @@ public sealed class CustomerProfileSearchController(CustomerProfileSearchService
     [HttpGet("")]
     public async Task<IActionResult> Index(string? q)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var response = await search.SearchAsync(q);
+        stopwatch.Stop();
         return View(new CustomerProfileSearchPageViewModel
         {
             Query = q?.Trim() ?? string.Empty,
             Results = response.Results,
-            Message = response.Error ?? (q is not null && response.Results.Count == 0 ? "Không tìm thấy hồ sơ phù hợp." : null)
+            Message = response.Error ?? (q is not null && response.Results.Count == 0 ? "Không tìm thấy hồ sơ phù hợp." : null),
+            SearchMilliseconds = string.IsNullOrWhiteSpace(q) ? null : stopwatch.ElapsedMilliseconds
         });
     }
 }

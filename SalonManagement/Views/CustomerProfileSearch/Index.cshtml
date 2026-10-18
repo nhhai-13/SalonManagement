@@ -1,11 +1,78 @@
 @model SalonManagement.Models.CustomerProfileSearchPageViewModel
-@{ ViewData["Title"] = "Hồ sơ khách hàng"; }
-<div class="container py-4" style="max-width:960px">
-    <a class="btn btn-outline-secondary btn-sm mb-3" href="/reception">Quay lại Lễ tân</a>
-    <span class="sl-eyebrow text-uppercase text-muted small fw-semibold">S3-10 · Khách hàng thân thiết</span>
-    <h1 class="h3 mt-1">Hồ sơ khách hàng</h1>
-    <p class="text-muted">Khách đặt lịch bằng cùng số điện thoại được tự động nhận diện trong một hồ sơ. Tìm theo tên (có hoặc không dấu) hoặc 4 số cuối điện thoại.</p>
-    <form class="row g-2 mb-4" method="get"><div class="col-sm-8"><label class="visually-hidden" for="customer-search-query">Từ khóa</label><input id="customer-search-query" name="q" class="form-control" value="@Model.Query" placeholder="Ví dụ: Minh hoặc 5678" autofocus /></div><div class="col-sm-4"><button class="btn btn-primary w-100">Tìm hồ sơ</button></div></form>
-    @if (Model.Message is not null) { <div class="alert @(Model.Results.Count == 0 ? "alert-info" : "alert-warning")">@Model.Message</div> }
-    @if (Model.Results.Count > 0) { <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Họ tên</th><th>Số điện thoại</th><th>Đã đến</th><th>Không đến</th><th></th></tr></thead><tbody>@foreach (var customer in Model.Results) { <tr><td>@customer.FullName</td><td>@customer.Phone</td><td>@customer.VisitCount</td><td>@customer.NoShowCount</td><td><a class="btn btn-outline-primary btn-sm" href="/reception/customers/@customer.CustomerId">Mở hồ sơ</a></td></tr> }</tbody></table></div> }
+@{
+    ViewData["Title"] = "Hồ sơ khách hàng";
+    var meetsTarget = Model.SearchMilliseconds is < 1000;
+}
+
+<style>
+    .crm-search-page { max-width: 1120px; }
+    .crm-search-kicker { color: #7c3aed; font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .crm-search-title { color: #172033; font-size: 1.42rem; font-weight: 800; margin: .28rem 0 .15rem; }
+    .crm-search-subtitle { color: #64748b; font-size: .88rem; }
+    .crm-search-box { align-items: center; background: #fff; border: 2px solid #6d28d9; border-radius: .72rem; display: grid; gap: .75rem; grid-template-columns: 1fr auto; padding: .55rem .75rem; }
+    .crm-search-box label { color: #1f2c42; font-size: .82rem; font-weight: 800; margin: 0; }
+    .crm-search-input { min-width: 280px; }
+    .crm-search-speed { background: #dcfce7; border: 1px solid #22c55e; border-radius: 1.5rem; color: #08763f; font-size: .76rem; font-weight: 800; padding: .52rem .78rem; white-space: nowrap; }
+    .crm-search-speed.slow { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+    .crm-search-card { background: #fff; border: 1px solid #c9d6e6; border-radius: .75rem; overflow: hidden; margin-top: 1rem; }
+    .crm-search-heading { background: #202c40; color: #fff; font-size: .8rem; font-weight: 800; letter-spacing: .025em; padding: .7rem 1rem; }
+    .crm-search-table { font-size: .82rem; margin-bottom: 0; }
+    .crm-search-table th { background: #f1f5f9; color: #52637d; font-size: .72rem; text-transform: uppercase; white-space: nowrap; }
+    .crm-search-table th, .crm-search-table td { border-color: #e3eaf3; padding: .75rem .85rem; vertical-align: middle; }
+    .crm-customer-name { color: #172033; font-weight: 800; }
+    .crm-customer-phone { color: #225dd6; font-weight: 800; }
+    .crm-mini-kpi { border-radius: .4rem; display: inline-block; font-size: .73rem; font-weight: 800; margin-right: .3rem; padding: .25rem .5rem; }
+    .crm-mini-visits { background: #dcfce7; color: #08763f; }
+    .crm-mini-noshow { background: #fee2e2; color: #c21f39; }
+    @@media (max-width: 768px) { .crm-search-box { grid-template-columns: 1fr; } .crm-search-input { min-width: 0; } }
+</style>
+
+<div class="container-fluid crm-search-page py-4">
+    <a class="btn btn-outline-secondary btn-sm mb-3" href="/reception"><i class="bi bi-arrow-left"></i> Quay lại không gian Lễ tân</a>
+    <div class="crm-search-kicker">Lễ tân · Hồ sơ khách hàng &amp; CRM · S3-10</div>
+    <h1 class="crm-search-title">Quản lý hồ sơ khách hàng &amp; tự động gộp theo số điện thoại</h1>
+    <p class="crm-search-subtitle">Nhập tên hoặc số điện thoại để nhận diện khách quen và mở toàn bộ lịch sử đặt Online lẫn tại quầy.</p>
+
+    <form class="crm-search-box" method="get">
+        <div>
+            <label for="customer-search-query"><i class="bi bi-search"></i> Tìm kiếm hồ sơ (Tên hoặc số điện thoại)</label>
+            <input id="customer-search-query" name="q" class="form-control crm-search-input mt-2" value="@Model.Query" placeholder="Ví dụ: 0908 123 456 hoặc Nguyễn Thị Mai" autofocus />
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            @if (Model.SearchMilliseconds.HasValue)
+            {
+                <span class="crm-search-speed @(meetsTarget ? "" : "slow")"><i class="bi @(meetsTarget ? "bi-lightning-charge-fill" : "bi-exclamation-triangle-fill")"></i> Phản hồi: @Model.SearchMilliseconds ms @(meetsTarget ? "· đạt chuẩn < 1 giây" : "· cần kiểm tra tốc độ")</span>
+            }
+            <button class="btn btn-primary fw-semibold" type="submit">Tìm hồ sơ</button>
+        </div>
+    </form>
+
+    @if (Model.Message is not null)
+    {
+        <div class="alert @(Model.Results.Count == 0 ? "alert-info" : "alert-warning") mt-3 mb-0">@Model.Message</div>
+    }
+
+    @if (Model.Results.Count > 0)
+    {
+        <section class="crm-search-card">
+            <div class="crm-search-heading"><i class="bi bi-people"></i> KẾT QUẢ HỒ SƠ KHÁCH HÀNG · TỰ ĐỘNG GỘP THEO SỐ ĐIỆN THOẠI</div>
+            <div class="table-responsive">
+                <table class="table table-hover crm-search-table">
+                    <thead><tr><th>Khách hàng</th><th>Số điện thoại</th><th>Lượt đến</th><th>No-show</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var customer in Model.Results)
+                    {
+                        <tr>
+                            <td><span class="crm-customer-name">@customer.FullName</span><br /><small class="text-muted">Hồ sơ #@customer.CustomerId</small></td>
+                            <td><span class="crm-customer-phone"><i class="bi bi-telephone"></i> @customer.Phone</span></td>
+                            <td><span class="crm-mini-kpi crm-mini-visits">@customer.VisitCount lượt</span></td>
+                            <td><span class="crm-mini-kpi crm-mini-noshow">@customer.NoShowCount lần</span></td>
+                            <td><a class="btn btn-primary btn-sm" href="/reception/customers/@customer.CustomerId">Mở hồ sơ CRM <i class="bi bi-arrow-right"></i></a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
 </div>

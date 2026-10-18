@@ -37,6 +37,8 @@ public sealed class CustomerProfilesController(ApplicationDbContext db, Customer
             Customer = customer,
             VisitCount = summary?.VisitCount ?? 0,
             NoShowCount = summary?.NoShowCount ?? 0,
+            OnlineVisitCount = summary?.OnlineVisitCount ?? 0,
+            CounterVisitCount = summary?.CounterVisitCount ?? 0,
             ShopNotes = summary?.ShopNotes
         });
     }

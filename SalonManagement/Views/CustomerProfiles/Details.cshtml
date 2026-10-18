@@ -1,15 +1,173 @@
 @model SalonManagement.Models.CustomerProfileDetailsViewModel
-@{ ViewData["Title"] = "Hồ sơ khách hàng"; }
-<div class="container py-4" style="max-width:900px">
-    <a class="btn btn-outline-secondary btn-sm mb-3" href="/reception/customer-search">Quay lại danh sách hồ sơ</a>
-    <h1 class="h3">@Model.Customer.FullName</h1>
-    <dl class="row"><dt class="col-sm-3">Số điện thoại</dt><dd class="col-sm-9">@Model.Customer.Phone</dd><dt class="col-sm-3">Email</dt><dd class="col-sm-9">@(Model.Customer.Email ?? "Chưa có")</dd></dl>
-    <div class="row g-3 mb-4"><div class="col-sm-6"><div class="border rounded p-3 bg-light"><div class="text-muted small">Số lần đã đến</div><strong class="fs-3">@Model.VisitCount</strong></div></div><div class="col-sm-6"><div class="border rounded p-3 bg-light"><div class="text-muted small">Số lần không đến</div><strong class="fs-3">@Model.NoShowCount</strong></div></div></div>
-    <section class="mb-4"><h2 class="h5">Ghi chú riêng của tiệm</h2><textarea id="shop-notes" class="form-control" maxlength="500" rows="3" placeholder="Ví dụ: thích thợ Minh, dị ứng thuốc nhuộm">@Model.ShopNotes</textarea><div class="d-flex justify-content-between mt-1"><small class="text-muted">Tối đa 500 ký tự. Chỉ Lễ tân có quyền sửa.</small><button id="save-shop-notes" type="button" class="btn btn-primary btn-sm">Lưu ghi chú</button></div><div id="shop-notes-message" class="small mt-2" role="status"></div></section>
-    <h2 class="h5 mt-4">Lịch hẹn</h2>
-    <div class="table-responsive"><table class="table table-hover"><thead><tr><th>Ngày giờ</th><th>Dịch vụ</th><th>Thợ</th><th>Trạng thái</th></tr></thead><tbody>
-    @foreach (var appointment in Model.Customer.Appointments.OrderByDescending(item => item.AppointmentDate).ThenByDescending(item => item.StartTime))
-    { <tr><td>@appointment.AppointmentDate.ToString("dd/MM/yyyy") @appointment.StartTime.ToString(@"hh\:mm")–@appointment.EndTime.ToString(@"hh\:mm")</td><td>@string.Join(", ", appointment.AppointmentServices.Select(item => item.Service.ServiceName))</td><td>@appointment.Stylist.FullName</td><td>@appointment.Status<br /><small class="text-muted">@(appointment.BookingSource == "Online" ? "Đặt online" : appointment.BookingSource == "Counter" ? "Tại quầy" : "Dữ liệu cũ")</small>@if (appointment.NameConflictResolution is not null) { <br /><small class="@(appointment.NameConflictResolution == "PendingReceptionReview" ? "text-warning fw-semibold" : "text-muted")">@(appointment.NameConflictResolution switch { "KeepProfile" => "Đã chọn giữ tên hồ sơ", "UpdateProfile" => "Đã chọn cập nhật tên hồ sơ", "UseForThisAppointment" => "Chỉ dùng tên mới cho lịch này: " + appointment.CustomerNameOverride, "PendingReceptionReview" => "Tên khác hồ sơ – chờ Lễ tân chọn", _ => appointment.NameConflictResolution })</small> }</td></tr> }
-    </tbody></table></div>
+@{
+    ViewData["Title"] = "Hồ sơ khách hàng";
+
+    string StatusLabel(string status) => status switch
+    {
+        "Pending" or "PendingConfirmation" => "Chờ xác nhận",
+        "Confirmed" => "Đã xác nhận",
+        "Arrived" => "Đã đến",
+        "InProgress" => "Đang phục vụ",
+        "Completed" => "Hoàn thành",
+        "Cancelled" => "Đã hủy",
+        "NoShow" => "No-show (bùng)",
+        "Rejected" => "Đã từ chối",
+        _ => "Chưa xác định"
+    };
+
+    string StatusClass(string status) => status switch
+    {
+        "Completed" => "profile-status-complete",
+        "NoShow" => "profile-status-noshow",
+        "Cancelled" or "Rejected" => "profile-status-cancelled",
+        "InProgress" or "Arrived" => "profile-status-progress",
+        _ => "profile-status-pending"
+    };
+
+    string SourceLabel(string? source) => source switch
+    {
+        "Online" => "Đặt trực tuyến",
+        "Counter" or "CounterWalkIn" => "Tại quầy",
+        _ => "Dữ liệu cũ"
+    };
+
+    string SourceIcon(string? source) => source == "Online" ? "bi-globe2" : "bi-lightning-charge-fill";
+    var appointments = Model.Customer.Appointments
+        .OrderByDescending(item => item.AppointmentDate)
+        .ThenByDescending(item => item.StartTime)
+        .ToList();
+}
+
+<style>
+    .crm-page { max-width: 1320px; }
+    .crm-kicker { color: #7c3aed; font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .crm-title { color: #172033; font-size: 1.38rem; font-weight: 800; margin: .28rem 0 .18rem; }
+    .crm-subtitle { color: #64748b; font-size: .88rem; }
+    .crm-shell { border: 1px solid #c8d6e8; border-radius: .75rem; overflow: hidden; background: #fff; }
+    .crm-shell-heading { background: #202c40; color: #fff; font-size: .8rem; font-weight: 800; letter-spacing: .025em; padding: .7rem 1rem; }
+    .crm-grid { display: grid; grid-template-columns: minmax(320px, .95fr) minmax(440px, 1.35fr); gap: 1.1rem; padding: .9rem; }
+    .crm-panel { border: 1px solid #d8e2ee; border-radius: .7rem; background: #f8fafc; padding: 1rem; }
+    .crm-profile-name { color: #172033; font-size: 1.02rem; font-weight: 800; }
+    .crm-vip { background: #f2e8ff; border-radius: 1rem; color: #7c3aed; display: inline-block; font-size: .72rem; font-weight: 800; margin-right: .45rem; padding: .3rem .58rem; }
+    .crm-contact { color: #44556f; font-size: .84rem; margin: .55rem 0; }
+    .crm-contact strong { color: #225dd6; }
+    .crm-note { background: #fff4cf; border: 1px solid #f59e0b; border-radius: .5rem; color: #92400e; font-size: .8rem; margin-top: .8rem; padding: .7rem; }
+    .crm-note strong { display: block; font-size: .74rem; letter-spacing: .02em; text-transform: uppercase; }
+    .crm-note textarea { background: rgba(255,255,255,.55); border-color: #f5c75a; font-size: .8rem; margin-top: .4rem; }
+    .crm-stat-grid { display: grid; gap: .8rem; grid-template-columns: 1fr 1fr; margin-top: .8rem; }
+    .crm-stat { border-radius: .65rem; padding: .85rem; }
+    .crm-stat strong { display: block; font-size: 1.35rem; line-height: 1.15; }
+    .crm-stat small { font-size: .76rem; }
+    .crm-stat-visits { background: #dcfce7; border: 1px solid #22c55e; color: #08763f; }
+    .crm-stat-noshow { background: #fee2e2; border: 1px solid #fb7185; color: #c21f39; }
+    .crm-history-title { color: #3e4f68; font-size: .8rem; font-weight: 800; letter-spacing: .025em; margin: 0 0 .55rem; }
+    .crm-history { border: 1px solid #d8e2ee; border-radius: .6rem; overflow: hidden; }
+    .crm-history table { font-size: .78rem; margin-bottom: 0; }
+    .crm-history th { background: #f1f5f9; color: #52637d; font-size: .71rem; text-transform: uppercase; white-space: nowrap; }
+    .crm-history th, .crm-history td { border-color: #e3eaf3; padding: .65rem .72rem; vertical-align: middle; }
+    .crm-source-online { color: #2563eb; font-weight: 700; }
+    .crm-source-counter { color: #ea580c; font-weight: 700; }
+    .crm-status { border-radius: .25rem; display: inline-block; font-size: .7rem; font-weight: 800; padding: .23rem .48rem; white-space: nowrap; }
+    .profile-status-complete { background: #d9f8e7; color: #08763f; }
+    .profile-status-noshow, .profile-status-cancelled { background: #fee2e2; color: #c21f39; }
+    .profile-status-progress { background: #dbeafe; color: #2563eb; }
+    .profile-status-pending { background: #fef3c7; color: #a16207; }
+    @@media (max-width: 991px) { .crm-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="container-fluid crm-page py-4">
+    <a class="btn btn-outline-secondary btn-sm mb-3" href="/reception/customer-search"><i class="bi bi-arrow-left"></i> Quay lại danh sách hồ sơ</a>
+    <div class="crm-kicker">Lễ tân · Hồ sơ khách hàng &amp; CRM · S3-10</div>
+    <h1 class="crm-title">Hồ sơ khách hàng gộp theo số điện thoại</h1>
+    <p class="crm-subtitle">Toàn bộ lượt đặt từ Website và tại quầy được tổng hợp trong một hồ sơ duy nhất.</p>
+
+    <section class="crm-shell">
+        <div class="crm-shell-heading"><i class="bi bi-person-vcard"></i> THÔNG TIN HỒ SƠ KHÁCH HÀNG TỔNG HỢP · GỘP THEO SỐ ĐIỆN THOẠI</div>
+        <div class="crm-grid">
+            <aside>
+                <div class="crm-panel">
+                    <div><span class="crm-vip"><i class="bi bi-star-fill"></i> KHÁCH HÀNG</span><span class="crm-profile-name">@Model.Customer.FullName</span></div>
+                    <div class="crm-contact"><i class="bi bi-telephone"></i> <strong>Số điện thoại: @Model.Customer.Phone (Khóa nhận diện)</strong></div>
+                    <div class="crm-contact"><i class="bi bi-envelope"></i> Email: @(Model.Customer.Email ?? "Chưa có email xác nhận")</div>
+                    <div class="crm-contact"><i class="bi bi-calendar3"></i> Ngày tham gia: @Model.Customer.CreatedAt.ToString("dd/MM/yyyy")</div>
+
+                    <div class="crm-note">
+                        <strong><i class="bi bi-journal-text"></i> Ghi chú riêng của tiệm</strong>
+                        <textarea id="shop-notes" class="form-control" maxlength="500" rows="3" placeholder="Ví dụ: dị ứng thuốc nhuộm, thích nước ấm khi gội.">@Model.ShopNotes</textarea>
+                        <div class="d-flex align-items-center justify-content-between mt-2 gap-2">
+                            <small>Tối đa 500 ký tự · Chỉ Lễ tân được sửa.</small>
+                            <button id="save-shop-notes" type="button" class="btn btn-sm btn-warning fw-semibold">Lưu ghi chú</button>
+                        </div>
+                        <div id="shop-notes-message" class="small mt-2" role="status"></div>
+                    </div>
+                </div>
+
+                <div class="crm-stat-grid">
+                    <div class="crm-stat crm-stat-visits">
+                        <small>TỔNG SỐ LẦN ĐẾN (AC2)</small>
+                        <strong>@Model.VisitCount lượt</strong>
+                        <small>• Trực tuyến: @Model.OnlineVisitCount &nbsp;|&nbsp; Tại quầy: @Model.CounterVisitCount</small>
+                    </div>
+                    <div class="crm-stat crm-stat-noshow">
+                        <small>SỐ LẦN NO-SHOW (AC2)</small>
+                        <strong>@Model.NoShowCount lần</strong>
+                        <small>• Tỷ lệ bùng lịch: @(appointments.Count == 0 ? "0,0" : ((decimal)Model.NoShowCount / appointments.Count * 100).ToString("N1"))%</small>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="crm-panel">
+                <h2 class="crm-history-title"><i class="bi bi-clock-history"></i> LỊCH SỬ CÁC LẦN ĐẾN · GỘP THEO SỐ ĐIỆN THOẠI</h2>
+                <div class="crm-history table-responsive">
+                    <table class="table table-hover">
+                        <thead><tr><th>Ngày hẹn</th><th>Nguồn đặt</th><th>Dịch vụ / Thợ</th><th>Trạng thái</th></tr></thead>
+                        <tbody>
+                        @if (!appointments.Any())
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">Chưa có lịch sử đặt lịch.</td></tr>
+                        }
+                        else
+                        {
+                            foreach (var appointment in appointments)
+                            {
+                                var isOnline = appointment.BookingSource == "Online";
+                                <tr>
+                                    <td><strong>@appointment.AppointmentDate.ToString("dd/MM/yyyy")</strong><br /><small class="text-muted">@appointment.StartTime.ToString(@"hh\:mm")</small></td>
+                                    <td><span class="@(isOnline ? "crm-source-online" : "crm-source-counter")"><i class="bi @SourceIcon(appointment.BookingSource)"></i> @SourceLabel(appointment.BookingSource)</span></td>
+                                    <td>@string.Join(", ", appointment.AppointmentServices.Select(item => item.Service.ServiceName))<br /><small class="text-muted">@(appointment.Stylist?.FullName ?? "Chưa phân công")</small></td>
+                                    <td>
+                                        <span class="crm-status @StatusClass(appointment.Status)">@StatusLabel(appointment.Status)</span>
+                                        @if (appointment.NameConflictResolution is not null)
+                                        {
+                                            <small class="d-block mt-1 text-muted">@((appointment.NameConflictResolution == "UseForThisAppointment") ? "Dùng tên riêng cho lịch này" : "Đã xử lý lệch tên hồ sơ")</small>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </section>
 </div>
-@section Scripts {<script>document.getElementById('save-shop-notes').addEventListener('click',async()=>{const button=document.getElementById('save-shop-notes'),message=document.getElementById('shop-notes-message');button.disabled=true;const response=await fetch('/reception/customers/@Model.Customer.CustomerId/shop-notes',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes:document.getElementById('shop-notes').value})});const body=await response.json();message.textContent=body.message||body.error||'Không thể lưu ghi chú.';message.className='small mt-2 '+(response.ok?'text-success':'text-danger');button.disabled=false})</script>}
+
+@section Scripts {
+<script>
+    document.getElementById('save-shop-notes').addEventListener('click', async () => {
+        const button = document.getElementById('save-shop-notes');
+        const message = document.getElementById('shop-notes-message');
+        button.disabled = true;
+        const response = await fetch('/reception/customers/@Model.Customer.CustomerId/shop-notes', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: document.getElementById('shop-notes').value })
+        });
+        const body = await response.json().catch(() => ({}));
+        message.textContent = body.message || body.error || 'Không thể lưu ghi chú.';
+        message.className = 'small mt-2 ' + (response.ok ? 'text-success' : 'text-danger');
+        button.disabled = false;
+    });
+</script>
+}

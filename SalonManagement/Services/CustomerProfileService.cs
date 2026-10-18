@@ -7,7 +7,12 @@ using System.Text;
 namespace SalonManagement.Services;
 
 public sealed record CustomerConsolidationResult(int ConsolidatedProfiles, int ReassignedAppointments, int SkippedWithoutValidPhone);
-public sealed record CustomerProfileSummary(int VisitCount, int NoShowCount, string? ShopNotes);
+public sealed record CustomerProfileSummary(
+    int VisitCount,
+    int NoShowCount,
+    int OnlineVisitCount,
+    int CounterVisitCount,
+    string? ShopNotes);
 
 public sealed class CustomerProfileService(ApplicationDbContext db)
 {
@@ -79,11 +84,18 @@ public sealed class CustomerProfileService(ApplicationDbContext db)
             .Select(group => new
             {
                 Visits = group.Count(item => item.Status == "Arrived" || item.Status == "InProgress" || item.Status == "Completed"),
-                NoShows = group.Count(item => item.Status == "NoShow")
+                NoShows = group.Count(item => item.Status == "NoShow"),
+                OnlineVisits = group.Count(item => (item.Status == "Arrived" || item.Status == "InProgress" || item.Status == "Completed") && item.BookingSource == "Online"),
+                CounterVisits = group.Count(item => (item.Status == "Arrived" || item.Status == "InProgress" || item.Status == "Completed") && (item.BookingSource == "Counter" || item.BookingSource == "CounterWalkIn"))
             })
             .SingleOrDefaultAsync();
 
-        return new CustomerProfileSummary(counts?.Visits ?? 0, counts?.NoShows ?? 0, customer.Notes);
+        return new CustomerProfileSummary(
+            counts?.Visits ?? 0,
+            counts?.NoShows ?? 0,
+            counts?.OnlineVisits ?? 0,
+            counts?.CounterVisits ?? 0,
+            customer.Notes);
     }
 
     public async Task SaveShopNotesAsync(int customerId, string? notes)
