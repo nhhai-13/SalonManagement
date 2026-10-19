@@ -39,11 +39,14 @@ window.BusinessHoursPage = (() => {
         async initialize() {
             const page = document.getElementById("hours-page");
             const result = document.getElementById("hours-result");
+            const saveButton = document.querySelector('#hours-form [type="submit"]');
+            saveButton.disabled = true;
             try {
                 const response = await SalonAuth.authenticatedFetch("/api/business-hours");
                 if (!response.ok) return SalonAuth.redirectToLogin();
                 list().innerHTML = (await response.json()).map(row).join("");
                 page.classList.remove("d-none");
+                saveButton.disabled = false;
             } catch {
                 page.classList.remove("d-none");
                 result.className = "alert alert-danger sl-alert";
