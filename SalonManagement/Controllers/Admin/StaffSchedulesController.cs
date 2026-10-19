@@ -3,17 +3,18 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
+using SalonManagement.Services;
 
 namespace SalonManagement.Controllers;
 
 [Authorize(Roles = UserRoles.Owner)]
 [Route("management/staff-schedules")]
-public sealed class StaffSchedulesController(ApplicationDbContext db) : Controller
+public sealed class StaffSchedulesController(ApplicationDbContext db, TimeProvider timeProvider) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(DateTime? weekStart)
     {
-        var start = StartOfWeek(weekStart ?? DateTime.Today);
+        var start = StartOfWeek(weekStart ?? SalonClock.GetLocalNow(timeProvider).Date);
         var staff = await (
             from user in db.Users.AsNoTracking()
             join userRole in db.UserRoles on user.Id equals userRole.UserId
