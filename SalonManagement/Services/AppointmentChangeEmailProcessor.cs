@@ -35,7 +35,7 @@ public sealed class AppointmentChangeEmailProcessor(ApplicationDbContext db, IEm
                 else
                 {
                     message.Status = "Retrying";
-                    message.NextAttemptAt = SalonClock.GetLocalNow(timeProvider).AddMinutes(message.AttemptCount);
+                    message.NextAttemptAt = SalonClock.GetLocalNow(timeProvider).AddMinutes(10);
                     await UpdateHistoryStatusAsync(message.AppointmentChangeLogId, "Retrying", cancellationToken);
                 }
                 await db.SaveChangesAsync(cancellationToken);

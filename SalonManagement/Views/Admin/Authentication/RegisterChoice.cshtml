@@ -1,0 +1,41 @@
+@{
+    ViewData["Title"] = "Đăng ký";
+    Layout = "_AuthLayout";
+}
+
+<div class="sl-auth-page" id="register-choice">
+    <div class="sl-auth-showcase">
+        <a class="brand" asp-controller="Home" asp-action="Index" aria-label="Về trang chủ">
+            <span><strong>Luminol</strong> <small>Salon &amp; Spa</small></span>
+        </a>
+        <div class="showcase-copy">
+            <span class="sl-eyebrow">Cổng vận hành salon</span>
+            <h1>Bắt đầu<br />cùng Luminol.</h1>
+            <p>Chọn đúng vị trí công việc để gửi yêu cầu tạo tài khoản đến salon.</p>
+        </div>
+        <div class="showcase-footer"><span>Xác minh email</span><span class="divider" aria-hidden="true"> | </span><span>Cấp quyền an toàn</span></div>
+    </div>
+
+    <div class="sl-auth-panel">
+        <div class="sl-auth-card">
+            <div class="sl-auth-heading">
+                <span class="sl-eyebrow">Tạo tài khoản</span>
+                <h2>Bạn đăng ký vị trí nào?</h2>
+                <p>Chọn một vị trí. Sau khi xác minh email, Admin hoặc Chủ tiệm sẽ xét duyệt và cấp đúng quyền truy cập.</p>
+            </div>
+            <div class="sl-register-choice-list">
+                <a class="sl-register-choice" href="/reception/register">
+                    <i class="bi bi-headset" aria-hidden="true"></i>
+                    <span><strong>Lễ tân</strong><small>Đón tiếp khách và quản lý lịch hẹn.</small></span>
+                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                </a>
+                <a class="sl-register-choice" href="/stylist/register">
+                    <i class="bi bi-scissors" aria-hidden="true"></i>
+                    <span><strong>Thợ</strong><small>Quản lý lịch làm việc và phục vụ khách.</small></span>
+                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                </a>
+            </div>
+            <p class="text-center text-muted small mt-4 mb-0">Đã có tài khoản? <a href="/admin/login" class="text-decoration-none fw-semibold">Đăng nhập</a></p>
+        </div>
+    </div>
+</div>

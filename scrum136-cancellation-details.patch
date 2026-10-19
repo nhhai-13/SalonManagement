@@ -1,0 +1,185 @@
+From cf6f951134e23c7d6db215baca37f705b918073f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Nguy=E1=BB=85n=20H=E1=BB=AFu=20H=E1=BA=A3i?=
+ <nguyenhuuhaib750@gmail.com>
+Date: Sun, 11 Oct 2026 22:34:57 +0700
+Subject: [PATCH] feat: record appointment cancellation details
+
+---
+ .../AppointmentCancellationServiceTests.cs    | 21 +++++++++++++++-
+ .../Booking/AppointmentLookupController.cs    |  2 +-
+ ...10000_AddAppointmentCancellationDetails.cs | 24 +++++++++++++++++++
+ .../ApplicationDbContextModelSnapshot.cs      |  6 +++++
+ .../Models/Appointments/Appointment.cs        |  4 ++++
+ .../AppointmentCancellationService.cs         |  5 +++-
+ .../Services/AppointmentLookupService.cs      |  4 ++--
+ .../Views/AppointmentLookup/Index.cshtml      |  1 +
+ 8 files changed, 62 insertions(+), 5 deletions(-)
+ create mode 100644 SalonManagement/Data/Migrations/20261011210000_AddAppointmentCancellationDetails.cs
+
+diff --git a/SalonManagement.Tests/AppointmentCancellationServiceTests.cs b/SalonManagement.Tests/AppointmentCancellationServiceTests.cs
+index 12f5817..f0ae36e 100644
+--- a/SalonManagement.Tests/AppointmentCancellationServiceTests.cs
++++ b/SalonManagement.Tests/AppointmentCancellationServiceTests.cs
+@@ -20,7 +20,10 @@ public sealed class AppointmentCancellationServiceTests
+         var result = await new AppointmentCancellationService(db, new FakeTimeProvider(now)).CancelAsync("cancel01");
+ 
+         Assert.IsTrue(result.Succeeded);
+-        Assert.AreEqual("Cancelled", (await db.Appointments.SingleAsync()).Status);
++        var cancelled = await db.Appointments.SingleAsync();
++        Assert.AreEqual("Cancelled", cancelled.Status);
++        Assert.AreEqual("Khách hàng", cancelled.CancelledBy);
++        Assert.IsNotNull(cancelled.CancelledAt);
+     }
+ 
+     [TestMethod]
+@@ -37,6 +40,22 @@ public sealed class AppointmentCancellationServiceTests
+         Assert.AreEqual("Confirmed", (await db.Appointments.SingleAsync()).Status);
+     }
+ 
++    [TestMethod]
++    public async Task Cancel_twice_is_rejected_without_overwriting_cancellation_details()
++    {
++        await using var db = CreateDb();
++        var now = new DateTimeOffset(2031, 2, 3, 8, 0, 0, TimeSpan.FromHours(7));
++        await SeedAsync(db, now.LocalDateTime.AddMinutes(121), "CANCEL03");
++        var service = new AppointmentCancellationService(db, new FakeTimeProvider(now));
++        Assert.IsTrue((await service.CancelAsync("CANCEL03")).Succeeded);
++        var firstCancelledAt = (await db.Appointments.SingleAsync()).CancelledAt;
++
++        var repeat = await service.CancelAsync("CANCEL03");
++
++        Assert.AreEqual("already_cancelled", repeat.ErrorCode);
++        Assert.AreEqual(firstCancelledAt, (await db.Appointments.SingleAsync()).CancelledAt);
++    }
++
+     private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
+     private static async Task SeedAsync(ApplicationDbContext db, DateTime date, string reference)
+     {
+diff --git a/SalonManagement/Controllers/Booking/AppointmentLookupController.cs b/SalonManagement/Controllers/Booking/AppointmentLookupController.cs
+index bf064d1..369ad81 100644
+--- a/SalonManagement/Controllers/Booking/AppointmentLookupController.cs
++++ b/SalonManagement/Controllers/Booking/AppointmentLookupController.cs
+@@ -29,7 +29,7 @@ public sealed class AppointmentLookupController(ApplicationDbContext db, TimePro
+                 return StatusCode(StatusCodes.Status429TooManyRequests, new { error = $"Bạn tạm thời bị chặn tra cứu. Vui lòng thử lại sau {block.RetryAt!.Value.LocalDateTime:HH:mm}." });
+             }
+         }
+-        return Ok(new { error = result.Error, appointments = result.Items.Select(item => new { item.Reference, date = item.Date.ToString("dd/MM/yyyy"), startTime = item.StartTime.ToString(@"hh\:mm"), endTime = item.EndTime.ToString(@"hh\:mm"), item.Services, item.StylistName, item.DurationMinutes, item.Status }) });
++        return Ok(new { error = result.Error, appointments = result.Items.Select(item => new { item.Reference, date = item.Date.ToString("dd/MM/yyyy"), startTime = item.StartTime.ToString(@"hh\:mm"), endTime = item.EndTime.ToString(@"hh\:mm"), item.Services, item.StylistName, item.DurationMinutes, item.Status, cancelledAt = item.CancelledAt?.ToString("dd/MM/yyyy HH:mm"), item.CancelledBy }) });
+     }
+ 
+     [HttpPost("cancel")]
+diff --git a/SalonManagement/Data/Migrations/20261011210000_AddAppointmentCancellationDetails.cs b/SalonManagement/Data/Migrations/20261011210000_AddAppointmentCancellationDetails.cs
+new file mode 100644
+index 0000000..850ec8c
+--- /dev/null
++++ b/SalonManagement/Data/Migrations/20261011210000_AddAppointmentCancellationDetails.cs
+@@ -0,0 +1,24 @@
++using System;
++using Microsoft.EntityFrameworkCore.Infrastructure;
++using Microsoft.EntityFrameworkCore.Migrations;
++
++#nullable disable
++
++namespace SalonManagement.Data.Migrations;
++
++[DbContext(typeof(ApplicationDbContext))]
++[Migration("20261011210000_AddAppointmentCancellationDetails")]
++public partial class AddAppointmentCancellationDetails : Migration
++{
++    protected override void Up(MigrationBuilder migrationBuilder)
++    {
++        migrationBuilder.AddColumn<DateTime>(name: "CancelledAt", table: "Appointments", type: "datetime2", nullable: true);
++        migrationBuilder.AddColumn<string>(name: "CancelledBy", table: "Appointments", type: "nvarchar(max)", nullable: true);
++    }
++
++    protected override void Down(MigrationBuilder migrationBuilder)
++    {
++        migrationBuilder.DropColumn(name: "CancelledAt", table: "Appointments");
++        migrationBuilder.DropColumn(name: "CancelledBy", table: "Appointments");
++    }
++}
+diff --git a/SalonManagement/Data/Migrations/ApplicationDbContextModelSnapshot.cs b/SalonManagement/Data/Migrations/ApplicationDbContextModelSnapshot.cs
+index 55d728f..35b9de9 100644
+--- a/SalonManagement/Data/Migrations/ApplicationDbContextModelSnapshot.cs
++++ b/SalonManagement/Data/Migrations/ApplicationDbContextModelSnapshot.cs
+@@ -268,6 +268,12 @@ namespace SalonManagement.Data.Migrations
+                         .HasMaxLength(8)
+                         .HasColumnType("nvarchar(8)");
+ 
++                    b.Property<DateTime?>("CancelledAt")
++                        .HasColumnType("datetime2");
++
++                    b.Property<string>("CancelledBy")
++                        .HasColumnType("nvarchar(max)");
++
+                     b.Property<DateTime?>("ConfirmedAt")
+                         .HasColumnType("datetime2");
+ 
+diff --git a/SalonManagement/Models/Appointments/Appointment.cs b/SalonManagement/Models/Appointments/Appointment.cs
+index dcc28fe..733a39b 100644
+--- a/SalonManagement/Models/Appointments/Appointment.cs
++++ b/SalonManagement/Models/Appointments/Appointment.cs
+@@ -34,6 +34,10 @@
+ 
+         public DateTime? RejectedAt { get; set; }
+ 
++        public DateTime? CancelledAt { get; set; }
++
++        public string? CancelledBy { get; set; }
++
+         public Customer Customer { get; set; } = null!;
+ 
+         public Stylist Stylist { get; set; } = null!;
+diff --git a/SalonManagement/Services/AppointmentCancellationService.cs b/SalonManagement/Services/AppointmentCancellationService.cs
+index d7a52c9..11def46 100644
+--- a/SalonManagement/Services/AppointmentCancellationService.cs
++++ b/SalonManagement/Services/AppointmentCancellationService.cs
+@@ -26,7 +26,10 @@ public sealed class AppointmentCancellationService(ApplicationDbContext db, Time
+             return AppointmentCancellationResult.Rejected("too_late", "Lịch hẹn còn dưới 120 phút. Vui lòng gọi điện cho tiệm để được hỗ trợ.");
+ 
+         appointment.Status = "Cancelled";
+-        appointment.UpdatedAt = SalonClock.GetLocalNow(timeProvider);
++        var cancelledAt = SalonClock.GetLocalNow(timeProvider);
++        appointment.CancelledAt = cancelledAt;
++        appointment.CancelledBy = "Khách hàng";
++        appointment.UpdatedAt = cancelledAt;
+         await db.SaveChangesAsync();
+         return AppointmentCancellationResult.Success();
+     }
+diff --git a/SalonManagement/Services/AppointmentLookupService.cs b/SalonManagement/Services/AppointmentLookupService.cs
+index 58b2472..51f9d4d 100644
+--- a/SalonManagement/Services/AppointmentLookupService.cs
++++ b/SalonManagement/Services/AppointmentLookupService.cs
+@@ -4,7 +4,7 @@ using SalonManagement.Models;
+ 
+ namespace SalonManagement.Services;
+ 
+-public sealed record AppointmentLookupItem(string Reference, DateTime Date, TimeSpan StartTime, TimeSpan EndTime, IReadOnlyList<string> Services, string StylistName, int DurationMinutes, string Status);
++public sealed record AppointmentLookupItem(string Reference, DateTime Date, TimeSpan StartTime, TimeSpan EndTime, IReadOnlyList<string> Services, string StylistName, int DurationMinutes, string Status, DateTime? CancelledAt, string? CancelledBy);
+ public sealed record AppointmentLookupResult(IReadOnlyList<AppointmentLookupItem> Items, string? Error);
+ 
+ public sealed class AppointmentLookupService(ApplicationDbContext db)
+@@ -33,7 +33,7 @@ public sealed class AppointmentLookupService(ApplicationDbContext db)
+     private static AppointmentLookupItem ToItem(Appointment appointment)
+     {
+         var duration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
+-        return new(appointment.BookingReference, appointment.AppointmentDate, appointment.StartTime, appointment.EndTime, appointment.AppointmentServices.Select(item => item.Service.ServiceName).ToList(), appointment.Stylist?.FullName ?? "Chưa phân công", duration, StatusLabel(appointment.Status));
++        return new(appointment.BookingReference, appointment.AppointmentDate, appointment.StartTime, appointment.EndTime, appointment.AppointmentServices.Select(item => item.Service.ServiceName).ToList(), appointment.Stylist?.FullName ?? "Chưa phân công", duration, StatusLabel(appointment.Status), appointment.CancelledAt, appointment.CancelledBy);
+     }
+     private static string StatusLabel(string status) => status switch { "Pending" => "Chờ xác nhận", "Confirmed" => "Đã xác nhận", "InProgress" => "Đang thực hiện", "Completed" => "Đã hoàn thành", "Cancelled" => "Đã huỷ", "NoShow" => "Không đến", _ => status };
+ }
+diff --git a/SalonManagement/Views/AppointmentLookup/Index.cshtml b/SalonManagement/Views/AppointmentLookup/Index.cshtml
+index 0e7f332..32420d9 100644
+--- a/SalonManagement/Views/AppointmentLookup/Index.cshtml
++++ b/SalonManagement/Views/AppointmentLookup/Index.cshtml
+@@ -58,6 +58,7 @@
+                     addText(body, 'div', (appointment.services || []).join(', '), 'mt-2');
+                     addText(body, 'div', `Thợ: ${appointment.stylistName}`);
+                     addText(body, 'div', `${appointment.date} · ${appointment.startTime}–${appointment.endTime} · ${appointment.durationMinutes} phút`);
++                    if (appointment.status === 'Đã huỷ') addText(body, 'div', `Đã huỷ lúc ${appointment.cancelledAt || 'không rõ'} bởi ${appointment.cancelledBy || 'Khách hàng'}`, 'text-muted mt-2');
+                     if (appointment.status !== 'Đã huỷ') {
+                         const cancel = document.createElement('button');
+                         cancel.type = 'button'; cancel.className = 'btn btn-outline-danger btn-sm mt-3'; cancel.textContent = 'Huỷ lịch';
+-- 
+2.55.0.windows.4
+
