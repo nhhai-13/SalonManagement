@@ -39,11 +39,28 @@ namespace SalonManagement.Models
 
         public string? DiscountTypeSnapshot { get; set; }
 
+        [NotMapped]
+        public string? AppliedDiscountType
+        {
+            get => DiscountTypeSnapshot;
+            set => DiscountTypeSnapshot = value;
+        }
+
         public decimal? DiscountValueSnapshot { get; set; }
+
+        [NotMapped]
+        public decimal? AppliedDiscountValue
+        {
+            get => DiscountValueSnapshot;
+            set => DiscountValueSnapshot = value;
+        }
 
         public DiscountCoupon? DiscountCoupon { get; set; }
 
         public decimal TotalAmount { get; set; }
+
+        /// <summary>Snapshot of the promotion code used at checkout; null when no discount was used.</summary>
+        public string? PromotionCode { get; set; }
 
         [NotMapped]
         public decimal FinalAmount

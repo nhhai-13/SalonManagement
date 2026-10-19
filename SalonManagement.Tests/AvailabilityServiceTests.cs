@@ -91,6 +91,34 @@ public sealed class AvailabilityServiceTests
     }
 
     [Fact]
+    public async Task GetSlots_ExcludesFullDayStylistTimeOff()
+    {
+        await using var db = CreateDb(); var date = new DateTime(2026, 10, 6);
+        var service = new Service { ServiceName = "Cắt", DurationMinutes = 30, Price = 1 }; db.Services.Add(service); await db.SaveChangesAsync();
+        var stylist = new Stylist { FullName = "A", Phone = "0900000001", Services = [new StylistService { ServiceId = service.ServiceId }] }; db.Stylists.Add(stylist); await db.SaveChangesAsync();
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(10) });
+        db.StylistTimeOffs.Add(new StylistTimeOff { StylistId = stylist.StylistId, OffDate = DateOnly.FromDateTime(date), IsFullDay = true, Reason = "Nghỉ phép" }); await db.SaveChangesAsync();
+
+        Assert.Empty((await Service(db).GetSlotsAsync(date, [service.ServiceId])).Slots);
+    }
+
+    [Fact]
+    public async Task GetSlots_ExcludesPartialStylistTimeOffButAllowsAdjacentSlots()
+    {
+        await using var db = CreateDb(); var date = new DateTime(2026, 10, 6);
+        var service = new Service { ServiceName = "Cắt", DurationMinutes = 60, Price = 1 }; db.Services.Add(service); await db.SaveChangesAsync();
+        var stylist = new Stylist { FullName = "A", Phone = "0900000001", Services = [new StylistService { ServiceId = service.ServiceId }] }; db.Stylists.Add(stylist); await db.SaveChangesAsync();
+        db.WorkSchedules.Add(new WorkSchedule { StylistId = stylist.StylistId, WorkDate = date, StartTime = TimeSpan.FromHours(8), EndTime = TimeSpan.FromHours(12) });
+        db.StylistTimeOffs.Add(new StylistTimeOff { StylistId = stylist.StylistId, OffDate = DateOnly.FromDateTime(date), IsFullDay = false, StartTime = new TimeOnly(9, 0), EndTime = new TimeOnly(10, 0), Reason = "Việc riêng" }); await db.SaveChangesAsync();
+
+        var slots = (await Service(db).GetSlotsAsync(date, [service.ServiceId])).Slots;
+
+        Assert.Contains(TimeSpan.FromHours(8), slots);
+        Assert.DoesNotContain(TimeSpan.FromHours(8.25), slots);
+        Assert.Contains(TimeSpan.FromHours(10), slots);
+    }
+
+    [Fact]
     public async Task GetSlots_ReturnsNoneWhenSalonIsOnHoliday()
     {
         await using var db = CreateDb(); var date = new DateTime(2026, 10, 6);

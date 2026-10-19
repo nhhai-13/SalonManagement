@@ -1,0 +1,119 @@
+@using SalonManagement.Models
+@{
+    ViewData["Title"] = "Đặt lịch tại quầy";
+    var services = (IReadOnlyList<Service>)ViewBag.Services;
+    var stylists = (IReadOnlyList<Stylist>)ViewBag.Stylists;
+    var embedded = ViewData["Embed"] is true;
+    if (embedded) { Layout = null; }
+}
+@if (embedded)
+{
+    <head><meta name="viewport" content="width=device-width, initial-scale=1" /><link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" /><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" /><link rel="stylesheet" href="~/css/salon-design.css" asp-append-version="true" /><link rel="stylesheet" href="~/css/site.css" asp-append-version="true" /></head>
+}
+<div class="container py-4 counter-appointment-page">
+    <header class="counter-page-heading">
+        <div>
+            <span class="counter-role-badge">LỄ TÂN</span>
+            <h1>Đặt lịch tại quầy &amp; Nhận khách vãng lai</h1>
+            <p>Tìm khách hàng theo số điện thoại, hệ thống tự động điền thông tin và hỗ trợ tạo lịch hẹn nhanh.</p>
+        </div>
+        @if (!embedded) { <a class="btn counter-back-button" href="/reception"><i class="bi bi-arrow-left"></i> Quay lại</a> }
+    </header>
+    <div id="message" class="alert d-none counter-message"></div>
+    <div id="customer-history" class="visually-hidden" aria-live="polite"></div>
+    <section id="name-conflict" class="card border-warning mb-3 d-none" aria-live="polite"><div class="card-body"><h2 class="h6 text-warning-emphasis">Tên khác với hồ sơ khách</h2><p class="mb-2">Hồ sơ: <strong id="profile-name"></strong><br />Tên vừa nhập: <strong id="entered-name"></strong></p><div class="d-flex flex-wrap gap-2"><button type="button" class="btn btn-outline-secondary btn-sm" data-name-resolution="KeepProfile">Giữ tên hồ sơ</button><button type="button" class="btn btn-primary btn-sm" data-name-resolution="UpdateProfile">Cập nhật hồ sơ</button><button type="button" class="btn btn-outline-primary btn-sm" data-name-resolution="UseForThisAppointment">Chỉ dùng lịch này</button></div></div></section>
+    <form id="counter-form" class="counter-booking-card">
+        <section class="counter-phone-section position-relative">
+            <label class="form-label" for="phone">Số điện thoại / Tìm khách hàng <span>(*)</span></label>
+            <div class="counter-phone-input">
+                <i class="bi bi-phone"></i>
+                <input id="phone" autocomplete="off" inputmode="tel" placeholder="Nhập số điện thoại khách" required />
+                <span id="customer-chip" class="counter-customer-chip d-none"><i class="bi bi-check-lg"></i> <span id="customer-chip-text"></span></span>
+            </div>
+            <div id="customer-summary" class="counter-customer-summary d-none"></div>
+            <div id="customer-suggestions" class="list-group position-absolute start-0 end-0 d-none"></div>
+        </section>
+
+        <div class="counter-booking-grid">
+            <section>
+                <label class="form-label" for="name">Tên khách hàng <span>(*)</span></label>
+                <input id="name" class="form-control" placeholder="Nhập họ và tên" required />
+            </section>
+            <section>
+                <label class="form-label" for="email">Email nhận xác nhận</label>
+                <input id="email" type="email" class="form-control" placeholder="email@example.com" />
+            </section>
+            <section>
+                <label class="form-label">Dịch vụ đã chọn <span>(*)</span></label>
+                <select id="services" class="visually-hidden" multiple aria-label="Dịch vụ đã chọn">@foreach (var service in services) { <option value="@service.ServiceId" data-price="@service.Price">@service.ServiceName · @service.Price.ToString("N0") đ</option> }</select>
+                <div class="counter-service-list" id="counter-service-list">
+                    @foreach (var service in services)
+                    {
+                        <label class="counter-service-option" data-service-id="@service.ServiceId">
+                            <input type="checkbox" class="counter-service-check" value="@service.ServiceId" data-price="@service.Price" />
+                            <span class="counter-service-name">@service.ServiceName</span>
+                            <strong>@service.Price.ToString("N0") đ</strong>
+                        </label>
+                    }
+                </div>
+                <p id="service-summary" class="counter-service-summary"><i class="bi bi-receipt"></i> Chưa chọn dịch vụ</p>
+            </section>
+            <section>
+                <label class="form-label" for="stylist">Thợ phụ trách <span>(*)</span></label>
+                <select id="stylist" class="form-select" required><option value="">Chọn thợ phù hợp</option>@foreach (var stylist in stylists) { <option value="@stylist.StylistId">@stylist.FullName</option> }</select>
+                <div class="counter-stylist-status" id="stylist-status"><strong><i class="bi bi-info-circle"></i> Trạng thái thợ hôm nay</strong><span>Chọn thợ để kiểm tra lịch phục vụ.</span></div>
+            </section>
+            <section>
+                <label class="form-label" for="date">Ngày hẹn <span>(*)</span></label>
+                <div class="counter-date-input"><i class="bi bi-calendar3"></i><input id="date" type="date" value="@DateTime.Today.ToString("yyyy-MM-dd")" required /></div>
+            </section>
+            <section>
+                <label class="form-label" for="time">Giờ bắt đầu <span>(*)</span></label>
+                <div class="counter-date-input"><i class="bi bi-clock"></i><input id="time" type="time" step="900" required /></div>
+            </section>
+        </div>
+
+        <section class="counter-instant-section">
+            <input id="instant-start" type="checkbox" />
+            <label for="instant-start"><strong><i class="bi bi-lightning-charge-fill"></i> Khách vãng lai làm ngay tại quầy (Xác nhận tức thì)</strong><span>Tạo lịch đã xác nhận từ nguồn tại quầy, bỏ qua điều kiện đặt trước 60 phút.</span></label>
+        </section>
+        <footer class="counter-form-actions"><button class="btn counter-reset-button" type="reset"><i class="bi bi-arrow-counterclockwise"></i> Nhập lại</button><button class="btn counter-submit-button" type="submit"><i class="bi bi-lightning-charge-fill"></i> TẠO LỊCH HẸN NGAY <kbd>F2</kbd></button></footer>
+    </form>
+</div>
+<script src="~/js/auth.js" asp-append-version="true"></script>
+<script>
+    const phoneEl = document.getElementById('phone'), nameEl = document.getElementById('name'), emailEl = document.getElementById('email'), servicesEl = document.getElementById('services'), stylistEl = document.getElementById('stylist'), historyEl = document.getElementById('customer-history'), conflictEl = document.getElementById('name-conflict'), messageEl = document.getElementById('message'), suggestionsEl = document.getElementById('customer-suggestions');
+    const customerChip = document.getElementById('customer-chip'), customerChipText = document.getElementById('customer-chip-text'), customerSummary = document.getElementById('customer-summary'), serviceSummary = document.getElementById('service-summary'), stylistStatus = document.getElementById('stylist-status');
+    const embedded = @embedded.ToString().ToLowerInvariant();
+    let lookupTimer;
+    if (!document.getElementById('time').value) document.getElementById('time').value = new Date().toTimeString().slice(0, 5);
+    const fetchWithSession = (url, options) => SalonAuth.authenticatedFetch(url, options);
+    const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+    async function loadCustomer() {
+        const response = await fetchWithSession(`/reception/counter-appointments/customer?phone=${encodeURIComponent(phoneEl.value)}`);
+        const customer = await response.json().catch(() => ({}));
+        if (!response.ok || !customer.found) { historyEl.classList.add('d-none'); customerChip.classList.add('d-none'); customerSummary.classList.add('d-none'); return; }
+        nameEl.value = customer.fullName; emailEl.value = customer.email || '';
+        customerChipText.textContent = `Khách cũ: ${customer.fullName}${customer.visitCount ? ` · ${customer.visitCount} lần đến` : ''}`;
+        customerChip.classList.remove('d-none');
+        customerSummary.textContent = `Hồ sơ đã được điền tự động${customer.noShowCount ? ` · Lưu ý: ${customer.noShowCount} lần không đến` : ''}${customer.shopNotes ? ` · ${customer.shopNotes}` : ''}`;
+        customerSummary.classList.remove('d-none');
+        historyEl.textContent = customerSummary.textContent;
+    }
+    phoneEl.addEventListener('input', () => { clearTimeout(lookupTimer); const value = phoneEl.value.trim(); suggestionsEl.classList.add('d-none'); if (value.length < 2) return; lookupTimer = setTimeout(async () => { const response = await fetchWithSession(`/reception/counter-appointments/customers?query=${encodeURIComponent(value)}`); const rows = await response.json().catch(() => []); if (!response.ok || !rows.length) return; suggestionsEl.innerHTML = rows.map(row => `<button type="button" class="list-group-item list-group-item-action" data-customer-phone="${escapeHtml(row.phone)}"><strong>${escapeHtml(row.fullName)}</strong> <small class="text-muted">${escapeHtml(row.phone)}</small><br><small>Đã đến ${row.visitCount} lần · Không đến ${row.noShowCount} lần</small></button>`).join(''); suggestionsEl.classList.remove('d-none'); suggestionsEl.querySelectorAll('[data-customer-phone]').forEach(button => button.addEventListener('click', async () => { phoneEl.value = button.dataset.customerPhone; suggestionsEl.classList.add('d-none'); await loadCustomer(); })); }, 220); });
+    phoneEl.addEventListener('change', loadCustomer);
+    function updateServices() {
+        const checked = [...document.querySelectorAll('.counter-service-check:checked')];
+        [...servicesEl.options].forEach(option => option.selected = checked.some(item => item.value === option.value));
+        document.querySelectorAll('.counter-service-option').forEach(item => item.classList.toggle('is-selected', item.querySelector('input').checked));
+        const total = checked.reduce((sum, item) => sum + Number(item.dataset.price || 0), 0);
+        serviceSummary.innerHTML = checked.length ? `<i class="bi bi-receipt"></i> Tổng tiền dịch vụ chọn: <strong>${total.toLocaleString('vi-VN')} đ</strong> <span>(${checked.length} dịch vụ)</span>` : '<i class="bi bi-receipt"></i> Chưa chọn dịch vụ';
+    }
+    document.querySelectorAll('.counter-service-check').forEach(item => item.addEventListener('change', updateServices));
+    stylistEl.addEventListener('change', () => { const option = stylistEl.selectedOptions[0]; stylistStatus.innerHTML = option?.value ? `<strong><i class="bi bi-person-check"></i> Trạng thái thợ hôm nay</strong><span><b>${escapeHtml(option.textContent)}</b> đã được chọn. Hệ thống sẽ kiểm tra lịch trống trước khi tạo hẹn.</span>` : '<strong><i class="bi bi-info-circle"></i> Trạng thái thợ hôm nay</strong><span>Chọn thợ để kiểm tra lịch phục vụ.</span>'; });
+    async function createAppointment(nameConflictResolution = null) { const body = { fullName: nameEl.value, phone: phoneEl.value, email: emailEl.value || null, serviceIds: [...servicesEl.selectedOptions].map(option => +option.value), stylistId: +stylistEl.value, date: document.getElementById('date').value, startTime: `${document.getElementById('time').value}:00`, nameConflictResolution, instantStart: document.getElementById('instant-start').checked }; const response = await fetchWithSession('/reception/counter-appointments/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const result = await response.json().catch(() => ({})); if (response.status === 409 && result.code === 'name_conflict') { document.getElementById('profile-name').textContent = result.profileName; document.getElementById('entered-name').textContent = result.enteredName; conflictEl.classList.remove('d-none'); return; } messageEl.textContent = result.error || result.message; messageEl.className = `alert ${response.ok ? 'alert-success' : 'alert-danger'}`; if (response.ok) { if (embedded && window.parent !== window) window.parent.postMessage({ type: 'counter-appointment-created' }, window.location.origin); else setTimeout(() => location.href = result.redirect, 500); } }
+    document.getElementById('counter-form').addEventListener('submit', async event => { event.preventDefault(); conflictEl.classList.add('d-none'); if (!servicesEl.selectedOptions.length) { messageEl.textContent = 'Vui lòng chọn ít nhất một dịch vụ.'; messageEl.className = 'alert alert-danger counter-message'; return; } await createAppointment(); });
+    document.getElementById('counter-form').addEventListener('reset', () => setTimeout(() => { customerChip.classList.add('d-none'); customerSummary.classList.add('d-none'); document.querySelectorAll('.counter-service-check').forEach(item => item.checked = false); updateServices(); stylistStatus.innerHTML = '<strong><i class="bi bi-info-circle"></i> Trạng thái thợ hôm nay</strong><span>Chọn thợ để kiểm tra lịch phục vụ.</span>'; }, 0));
+    document.addEventListener('keydown', event => { if (event.key === 'F2') { event.preventDefault(); document.getElementById('counter-form').requestSubmit(); } });
+    document.querySelectorAll('[data-name-resolution]').forEach(button => button.addEventListener('click', () => createAppointment(button.dataset.nameResolution)));
+</script>
