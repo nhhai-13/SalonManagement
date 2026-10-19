@@ -1,0 +1,64 @@
+@{
+    ViewData["Title"] = "Xử lý lịch thợ nghỉ";
+    var selectedDate = ViewData["SelectedDate"] is DateTime configuredDate ? configuredDate : DateTime.Today;
+}
+
+<div id="absence-appointments-page" class="container py-4 absence-workspace d-none">
+    <header class="absence-page-heading">
+        <div>
+            <span class="absence-role-badge">LỄ TÂN</span>
+            <h1>Lịch cần xử lý khi thợ nghỉ</h1>
+            <p>Chọn thợ và ngày nghỉ để xem các lịch chưa hoàn tất cần chuyển thợ hoặc đổi giờ cho khách hàng.</p>
+        </div>
+        <a class="btn absence-back-button" href="/reception"><i class="bi bi-arrow-counterclockwise"></i> Quay lại không gian lễ tân</a>
+    </header>
+
+    <section class="absence-filter-card">
+        <form id="absence-appointments-form" class="absence-filter-form">
+            <div>
+                <label class="form-label" for="absent-stylist">Thợ nghỉ <span>*</span></label>
+                    <select class="form-select" id="absent-stylist" required><option value="">Đang tải danh sách thợ…</option></select>
+            </div>
+            <div>
+                    <label class="form-label" for="absence-date">Ngày cần xử lý <span>*</span></label>
+                    <input class="form-control" id="absence-date" type="date" required value="@selectedDate.ToString("yyyy-MM-dd")" />
+            </div>
+            <button class="btn absence-load-button" type="submit"><i class="bi bi-search"></i> Xem lịch</button>
+        </form>
+        <div id="absence-appointments-error" class="alert alert-danger mt-3 mb-0 d-none" role="alert"></div>
+    </section>
+
+    <section class="absence-kpis d-none" id="absence-appointments-metrics" aria-label="Tổng quan điều phối">
+        <article class="absence-kpi total"><i class="bi bi-exclamation-triangle-fill"></i><div><span>Tổng lịch<br />bị ảnh hưởng</span><strong id="absence-metric-total">0 lịch hẹn</strong></div></article>
+        <article class="absence-kpi urgent"><i class="bi bi-clock-fill"></i><div><span>Cần chuyển<br />thợ gấp</span><strong id="absence-metric-ready">0 lịch</strong></div></article>
+        <article class="absence-kpi available"><i class="bi bi-check-circle-fill"></i><div><span>Thợ rảnh<br />trong ca</span><strong id="absence-metric-stylists">0 thợ sẵn sàng</strong></div></article>
+        <article class="absence-kpi notified"><i class="bi bi-chat-dots-fill"></i><div><span>Sẽ báo<br />khách hàng</span><strong id="absence-metric-notify">0 / 0 khách</strong></div></article>
+    </section>
+
+    <section class="absence-results d-none" id="absence-appointments-results">
+        <header class="absence-results-heading">
+            <div><span>ĐIỀU PHỐI LỊCH BỊ ẢNH HƯỞNG</span><h2>Lịch của <b id="absence-appointments-stylist"></b></h2></div>
+            <div class="absence-selection-tools"><label><input id="batch-reschedule-select-all" type="checkbox" /> Chọn tất cả phương án</label><button id="batch-reschedule-confirm" class="btn absence-batch-button" type="button" disabled><i class="bi bi-arrow-left-right"></i> Xác nhận chuyển đã chọn</button></div>
+        </header>
+        <div class="absence-empty d-none" id="absence-appointments-empty"><i class="bi bi-calendar-check"></i><strong>Không có lịch cần xử lý</strong><span>Thợ này không có lịch chưa hoàn tất trong ngày đã chọn.</span></div>
+        <div id="absence-appointments-list" class="absence-appointment-list"></div>
+    </section>
+
+    <section class="absence-callout d-none" id="call-customer-results">
+        <div><i class="bi bi-telephone-outbound"></i><strong>Cần liên hệ trực tiếp</strong><span id="call-customer-count">0 lịch</span></div>
+        <div id="call-customer-list"></div>
+    </section>
+
+    <section class="absence-result-toast d-none" id="batch-reschedule-results">
+        <div id="batch-reschedule-success" class="d-none"></div><div id="batch-reschedule-failed" class="d-none"></div>
+    </section>
+</div>
+
+@section Scripts {
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+    <script src="~/js/reception-absence-appointments.js" asp-append-version="true"></script>
+    <script>
+        SalonAuth.requireSession({ endpoint: "/api/portal/reception/session", contentId: "absence-appointments-page" })
+            .then(() => ReceptionAbsenceAppointments.initialize());
+    </script>
+}

@@ -12,26 +12,7 @@ namespace SalonManagement.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "BookingReference",
-                table: "Appointments",
-                type: "nvarchar(max)",
-                nullable: false,
-                defaultValue: "");
-
-            migrationBuilder.AddColumn<string>(
                 name: "CancelReason",
-                table: "Appointments",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<DateTimeOffset>(
-                name: "CancelledAt",
-                table: "Appointments",
-                type: "datetimeoffset",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "CancelledBy",
                 table: "Appointments",
                 type: "nvarchar(max)",
                 nullable: true);
@@ -41,19 +22,7 @@ namespace SalonManagement.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "BookingReference",
-                table: "Appointments");
-
-            migrationBuilder.DropColumn(
                 name: "CancelReason",
-                table: "Appointments");
-
-            migrationBuilder.DropColumn(
-                name: "CancelledAt",
-                table: "Appointments");
-
-            migrationBuilder.DropColumn(
-                name: "CancelledBy",
                 table: "Appointments");
         }
     }

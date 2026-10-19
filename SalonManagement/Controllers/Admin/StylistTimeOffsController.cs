@@ -35,11 +35,18 @@ public class StylistTimeOffsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] StylistTimeOffRequest request)
     {
+ feature/integrate-sprint4-02
+        if (string.IsNullOrWhiteSpace(request.Reason))
+
         if (request is null)
+ develop
         {
             return BadRequest(new { message = "Yêu cầu không hợp lệ." });
         }
+ feature/integrate-sprint4-02
 
+
+ develop
         // Kiểm tra thợ có tồn tại không
         var stylistExists = await _dbContext.Stylists
             .AnyAsync(x => x.StylistId == request.StylistId);
@@ -76,8 +83,42 @@ public class StylistTimeOffsController : ControllerBase
             return BadRequest(new { message = "Thợ đã có lịch nghỉ trong ngày này." });
         }
 
+ feature/integrate-sprint4-02
+       // Nếu nghỉ theo khoảng giờ
+       if (!request.IsFullDay)
+       {
+           var isOverlap = existingTimeOffs.Any(x =>
+               x.IsFullDay ||
+              (x.StartTime < request.EndTime &&
+               x.EndTime > request.StartTime));
+
+    if (isOverlap)
+    {
+        return BadRequest(new
+        {
+            message = "Khoảng giờ nghỉ bị trùng với lịch nghỉ đã có."
+        });
+    }
+}
+        var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
+        var nextDay = appointmentDay.AddDays(1);
+        var affectedAppointments = await dbContext.Appointments
+            .Include(appointment => appointment.AppointmentServices)
+            .Where(appointment => appointment.StylistId == request.StylistId &&
+                appointment.AppointmentDate >= appointmentDay && appointment.AppointmentDate < nextDay &&
+                appointment.Status != "Cancelled")
+            .Where(appointment => request.IsFullDay ||
+                (request.StartTime.HasValue && request.EndTime.HasValue &&
+                 appointment.StartTime < request.EndTime.Value.ToTimeSpan() &&
+                 appointment.EndTime > request.StartTime.Value.ToTimeSpan()))
+            .OrderBy(appointment => appointment.StartTime)
+            .ToListAsync();
+
+        if (affectedAppointments.Count > 0)
+
         // Nếu nghỉ theo khoảng giờ
         if (!request.IsFullDay)
+ develop
         {
             var isOverlap = existingTimeOffs.Any(x =>
                 x.IsFullDay ||
@@ -94,6 +135,28 @@ public class StylistTimeOffsController : ControllerBase
             StylistId = request.StylistId,
             OffDate = request.OffDate,
             IsFullDay = request.IsFullDay,
+ feature/integrate-sprint4-02
+
+            StartTime = request.IsFullDay
+                ? null
+                : request.StartTime,
+
+            EndTime = request.IsFullDay
+                ? null
+                : request.EndTime,
+
+            Reason = request.Reason.Trim()
+        };
+
+        dbContext.StylistTimeOffs.Add(timeOff);
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new
+        {
+            timeOff,
+            reassignedAppointmentIds = affectedAppointments.Select(appointment => appointment.AppointmentId)
+        });
+
             StartTime = request.IsFullDay ? null : request.StartTime,
             EndTime = request.IsFullDay ? null : request.EndTime,
             Reason = request.Reason
@@ -103,6 +166,7 @@ public class StylistTimeOffsController : ControllerBase
         await _dbContext.SaveChangesAsync();
 
         return Ok(timeOff);
+develop
     }
 
     // Xóa lịch nghỉ
@@ -121,6 +185,56 @@ public class StylistTimeOffsController : ControllerBase
 
         return NoContent();
     }
+ feature/integrate-sprint4-02
+
+    private async Task<string?> ValidateReplacementAsync(int replacementStylistId, int absentStylistId,
+        DateOnly offDate, List<Appointment> appointments)
+    {
+        if (replacementStylistId == absentStylistId)
+            return "Người thay thế phải là một thợ khác người nghỉ.";
+
+        var replacement = await dbContext.Stylists.Include(stylist => stylist.Services)
+            .FirstOrDefaultAsync(stylist => stylist.StylistId == replacementStylistId && stylist.IsActive);
+        if (replacement is null) return "Không tìm thấy người thay thế đang hoạt động.";
+
+        var day = offDate.ToDateTime(TimeOnly.MinValue);
+        var nextDay = day.AddDays(1);
+        var businessHours = await dbContext.BusinessHours.AsNoTracking()
+            .SingleOrDefaultAsync(hours => hours.DayOfWeek == day.DayOfWeek);
+        if (businessHours is null || businessHours.IsClosed || businessHours.OpensAt is null || businessHours.ClosesAt is null)
+            return "Tiệm không hoạt động trong ngày này nên không thể chuyển lịch.";
+
+        var shifts = await dbContext.WorkSchedules.AsNoTracking()
+            .Where(schedule => schedule.StylistId == replacementStylistId && schedule.WorkDate >= day && schedule.WorkDate < nextDay && schedule.Status == "Working")
+            .ToListAsync();
+        var existingAppointments = await dbContext.Appointments.AsNoTracking()
+            .Where(appointment => appointment.StylistId == replacementStylistId && appointment.AppointmentDate >= day && appointment.AppointmentDate < nextDay && appointment.Status != "Cancelled")
+            .ToListAsync();
+        var timeOffs = await dbContext.StylistTimeOffs.AsNoTracking()
+            .Where(timeOff => timeOff.StylistId == replacementStylistId && timeOff.OffDate == offDate)
+            .ToListAsync();
+        var breaks = await dbContext.StylistBreaks.AsNoTracking()
+            .Where(item => item.StylistId == replacementStylistId && item.BreakDate >= day && item.BreakDate < nextDay)
+            .ToListAsync();
+        var supportedServiceIds = replacement.Services.Select(link => link.ServiceId).ToHashSet();
+        var open = businessHours.OpensAt.Value.ToTimeSpan();
+        var close = businessHours.ClosesAt.Value.ToTimeSpan();
+
+        foreach (var appointment in appointments)
+        {
+            if (appointment.AppointmentServices.Any(item => !supportedServiceIds.Contains(item.ServiceId)))
+                return $"{replacement.FullName} không thực hiện đủ dịch vụ của lịch hẹn #{appointment.AppointmentId}.";
+            if (appointment.StartTime < open || appointment.EndTime > close || !shifts.Any(shift => shift.StartTime <= appointment.StartTime && shift.EndTime >= appointment.EndTime))
+                return $"{replacement.FullName} không có ca làm phù hợp cho lịch hẹn #{appointment.AppointmentId}.";
+            if (existingAppointments.Any(item => appointment.StartTime < item.EndTime && appointment.EndTime > item.StartTime))
+                return $"{replacement.FullName} đã có lịch trùng với lịch hẹn #{appointment.AppointmentId}.";
+            if (breaks.Any(item => appointment.StartTime < item.EndTime && appointment.EndTime > item.StartTime) || timeOffs.Any(item => item.IsFullDay || (item.StartTime.HasValue && item.EndTime.HasValue && appointment.StartTime < item.EndTime.Value.ToTimeSpan() && appointment.EndTime > item.StartTime.Value.ToTimeSpan())))
+                return $"{replacement.FullName} có thời gian nghỉ trùng với lịch hẹn #{appointment.AppointmentId}.";
+        }
+
+        return null;
+    }
+ develop
 }
 
 public class StylistTimeOffRequest
@@ -136,4 +250,10 @@ public class StylistTimeOffRequest
     public TimeOnly? EndTime { get; set; }
 
     public string? Reason { get; set; }
+ feature/integrate-sprint4-02
+
+    public int? ReplacementStylistId { get; set; }
 }
+
+}
+ develop

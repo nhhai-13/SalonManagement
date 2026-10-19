@@ -7,7 +7,7 @@
     <div class="home-container nav-wrap">
         <a class="home-brand" href="#top" aria-label="Luminol - Trang chủ"><span class="brand-monogram">L</span><span><strong>Luminol</strong><small>Salon &amp; Spa</small></span></a>
         <button class="home-menu-toggle" type="button" aria-label="Mở menu" aria-expanded="false"><i class="bi bi-list"></i></button>
-        <nav class="home-nav" aria-label="Điều hướng chính"><a class="active" href="#top">Trang chủ</a><a href="#services">Dịch vụ</a><a href="#team">Chuyên viên</a><a href="#about">Về Luminol</a><a href="#contact">Liên hệ</a></nav>
+        <nav class="home-nav" aria-label="Điều hướng chính"><a class="active" href="#top">Trang chủ</a><a href="#services">Dịch vụ</a><a href="#team">Chuyên viên</a><a href="/appointments/lookup">Tra cứu lịch</a><a href="#about">Về Luminol</a><a href="#contact">Liên hệ</a></nav>
         <div class="nav-actions">
             @if (User.Identity?.IsAuthenticated == true)
             {
@@ -48,7 +48,7 @@
     <section class="contact-section" id="contact"><div class="home-container contact-grid"><div><span class="home-eyebrow">Ghé thăm Luminol</span><h2>Một khoảng thời gian<br/>dành riêng cho bạn.</h2><p>Hãy đặt lịch trước để chúng tôi chuẩn bị trải nghiệm tốt nhất cho bạn.</p></div><div class="contact-details"><p><i class="bi bi-geo-alt"></i><span><small>Địa chỉ</small><strong>123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh</strong></span></p><p><i class="bi bi-clock"></i><span><small>Giờ mở cửa</small><strong>Thứ Hai – Chủ Nhật: 09:00 – 21:00</strong></span></p><p><i class="bi bi-telephone"></i><span><small>Hotline</small><strong>1900 6868</strong></span></p></div></div></section>
 </main>
 
-<footer class="home-footer"><div class="home-container footer-grid"><a class="home-brand light" href="#top"><span class="brand-monogram">L</span><span><strong>Luminol</strong><small>Salon &amp; Spa</small></span></a><p>Vẻ đẹp được tạo nên từ sự thấu hiểu và những trải nghiệm tinh tế.</p><div><a href="#services">Dịch vụ</a><a href="#booking">Đặt lịch</a><a href="/reception/login">Cổng nhân viên</a></div><span>© @DateTime.Now.Year Luminol Salon &amp; Spa</span></div></footer>
+<footer class="home-footer"><div class="home-container footer-grid"><a class="home-brand light" href="#top"><span class="brand-monogram">L</span><span><strong>Luminol</strong><small>Salon &amp; Spa</small></span></a><p>Vẻ đẹp được tạo nên từ sự thấu hiểu và những trải nghiệm tinh tế.</p><div><a href="#services">Dịch vụ</a><a href="#booking">Đặt lịch</a><a href="/appointments/lookup">Tra cứu lịch</a><a href="/reception/login">Cổng nhân viên</a></div><span>© @DateTime.Now.Year Luminol Salon &amp; Spa</span></div></footer>
 <div class="floating-actions"><a href="tel:19006868" aria-label="Gọi hotline"><i class="bi bi-telephone-fill"></i></a><button type="button" id="back-to-top" aria-label="Lên đầu trang"><i class="bi bi-arrow-up"></i></button></div>
 
 

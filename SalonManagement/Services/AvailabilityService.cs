@@ -15,6 +15,60 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
 {
     public AvailabilityService(ApplicationDbContext db) : this(db, TimeProvider.System) { }
 
+    public async Task<List<AvailabilitySlot>> GetAvailableSlotsAsync(
+        DateTime date,
+        List<int> serviceIds,
+        int? stylistId = null)
+    {
+        var stylistAvailability = new StylistAvailabilityService(db, timeProvider);
+        var stylists = await stylistAvailability.GetStylistsAsync(serviceIds);
+        if (stylistId.HasValue && stylistId.Value != StylistAvailabilityService.AnyStylist)
+            stylists = stylists.Where(stylist => stylist.Id == stylistId.Value).ToList();
+
+        var grouped = new Dictionary<(TimeSpan Start, TimeSpan End), HashSet<int>>();
+        var salonDate = DateOnly.FromDateTime(date);
+        foreach (var stylist in stylists)
+        {
+            var stylistSlots = await stylistAvailability.GetSlotsAsync(serviceIds, stylist.Id, salonDate);
+            foreach (var slot in stylistSlots)
+            {
+                if (!TimeSpan.TryParse(slot.Start, out var start) || !TimeSpan.TryParse(slot.End, out var end))
+                    continue;
+                var key = (start, end);
+                if (!grouped.TryGetValue(key, out var availableStylistIds))
+                {
+                    availableStylistIds = [];
+                    grouped.Add(key, availableStylistIds);
+                }
+                availableStylistIds.Add(stylist.Id);
+            }
+        }
+
+        return grouped.OrderBy(entry => entry.Key.Start).ThenBy(entry => entry.Key.End)
+            .Select(entry => new AvailabilitySlot
+            {
+                StartTime = entry.Key.Start,
+                EndTime = entry.Key.End,
+                AvailableStylistIds = entry.Value.Order().ToList()
+            }).ToList();
+    }
+
+    public async Task<List<DateTime>> FindNextAvailableDatesAsync(
+        DateTime fromDate,
+        int count,
+        List<int> serviceIds,
+        int? stylistId = null)
+    {
+        var dates = new List<DateTime>();
+        for (var offset = 1; offset <= 60 && dates.Count < count; offset++)
+        {
+            var candidate = fromDate.Date.AddDays(offset);
+            if ((await GetAvailableSlotsAsync(candidate, serviceIds, stylistId)).Count > 0)
+                dates.Add(candidate);
+        }
+        return dates;
+    }
+
     public async Task<AvailabilityResult> GetSlotsAsync(DateTime date, IReadOnlyCollection<int> serviceIds)
     {
         var services = await db.Services.AsNoTracking().Where(s => s.IsActive && serviceIds.Contains(s.ServiceId)).ToListAsync();
@@ -35,10 +89,19 @@ public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider ti
         var closesAt = (hours?.ClosesAt ?? new TimeOnly(17, 0)).ToTimeSpan();
         var daysOff = await db.StylistDaysOff.AsNoTracking().Where(item => item.OffDate == date.Date).Select(item => item.StylistId).ToListAsync();
         var breaks = await db.StylistBreaks.AsNoTracking().Where(item => item.BreakDate == date.Date).ToListAsync();
-        var eligible = candidates.Where(s => !daysOff.Contains(s.StylistId) && requiredIds.All(id => s.Services.Any(skill => skill.ServiceId == id))).ToList();
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking()
+            .Where(item => item.OffDate == DateOnly.FromDateTime(date))
+            .ToListAsync();
+        var eligible = candidates.Where(s =>
+            !daysOff.Contains(s.StylistId)
+            && !timeOffs.Any(item => item.StylistId == s.StylistId && item.IsFullDay)
+            && requiredIds.All(id => s.Services.Any(skill => skill.ServiceId == id))).ToList();
         var appointments = await db.Appointments.AsNoTracking().Where(a => a.AppointmentDate == date.Date && a.Status != "Cancelled" && a.Status != "NoShow" && a.Status != "Rejected").ToListAsync();
         var slots = eligible.SelectMany(stylist => stylist.WorkSchedules.SelectMany(shift => SlotsForShift(shift, duration, opensAt, closesAt)
-                .Where(slot => !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime) && !breaks.Where(b => b.StylistId == stylist.StylistId).Any(b => b.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < b.EndTime))))
+                .Where(slot => !appointments.Where(a => a.StylistId == stylist.StylistId).Any(a => a.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < a.EndTime)
+                    && !breaks.Where(b => b.StylistId == stylist.StylistId).Any(b => b.StartTime < slot + TimeSpan.FromMinutes(duration) && slot < b.EndTime)
+                    && !timeOffs.Where(item => item.StylistId == stylist.StylistId && !item.IsFullDay && item.StartTime.HasValue && item.EndTime.HasValue)
+                        .Any(item => item.StartTime!.Value.ToTimeSpan() < slot + TimeSpan.FromMinutes(duration) && slot < item.EndTime!.Value.ToTimeSpan()))))
             .Distinct().OrderBy(time => time).ToList();
 
         var now = SalonClock.GetLocalNow(timeProvider);

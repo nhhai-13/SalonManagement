@@ -1,0 +1,43 @@
+@model SalonManagement.Models.ViewModels.StylistServiceHistoryViewModel
+@{
+    ViewData["Title"] = "Lịch sử phục vụ";
+}
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Lịch sử phục vụ</h1>
+            <p class="text-muted mb-0">Các lịch hẹn bạn đã hoàn thành · @Model.StylistName</p>
+        </div>
+        <a class="btn btn-outline-primary" href="/stylist/schedule">Lịch hẹn hôm nay</a>
+    </div>
+
+    @if (Model.Appointments.Count == 0)
+    {
+        <div class="alert alert-info">Bạn chưa có lịch hẹn hoàn thành.</div>
+    }
+    else
+    {
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="table-light"><tr><th>Thời gian</th><th>Khách hàng</th><th>Dịch vụ</th><th>Thời lượng thực tế</th></tr></thead>
+                    <tbody>
+                    @foreach (var appointment in Model.Appointments)
+                    {
+                        var actualMinutes = appointment.ActualStartedAt.HasValue && appointment.ActualCompletedAt.HasValue
+                            ? (int?)(appointment.ActualCompletedAt.Value - appointment.ActualStartedAt.Value).TotalMinutes
+                            : null;
+                        <tr>
+                            <td><strong>@appointment.AppointmentDate.ToString("dd/MM/yyyy")</strong><br /><span class="text-muted">@appointment.StartTime.ToString(@"hh\:mm") – @appointment.EndTime.ToString(@"hh\:mm")</span></td>
+                            <td>@(appointment.CustomerNameOverride ?? appointment.Customer.FullName)</td>
+                            <td>@string.Join(", ", appointment.AppointmentServices.Select(item => item.Service.ServiceName))</td>
+                            <td>@(actualMinutes.HasValue ? $"{actualMinutes} phút" : "Chưa ghi nhận")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>

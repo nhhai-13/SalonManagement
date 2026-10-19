@@ -55,8 +55,7 @@
         <div class="sl-alert sl-alert-info alert alert-info">Hãy tạo hồ sơ thợ đang làm việc để bắt đầu xếp ca.</div> 
     }
     else { 
-        <div class="sl-week-scroll" tabindex="0" aria-label="Lịch làm việc bảy ngày trong tuần">
-        <div class="sl-week-grid">
+        <div class="sl-week-list" aria-label="Lịch làm việc bảy ngày trong tuần">
         @for (var index = 0; index < days.Count; index++)
         {
             var day = days[index]; var shifts = Model.Schedules.Where(s => s.WorkDate.Date == day.Date).ToList(); var hours = Model.BusinessHours[day.DayOfWeek];
@@ -88,7 +87,6 @@
                 </section>
             </div>
         }
-        </div>
         </div>
     }
 </div>
