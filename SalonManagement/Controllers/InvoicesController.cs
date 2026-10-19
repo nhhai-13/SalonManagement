@@ -29,16 +29,12 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
             .OrderBy(item => item.StartTime)
             .ToListAsync();
 
- codex/sprint-4-todo
         var paidInvoices = await db.Invoices.AsNoTracking()
             .Include(invoice => invoice.Appointment).ThenInclude(appointment => appointment.Customer)
             .Where(invoice => invoice.Status == "Paid" && invoice.Appointment.AppointmentDate.Date == selectedDate)
             .OrderBy(invoice => invoice.Appointment.StartTime)
             .ToListAsync();
         return View(new InvoiceDayViewModel { SelectedDate = selectedDate, Appointments = appointments, PaidInvoices = paidInvoices });
-
-        return View(appointments);
-develop
     }
 
     [HttpPost]
