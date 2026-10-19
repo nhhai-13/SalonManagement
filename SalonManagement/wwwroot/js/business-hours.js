@@ -37,12 +37,21 @@ window.BusinessHoursPage = (() => {
 
     return {
         async initialize() {
-            const response = await SalonAuth.authenticatedFetch("/api/business-hours");
-            if (!response.ok) return SalonAuth.redirectToLogin();
-            list().innerHTML = (await response.json()).map(row).join("");
-            document.getElementById("hours-page").classList.remove("d-none");
+            const page = document.getElementById("hours-page");
+            const result = document.getElementById("hours-result");
+            try {
+                const response = await SalonAuth.authenticatedFetch("/api/business-hours");
+                if (!response.ok) return SalonAuth.redirectToLogin();
+                list().innerHTML = (await response.json()).map(row).join("");
+                page.classList.remove("d-none");
+            } catch {
+                page.classList.remove("d-none");
+                result.className = "alert alert-danger sl-alert";
+                result.textContent = "Không thể tải giờ hoạt động. Vui lòng tải lại trang để thử lại.";
+            }
             list().addEventListener("change", event => {
                 const item = event.target.closest(".hours-row");
+                if (!item) return;
                 if (event.target.classList.contains("closed")) {
                     item.querySelectorAll("input[type=time]").forEach(input => input.disabled = event.target.checked);
                 }
@@ -58,22 +67,30 @@ window.BusinessHoursPage = (() => {
                     opensAt: item.querySelector(".closed").checked ? null : apiTime(item.querySelector(".opens").value),
                     closesAt: item.querySelector(".closed").checked ? null : apiTime(item.querySelector(".closes").value)
                 }));
-                const response = await SalonAuth.authenticatedFetch("/api/business-hours", {
-                    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days })
-                });
-                let problem = {};
-                if (!response.ok) {
-                    problem = await response.json().catch(() => ({}));
-                    Object.entries(problem.errors || {}).forEach(([key, messages]) => {
-                        const match = /^Days\[(\d+)\]/.exec(key);
-                        if (match) rows[Number(match[1])]?.querySelector('.error')?.replaceChildren(document.createTextNode(messages.join(' ')));
+                const button = event.currentTarget.querySelector('[type="submit"]');
+                button.disabled = true;
+                try {
+                    const response = await SalonAuth.authenticatedFetch("/api/business-hours", {
+                        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days })
                     });
+                    let problem = {};
+                    if (!response.ok) {
+                        problem = await response.json().catch(() => ({}));
+                        Object.entries(problem.errors || {}).forEach(([key, messages]) => {
+                            const match = /^Days\[(\d+)\]/.exec(key);
+                            if (match) rows[Number(match[1])]?.querySelector('.error')?.replaceChildren(document.createTextNode(messages.join(' ')));
+                        });
+                    }
+                    result.className = `alert ${response.ok ? "alert-success" : "alert-danger"}`;
+                    result.textContent = response.ok
+                        ? "Đã lưu giờ hoạt động."
+                        : (problem?.detail || problem?.title || "Không thể lưu. Vui lòng kiểm tra lại các khung giờ.");
+                } catch {
+                    result.className = "alert alert-danger";
+                    result.textContent = "Không thể kết nối để lưu giờ hoạt động. Vui lòng thử lại.";
+                } finally {
+                    button.disabled = false;
                 }
-                const result = document.getElementById("hours-result");
-                result.className = `alert ${response.ok ? "alert-success" : "alert-danger"}`;
-                result.textContent = response.ok
-                    ? "Đã lưu giờ hoạt động."
-                    : (problem?.detail || problem?.title || "Không thể lưu. Vui lòng kiểm tra lại các khung giờ.");
             });
         }
     };
