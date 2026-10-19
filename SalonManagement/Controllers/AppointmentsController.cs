@@ -13,7 +13,7 @@ namespace SalonManagement.Controllers;
 public class AppointmentsController(ApplicationDbContext db, ILogger<AppointmentsController> logger) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(DateTime? date, string? status)
+    public async Task<IActionResult> Index(DateTime? date, string? status = null)
     {
         var selectedDate = (date ?? VietnamTime.Today).Date;
         ViewBag.SelectedDate = selectedDate.ToString("yyyy-MM-dd");
@@ -25,10 +25,28 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                 .ThenInclude(item => item.Service)
             .Include(item => item.Invoice)
             .Where(item => item.AppointmentDate.Date == selectedDate);
-        if (status == "Pending") query = query.Where(item => item.Status == "Pending" || item.Status == "PendingConfirmation");
-        else if (status == "Cancelled") query = query.Where(item => item.Status == "Cancelled" || item.Status == "Canceled");
-        else if (status == "Completed") query = query.Where(item => item.Status == "Completed" || item.Status == "Closed");
-        else if (status is "Confirmed" or "Arrived" or "NoShow") query = query.Where(item => item.Status == status);
+
+        if (status == "Pending")
+            query = query.Where(item => item.Status == "Pending" || item.Status == "PendingConfirmation");
+        else if (status == "Cancelled")
+            query = query.Where(item => item.Status == "Cancelled" || item.Status == "Canceled");
+        else if (status == "Completed")
+            query = query.Where(item => item.Status == "Completed" || item.Status == "Closed");
+        else if (status is "Confirmed" or "Arrived" or "NoShow")
+            query = query.Where(item => item.Status == status);
+        else if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(item => item.Status == status);
+
+        if (User.IsInRole(UserRoles.Stylist))
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var stylistId = await db.Users.Where(user => user.Id == userId)
+                .Select(user => user.StylistId).SingleOrDefaultAsync();
+            if (!stylistId.HasValue) return Forbid();
+            query = query.Where(item => item.StylistId == stylistId.Value ||
+                item.AppointmentServices.Any(service => service.StylistId == stylistId.Value));
+        }
+
         var appointments = await query.OrderBy(item => item.StartTime).ToListAsync();
 
         return View(appointments);
@@ -52,6 +70,37 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             return NotFound();
         }
 
+        var isStylist = User.IsInRole(UserRoles.Stylist);
+        int? currentStylistId = null;
+        var canViewTechnicalNotes = isStylist || User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner);
+        if (isStylist)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            currentStylistId = await db.Users.Where(user => user.Id == userId)
+                .Select(user => user.StylistId).SingleOrDefaultAsync();
+            if (!currentStylistId.HasValue ||
+                (appointment.StylistId != currentStylistId.Value &&
+                 !appointment.AppointmentServices.Any(service => service.StylistId == currentStylistId.Value)))
+            {
+                return Forbid();
+            }
+            foreach (var service in appointment.AppointmentServices.Where(service => service.StylistId != currentStylistId.Value))
+            {
+                service.TechnicalNotes = null;
+                service.TechnicalNotesUpdatedBy = null;
+                service.TechnicalNotesUpdatedAt = null;
+            }
+        }
+        else if (!canViewTechnicalNotes)
+        {
+            foreach (var service in appointment.AppointmentServices)
+            {
+                service.TechnicalNotes = null;
+                service.TechnicalNotesUpdatedBy = null;
+                service.TechnicalNotesUpdatedAt = null;
+            }
+        }
+
         var history = new List<AppointmentHistoryRow>();
         var historyLoadFailed = false;
         var isNewCustomer = false;
@@ -73,6 +122,7 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                         StylistName = service.Stylist != null
                             ? service.Stylist.FullName
                             : item.Stylist.FullName,
+                        service.StylistId,
                         service.TechnicalNotes
                     }).ToList()
                 })
@@ -86,9 +136,15 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
                         AppointmentDate = item.AppointmentDate,
                         ServiceName = service?.ServiceName ?? "Chưa có dịch vụ",
                         StylistName = service?.StylistName ?? "Chưa phân công",
-                        TechnicalNotes = service?.TechnicalNotes
+                        TechnicalNotes = service is not null && (!isStylist || service.StylistId == currentStylistId)
+                            ? service.TechnicalNotes
+                            : null
                     }))
                 .ToList();
+            if (!canViewTechnicalNotes)
+            {
+                foreach (var row in history) row.TechnicalNotes = null;
+            }
         }
         catch (Exception exception)
         {
@@ -125,6 +181,12 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             return NotFound();
         }
 
+        var stylistId = await GetCurrentStylistId();
+        if (!stylistId.HasValue || (item.StylistId != stylistId.Value && item.Appointment.StylistId != stylistId.Value))
+        {
+            return Forbid();
+        }
+
         var assignedStylist = item.Stylist
             ?? await db.Stylists.FindAsync(item.Appointment.StylistId);
         if (assignedStylist is null || !string.Equals(
@@ -159,6 +221,12 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             return NotFound();
         }
 
+        var stylistId = await GetCurrentStylistId();
+        if (!stylistId.HasValue || (item.StylistId != stylistId.Value && item.Appointment.StylistId != stylistId.Value))
+        {
+            return Forbid();
+        }
+
         var assignedStylist = item.Stylist
             ?? await db.Stylists.FindAsync(item.Appointment.StylistId);
         if (assignedStylist is null || !string.Equals(
@@ -188,4 +256,11 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
     private async Task<int> GetAppointmentId(int appointmentServiceId) =>
         await db.AppointmentServices.Where(item => item.AppointmentServiceId == appointmentServiceId)
             .Select(item => item.AppointmentId).FirstOrDefaultAsync();
+
+    private async Task<int?> GetCurrentStylistId()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return await db.Users.Where(user => user.Id == userId)
+            .Select(user => user.StylistId).SingleOrDefaultAsync();
+    }
 }

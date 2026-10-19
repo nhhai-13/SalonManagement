@@ -73,7 +73,30 @@
                             </a>
                         </li>
 
-                        <!-- Menu Đặt lịch -->
+                        @if (User.Identity?.IsAuthenticated == true &&
+                             (User.IsInRole(UserRoles.Stylist) || User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Appointments" asp-action="Index">Lịch hẹn</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true &&
+                             (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Phiếu tính tiền</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Owner))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="DiscountCoupons" asp-action="Index">Mã giảm giá</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Index">Báo cáo</a></li>
+                        }
+                        @if (HostEnvironment.IsStaging() && User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Sprint4Staging" asp-action="Index">Kịch bản demo</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="PermissionAudit" asp-action="Index">Đối chiếu phân quyền</a></li>
+                        }
+`r`n                                                <!-- Menu Đặt lịch -->
                         <li class="nav-item">
                             <a class="nav-link text-primary fw-semibold"
                                asp-controller="Booking"
