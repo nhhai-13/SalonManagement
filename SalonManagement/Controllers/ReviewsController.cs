@@ -13,6 +13,8 @@ namespace SalonManagement.Controllers;
 public class ReviewsController(ApplicationDbContext db) : Controller
 {
     [HttpGet]
+ codex/sprint-4-todo
+
     public async Task<IActionResult> CreateByReference(string reference)
     {
         var review = await FindValidReviewByReference(reference);
@@ -44,6 +46,7 @@ public class ReviewsController(ApplicationDbContext db) : Controller
     }
 
     [HttpGet]
+ develop
     public async Task<IActionResult> Create(string token)
     {
         var review = await FindValidReview(token);
@@ -77,6 +80,8 @@ public class ReviewsController(ApplicationDbContext db) : Controller
             .FirstOrDefaultAsync(item => item.ReviewTokenHash == hash && item.Rating == null &&
                 item.ExpiresAt > now && item.Appointment.Status == "Closed");
     }
+ codex/sprint-4-todo
+
 
     private async Task<StylistReview?> FindValidReviewByReference(string? reference)
     {
@@ -88,4 +93,5 @@ public class ReviewsController(ApplicationDbContext db) : Controller
             .FirstOrDefaultAsync(item => item.Appointment.BookingReference == code && item.Rating == null &&
                 item.ExpiresAt > now && item.Appointment.Status == "Closed");
     }
+ develop
 }

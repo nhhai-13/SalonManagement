@@ -9,13 +9,18 @@ public sealed class AppointmentAnalyticsViewModel
     public int TotalAppointments { get; init; }
     public int NoShows { get; init; }
     public int Cancellations { get; init; }
+ codex/sprint-4-todo
+
     public int ReviewCount { get; init; }
     public double? AverageRating { get; init; }
+ develop
     public string? Error { get; init; }
 }
 
 public sealed record HourlyCount(int Hour, int Count);
 public sealed record DayTypeSummary(string Name, int Days, int Appointments, double PerDay, double NoShowRate, double CancellationRate, IReadOnlyList<double> HourlyPerDay, int PeakHour);
+ codex/sprint-4-todo
+
 
 public sealed class OwnerRevenueViewModel
 {
@@ -39,3 +44,4 @@ public sealed class OwnerTodayDashboardViewModel
 }
 
 public sealed record WorkingStylistRow(string Name, TimeSpan Start, TimeSpan End);
+ develop

@@ -32,6 +32,12 @@ namespace SalonManagement.Models
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; }
+ sprint-4-todo
+ codex/sprint-4-todo
+        public DateTime? ClosedAt { get; set; }
+        public string? ClosedByUserId { get; set; }
+
+
         public DateTime? ActualStartedAt { get; set; }
         public DateTime? ActualCompletedAt { get; set; }
         // Internal stylist note: never returned by public booking or lookup flows.
@@ -42,11 +48,13 @@ namespace SalonManagement.Models
         public bool IsLate { get; set; }
 
         public string? NoShowByUserId { get; set; }
+ develop
 
         public DateTime? ClosedAt { get; set; }
 
         public string? ClosedByUserId { get; set; }
 
+ develop
         public string? ClosedByName { get; set; }
         public Customer Customer { get; set; } = null!;
         public Stylist Stylist { get; set; } = null!;
