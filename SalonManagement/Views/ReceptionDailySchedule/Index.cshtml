@@ -4,7 +4,7 @@
     var rows = Enumerable.Range(0, Math.Max(0, (int)((Model.ClosingTime - Model.OpeningTime).TotalMinutes / 15) + 1))
         .Select(index => Model.OpeningTime.Add(TimeSpan.FromMinutes(index * 15))).ToList();
 }
-<div class="container-fluid py-3 reception-day-schedule">
+<div class="container-fluid reception-day-schedule">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
         <div><h1 class="h4 mb-0">Lịch hẹn trong ngày</h1><p class="text-muted small mb-0">Theo dõi lịch từng thợ, dời giờ hoặc đổi thợ ngay tại chỗ.</p></div>
         <div class="d-flex flex-wrap align-items-center justify-content-end gap-1">
