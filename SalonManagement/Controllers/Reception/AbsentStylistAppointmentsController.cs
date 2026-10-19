@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
+using SalonManagement.Services;
 
 namespace SalonManagement.Controllers.Reception;
 
@@ -63,13 +64,13 @@ public sealed class AbsentStylistAppointmentsController(ApplicationDbContext db)
     }
 }
 
-public sealed class ReceptionAbsenceAppointmentsPageController : Controller
+public sealed class ReceptionAbsenceAppointmentsPageController(TimeProvider timeProvider) : Controller
 {
     [Authorize(Roles = UserRoles.Receptionist)]
     [HttpGet("reception/absence-appointments")]
     public IActionResult Index(DateTime? date)
     {
-        ViewData["SelectedDate"] = date?.Date ?? DateTime.Today;
+        ViewData["SelectedDate"] = date?.Date ?? SalonClock.GetLocalNow(timeProvider).Date;
         return View();
     }
 }
