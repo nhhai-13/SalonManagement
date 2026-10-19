@@ -16,7 +16,8 @@ public sealed class ReceptionDailyScheduleController(ApplicationDbContext db, Ap
     [HttpGet("")]
     public async Task<IActionResult> Index(DateTime? date)
     {
-        var selected = (date ?? DateTime.Today).Date;
+        var now = SalonClock.GetLocalNow(timeProvider);
+        var selected = (date ?? now.Date).Date;
         var hours = await db.BusinessHours.AsNoTracking().SingleOrDefaultAsync(item => item.DayOfWeek == selected.DayOfWeek);
         var opening = hours is { IsClosed: false, OpensAt: { } opensAt } ? opensAt.ToTimeSpan() : TimeSpan.FromHours(8);
         var closing = hours is { IsClosed: false, ClosesAt: { } closesAt } ? closesAt.ToTimeSpan() : TimeSpan.FromHours(20);
@@ -35,8 +36,6 @@ public sealed class ReceptionDailyScheduleController(ApplicationDbContext db, Ap
             .ThenBy(item => item.EndTime)
             .ThenBy(item => item.AppointmentId)
             .ToList();
-        var now = SalonClock.GetLocalNow(timeProvider);
-
         return View(new ReceptionDailyScheduleViewModel
         {
             Date = selected,
