@@ -99,7 +99,7 @@ public sealed class OwnerOperationsDashboardController(ApplicationDbContext db, 
         .Where(item => item.AppointmentDate == today).ToListAsync();
 
     private static OwnerDashboardAppointmentRow ToRow(Appointment appointment) => new(appointment.AppointmentId, appointment.BookingReference, appointment.CustomerNameOverride ?? appointment.Customer.FullName, MaskPhone(appointment.Customer.Phone), string.Join(", ", appointment.AppointmentServices.Select(item => item.Service.ServiceName)), appointment.Stylist?.FullName ?? "Chưa phân công", appointment.StartTime, appointment.EndTime, appointment.Status, appointment.Invoice?.Status == "Paid");
-    private static string StatusKey(string status) => status switch { "Pending" or "PendingConfirmation" => "pending", "Confirmed" => "confirmed", "Arrived" or "InProgress" => "arrived", "Completed" => "completed", "Cancelled" or "Rejected" => "cancelled", "NoShow" => "noshow", _ => "confirmed" };
+    private static string? StatusKey(string status) => status switch { "Pending" or "PendingConfirmation" => "pending", "Confirmed" => "confirmed", "Arrived" or "InProgress" => "arrived", "Completed" => "completed", "Cancelled" or "Rejected" => "cancelled", "NoShow" => "noshow", _ => null };
     private static string MaskPhone(string phone) { var digits = new string(phone.Where(char.IsDigit).ToArray()); return digits.Length < 7 ? "***" : $"{digits[..3]}.***.{digits[^3..]}"; }
 }
 
