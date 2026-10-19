@@ -480,14 +480,11 @@ develop
     {
         invoice.Subtotal = invoice.Lines.Sum(line => line.UnitPrice);
         if (invoice.DiscountCouponId.HasValue && invoice.DiscountTypeSnapshot is not null && invoice.DiscountValueSnapshot.HasValue)
- codex/sprint-4-todo
-        {
             invoice.DiscountAmount = DiscountCalculator.Calculate(invoice.Subtotal, invoice.DiscountTypeSnapshot, invoice.DiscountValueSnapshot.Value);
-        }
+        else
+            invoice.DiscountAmount = 0;
 
-            invoice.DiscountAmount = DiscountCalculator.Calculate(invoice.Subtotal, invoice.DiscountTypeSnapshot, invoice.DiscountValueSnapshot.Value);
- develop
-        invoice.TotalAmount = invoice.Subtotal - invoice.DiscountAmount;
+        invoice.TotalAmount = Math.Max(0, invoice.Subtotal - invoice.DiscountAmount);
     }
 
     private static string Money(decimal amount) =>
