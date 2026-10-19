@@ -4,6 +4,86 @@ window.PromotionCodes = (() => {
     const localIso = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     const date = value => { const parsed = new Date(`${String(value ?? "").slice(0, 10)}T00:00:00`); return Number.isNaN(parsed.getTime()) ? "Chưa rõ ngày" : parsed.toLocaleDateString("vi-VN"); };
     const message = (text, ok) => { const el = document.getElementById("promotion-message"); el.textContent = text; el.className = `small mt-3 mb-0 ${ok ? "text-success" : "text-danger"}`; };
-    async function load() { const target = document.getElementById("promotion-list"); const response = await SalonAuth.authenticatedFetch("/api/owner/promotions"); const rows = await response.json().catch(() => []); if (!response.ok) { target.innerHTML = '<div class="p-4 text-danger">Không thể tải mã giảm giá.</div>'; return; } if (!rows.length) { target.innerHTML = '<div class="p-4 text-muted">Chưa có mã giảm giá nào.</div>'; return; } target.innerHTML = rows.map(row => `<article class="list-group-item d-flex gap-3 align-items-center justify-content-between"><div><div class="fw-bold">${escapeHtml(row.code)} <span class="badge ${row.isActive ? "text-bg-success" : "text-bg-secondary"}">${row.isActive ? "Đang bật" : "Tạm ngưng"}</span></div><div>${escapeHtml(row.name)} · ${row.discountType === "Percentage" ? `${row.discountValue}%` : money(row.discountValue)}</div><small class="text-muted">Hiệu lực: ${date(row.startsAt)} – ${date(row.endsAt)}</small></div><button class="btn btn-sm ${row.isActive ? "btn-outline-secondary" : "btn-outline-success"}" data-promotion-toggle="${row.id}" data-active="${row.isActive}">${row.isActive ? "Tạm ngưng" : "Bật lại"}</button></article>`).join(""); target.querySelectorAll("[data-promotion-toggle]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; const response = await SalonAuth.authenticatedFetch(`/api/owner/promotions/${button.dataset.promotionToggle}/status`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: button.dataset.active !== "true" }) }); if (!response.ok) message((await response.json().catch(() => ({}))).error || "Không thể cập nhật mã.", false); await load(); })); }
-    return { start() { const today = localIso(new Date()); document.getElementById("promotion-start").value = today; document.getElementById("promotion-end").value = today; document.getElementById("promotion-form").addEventListener("submit", async event => { event.preventDefault(); const payload = { code: document.getElementById("promotion-code").value, name: document.getElementById("promotion-name").value, discountType: document.getElementById("promotion-type").value, discountValue: Number(document.getElementById("promotion-value").value), startsOn: document.getElementById("promotion-start").value, endsOn: document.getElementById("promotion-end").value, isActive: true }; const response = await SalonAuth.authenticatedFetch("/api/owner/promotions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const result = await response.json().catch(() => ({})); if (!response.ok) return message(result.error || "Không thể tạo mã giảm giá.", false); event.target.reset(); document.getElementById("promotion-start").value = today; document.getElementById("promotion-end").value = today; message("Đã tạo mã giảm giá.", true); await load(); }); load(); } };
+
+    async function load() {
+        const target = document.getElementById("promotion-list");
+        try {
+            const response = await SalonAuth.authenticatedFetch("/api/owner/promotions");
+            const rows = await response.json().catch(() => []);
+            if (!response.ok) {
+                target.innerHTML = '<div class="p-4 text-danger">Không thể tải mã giảm giá.</div>';
+                return;
+            }
+            if (!rows.length) {
+                target.innerHTML = '<div class="p-4 text-muted">Chưa có mã giảm giá nào.</div>';
+                return;
+            }
+
+            target.innerHTML = rows.map(row => `<article class="list-group-item d-flex gap-3 align-items-center justify-content-between"><div><div class="fw-bold">${escapeHtml(row.code)} <span class="badge ${row.isActive ? "text-bg-success" : "text-bg-secondary"}">${row.isActive ? "Đang bật" : "Tạm ngưng"}</span></div><div>${escapeHtml(row.name)} · ${row.discountType === "Percentage" ? `${row.discountValue}%` : money(row.discountValue)}</div><small class="text-muted">Hiệu lực: ${date(row.startsAt)} – ${date(row.endsAt)}</small></div><button class="btn btn-sm ${row.isActive ? "btn-outline-secondary" : "btn-outline-success"}" data-promotion-toggle="${row.id}" data-active="${row.isActive}">${row.isActive ? "Tạm ngưng" : "Bật lại"}</button></article>`).join("");
+            target.querySelectorAll("[data-promotion-toggle]").forEach(button => button.addEventListener("click", async () => {
+                button.disabled = true;
+                try {
+                    const response = await SalonAuth.authenticatedFetch(`/api/owner/promotions/${button.dataset.promotionToggle}/status`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ isActive: button.dataset.active !== "true" })
+                    });
+                    if (!response.ok) {
+                        const result = await response.json().catch(() => ({}));
+                        message(result.error || "Không thể cập nhật mã.", false);
+                        return;
+                    }
+                    await load();
+                } catch {
+                    message("Không thể kết nối để cập nhật mã.", false);
+                } finally {
+                    button.disabled = false;
+                }
+            }));
+        } catch {
+            target.innerHTML = '<div class="p-4 text-danger">Không thể tải mã giảm giá.</div>';
+        }
+    }
+
+    return {
+        start() {
+            const today = localIso(new Date());
+            const form = document.getElementById("promotion-form");
+            document.getElementById("promotion-start").value = today;
+            document.getElementById("promotion-end").value = today;
+            form.addEventListener("submit", async event => {
+                event.preventDefault();
+                const button = event.submitter || form.querySelector('[type="submit"]');
+                const payload = {
+                    code: document.getElementById("promotion-code").value,
+                    name: document.getElementById("promotion-name").value,
+                    discountType: document.getElementById("promotion-type").value,
+                    discountValue: Number(document.getElementById("promotion-value").value),
+                    startsOn: document.getElementById("promotion-start").value,
+                    endsOn: document.getElementById("promotion-end").value,
+                    isActive: true
+                };
+                if (button) button.disabled = true;
+                try {
+                    const response = await SalonAuth.authenticatedFetch("/api/owner/promotions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) return message(result.error || "Không thể tạo mã giảm giá.", false);
+                    form.reset();
+                    document.getElementById("promotion-start").value = today;
+                    document.getElementById("promotion-end").value = today;
+                    message("Đã tạo mã giảm giá.", true);
+                    await load();
+                } catch {
+                    message("Không thể kết nối để tạo mã giảm giá.", false);
+                } finally {
+                    if (button) button.disabled = false;
+                }
+            });
+            load();
+        }
+    };
 })();
