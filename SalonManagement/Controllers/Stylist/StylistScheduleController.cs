@@ -6,12 +6,13 @@ using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
 using SalonManagement.Models.ViewModels;
+using SalonManagement.Services;
 
 namespace SalonManagement.Controllers.StylistPortal;
 
 [Authorize(Roles = UserRoles.Stylist)]
 [Route("stylist/schedule")]
-public sealed class StylistScheduleController(ApplicationDbContext db) : Controller
+public sealed class StylistScheduleController(ApplicationDbContext db, TimeProvider timeProvider) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(DateTime? date)
@@ -19,7 +20,7 @@ public sealed class StylistScheduleController(ApplicationDbContext db) : Control
         var email = CurrentUserEmail();
         var stylist = await db.Stylists.AsNoTracking().SingleOrDefaultAsync(item => item.Email == email && item.IsActive);
         if (stylist is null) return Forbid();
-        var selected = (date ?? DateTime.Today).Date;
+        var selected = (date ?? SalonClock.GetLocalNow(timeProvider).Date).Date;
         // SQLite cannot sort TimeSpan values in SQL.  Load the stylist's small
         // daily agenda first, then order it in memory.
         var appointments = (await db.Appointments.AsNoTracking().Include(item => item.Customer).Include(item => item.AppointmentServices).ThenInclude(item => item.Service)
@@ -37,7 +38,7 @@ public sealed class StylistScheduleController(ApplicationDbContext db) : Control
         var stylist = await GetCurrentStylistAsync();
         if (stylist is null) return Forbid();
 
-        var selected = (date ?? DateTime.Today).Date;
+        var selected = (date ?? SalonClock.GetLocalNow(timeProvider).Date).Date;
         var shifts = (await db.WorkSchedules.AsNoTracking()
                 .Where(item => item.StylistId == stylist.StylistId && item.WorkDate == selected && item.Status == "Working")
                 .ToListAsync())
@@ -81,7 +82,7 @@ public sealed class StylistScheduleController(ApplicationDbContext db) : Control
     {
         var stylist = await GetCurrentStylistAsync();
         if (stylist is null) return Forbid();
-        var selected = (weekStart ?? DateTime.Today).Date;
+        var selected = (weekStart ?? SalonClock.GetLocalNow(timeProvider).Date).Date;
         var monday = selected.AddDays(-((7 + (int)selected.DayOfWeek - (int)DayOfWeek.Monday) % 7));
         var end = monday.AddDays(7);
         var shifts = await db.WorkSchedules.AsNoTracking().Where(item => item.StylistId == stylist.StylistId && item.WorkDate >= monday && item.WorkDate < end).ToListAsync();
