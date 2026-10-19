@@ -106,7 +106,12 @@ public sealed class AppointmentBookingService
             var reference = await CreateReferenceAsync();
             // Bookings submitted from the public site must be reviewed by reception.
             // Staff-created appointments continue to use their existing workflow/statuses.
+ feature/integrate-sprint4-02
             var appointment = new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "PendingConfirmation", BookingReference = reference, BookingSource = "Online", CustomerNameOverride = hasNameConflict ? name : null, NameConflictResolution = hasNameConflict ? "PendingReceptionReview" : null, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() };
+
+            var now = timeProvider.GetUtcNow();
+            var appointment = new Appointment { Customer = customer, StylistId = stylist.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "PendingConfirmation", Source = "Online", BookingReference = reference, Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(), AppointmentServices = services.Select(service => new AppointmentService { ServiceId = service.ServiceId, Price = service.Price, DurationMinutes = service.DurationMinutes }).ToList() };
+develop
             db.Appointments.Add(appointment);
             try { await db.SaveChangesAsync(); } catch (DbUpdateException) { return BookingCreationResult.Rejected("slot_unavailable", "Khung giờ này vừa được đặt. Vui lòng chọn khung giờ khác."); }
             notifications.Add(stylist.Email, appointment.AppointmentId, "AppointmentAssigned", $"Bạn được gán lịch hẹn mới #{reference} lúc {request.StartTime:hh\\:mm} ngày {request.Date:dd/MM}.");
