@@ -33,6 +33,10 @@ window.ReceptionPendingAppointments = (() => {
             loading.textContent = appointments.length ? "" : "Chưa có lịch nào cần xác nhận.";
             error.classList.add("d-none");
             wrap.classList.toggle("d-none", appointments.length === 0);
+            const selectedReasons = new Map([...list.querySelectorAll("[data-reject-appointment]")].map(button => {
+                const reason = button.closest("tr").querySelector("[data-rejection-reason]").value;
+                return [button.dataset.rejectAppointment, reason];
+            }).filter(([, reason]) => reason));
             list.innerHTML = appointments.map(appointment => {
                 const services = Array.isArray(appointment.services) ? appointment.services : [];
                 const serviceNames = services.map(escapeHtml).join("<br>") || "Chưa có dịch vụ";
@@ -46,6 +50,10 @@ window.ReceptionPendingAppointments = (() => {
                     <td><div class="d-flex flex-column gap-1">${appointment.nameConflictResolution === "PendingReceptionReview" ? `<div class="border border-warning rounded p-2"><small class="d-block mb-1">Chọn cách xử lý tên:</small><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" type="button" data-resolve-name-conflict="${appointment.appointmentId}" data-name-resolution="KeepProfile">Giữ hồ sơ</button><button class="btn btn-outline-primary" type="button" data-resolve-name-conflict="${appointment.appointmentId}" data-name-resolution="UpdateProfile">Cập nhật hồ sơ</button><button class="btn btn-outline-primary" type="button" data-resolve-name-conflict="${appointment.appointmentId}" data-name-resolution="UseForThisAppointment">Chỉ dùng lịch này</button></div></div>` : ''}<button class="btn btn-sm btn-success" type="button" data-confirm-appointment="${appointment.appointmentId}" ${appointment.nameConflictResolution === "PendingReceptionReview" ? "disabled" : ""}>Xác nhận</button><div class="input-group input-group-sm"><select class="form-select" aria-label="Lý do từ chối" data-rejection-reason><option value="">Chọn lý do…</option><option>Không còn thợ phù hợp</option><option>Khung giờ không còn trống</option><option>Không liên hệ được khách</option><option>Yêu cầu của khách không phù hợp</option></select><button class="btn btn-outline-danger" type="button" data-reject-appointment="${appointment.appointmentId}">Từ chối</button></div></div></td>
                 </tr>`;
             }).join("");
+            list.querySelectorAll("[data-reject-appointment]").forEach(button => {
+                const reason = selectedReasons.get(button.dataset.rejectAppointment);
+                if (reason) button.closest("tr").querySelector("[data-rejection-reason]").value = reason;
+            });
             list.querySelectorAll("[data-confirm-appointment]").forEach(button => button.addEventListener("click", async () => {
                 button.disabled = true;
                 try {
