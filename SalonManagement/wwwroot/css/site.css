@@ -230,15 +230,34 @@ html { scroll-behavior: smooth; }
   .footer-grid .home-brand, .footer-grid div { justify-content: center; }
 }
 /* Reception: compact daily schedule so busy teams can scan more appointments at once. */
+.reception-day-schedule {
+    height: calc(100vh - 130px);
+    display: flex;
+    flex-direction: column;
+    padding-top: .75rem !important;
+    padding-bottom: .25rem !important;
+}
+
+.reception-day-schedule > div:first-child {
+    flex-shrink: 0;
+}
+
 .reception-day-schedule .alert {
     margin-bottom: .5rem;
     padding: .5rem .75rem;
+    flex-shrink: 0;
 }
 
 .reception-day-schedule-grid {
-    max-height: calc(100vh - 225px);
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    max-height: none;
     overflow: auto;
     background: #e9eef3;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .05);
 }
 
 .schedule-grid {
@@ -246,17 +265,23 @@ html { scroll-behavior: smooth; }
     min-width: 100%;
     font-size: .82rem;
     table-layout: fixed;
+    border-collapse: separate !important;
+    border-spacing: 0;
 }
 
 .schedule-grid thead th {
     position: sticky;
     top: 0;
-    z-index: 3;
+    z-index: 10;
     padding: .5rem .6rem;
-    background: #f9fbfd;
+    background: #f8fafc !important;
+    color: #1e293b;
     font-size: .76rem;
     font-weight: 700;
     white-space: nowrap;
+    border-bottom: 2px solid #cbd5e1 !important;
+    border-right: 1px solid #e2e8f0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .06);
 }
 
 .schedule-time-column,
@@ -268,16 +293,32 @@ html { scroll-behavior: smooth; }
 .schedule-time-col { width: 62px; }
 .schedule-staff-col { width: 136px; }
 
-.schedule-time {
+/* Ô góc trên bên trái ("Giờ") - Khóa cứng cố định cả 2 chiều Top và Left */
+.schedule-grid thead th.schedule-time-column {
+    position: sticky !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 30 !important;
+    background: #e2e8f0 !important;
+    border-right: 2px solid #cbd5e1 !important;
+    border-bottom: 2px solid #cbd5e1 !important;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, .08);
+}
+
+/* Cột mốc giờ bên trái - Khóa cứng cố định khi cuộn ngang */
+.schedule-grid tbody th.schedule-time {
     padding: .45rem .5rem !important;
-    position: sticky;
-    left: 0;
-    z-index: 2;
-    background: #fff;
-    color: #4b5563 !important;
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 5 !important;
+    background: #f8fafc !important;
+    color: #334155 !important;
     font-size: .78rem;
     font-weight: 700;
     white-space: nowrap;
+    border-right: 2px solid #cbd5e1 !important;
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, .04);
 }
 
 .schedule-stylist-column {
@@ -286,12 +327,7 @@ html { scroll-behavior: smooth; }
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.schedule-time-column {
-    position: sticky !important;
-    left: 0;
-    z-index: 5 !important;
+    border-right: 1px solid #e2e8f0;
 }
 
 .schedule-stylist-avatar {
@@ -319,6 +355,8 @@ html { scroll-behavior: smooth; }
     padding: .25rem !important;
     height: 36px;
     overflow: hidden;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .schedule-working { background: #eef2f6; }
@@ -898,8 +936,8 @@ body.stylist-drawer-open { overflow:hidden; }.stylist-technical-drawer { positio
     .reception-operation-row .btn { grid-column: 2; }
     .reception-panel-link { display: none; }
 
-    .reception-day-schedule-grid {
-        max-height: calc(100vh - 205px);
+    .reception-day-schedule {
+        height: calc(100vh - 90px);
     }
 
     .schedule-stylist-column,

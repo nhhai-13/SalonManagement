@@ -15,7 +15,7 @@
     </div>
     @if (TempData["Success"] is string success) { <div class="alert alert-success">@success</div> }
     @if (TempData["Error"] is string error) { <div class="alert alert-danger">@error</div> }
-    <div class="table-responsive border rounded bg-white reception-day-schedule-grid">
+    <div class="border rounded bg-white reception-day-schedule-grid">
         <table class="table table-bordered align-top mb-0 schedule-grid">
             <colgroup><col class="schedule-time-col" />@foreach (var _ in Model.Stylists) { <col class="schedule-staff-col" /> }</colgroup>
             <thead class="table-light"><tr><th class="schedule-time-column">Giờ</th>@foreach (var stylist in Model.Stylists) { var names = stylist.StylistName.Split(' ', StringSplitOptions.RemoveEmptyEntries); var initials = string.Concat(names.Take(2).Select(name => char.ToUpperInvariant(name[0]))); var shortName = string.Join(" ", names.Take(2)); <th class="schedule-stylist-column" title="@stylist.StylistName"><span class="schedule-stylist-avatar">@initials</span><span class="schedule-stylist-name">@shortName</span></th> }</tr></thead>
