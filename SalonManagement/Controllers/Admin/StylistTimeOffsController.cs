@@ -9,13 +9,20 @@ namespace SalonManagement.Controllers;
 [Authorize(Roles = UserRoles.Owner)]
 [ApiController]
 [Route("api/stylist-time-offs")]
-public class StylistTimeOffsController(ApplicationDbContext dbContext) : ControllerBase
+public class StylistTimeOffsController : ControllerBase
 {
+    private readonly ApplicationDbContext _dbContext;
+
+    public StylistTimeOffsController(ApplicationDbContext dbContext)
+    {
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+    }
+
     // Lấy danh sách ngày nghỉ của một thợ
     [HttpGet("{stylistId:int}")]
     public async Task<IActionResult> Get(int stylistId)
     {
-        var items = await dbContext.StylistTimeOffs
+        var items = await _dbContext.StylistTimeOffs
             .Where(x => x.StylistId == stylistId)
             .OrderBy(x => x.OffDate)
             .ThenBy(x => x.StartTime)
@@ -26,9 +33,9 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
     // Thêm ngày/giờ nghỉ cho thợ
     [HttpPost]
-    public async Task<IActionResult> Create(
-        [FromBody] StylistTimeOffRequest request)
+    public async Task<IActionResult> Create([FromBody] StylistTimeOffRequest request)
     {
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
  feature/s4-02/recalculate-discount-on-service-change-and-reports
 
  feature/s2-02-stylist-time-off-warning
@@ -39,20 +46,20 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
  develop
         if (string.IsNullOrWhiteSpace(request.Reason))
+
+        if (request is null)
+ develop
         {
-            return BadRequest(new { message = "Vui lòng nhập lý do nghỉ." });
+            return BadRequest(new { message = "Yêu cầu không hợp lệ." });
         }
 
         // Kiểm tra thợ có tồn tại không
-        var stylistExists = await dbContext.Stylists
+        var stylistExists = await _dbContext.Stylists
             .AnyAsync(x => x.StylistId == request.StylistId);
 
         if (!stylistExists)
         {
-            return NotFound(new
-            {
-                message = "Không tìm thấy thợ."
-            });
+            return NotFound(new { message = "Không tìm thấy thợ." });
         }
 
         // Nếu nghỉ theo khoảng giờ
@@ -60,22 +67,17 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         {
             if (request.StartTime == null || request.EndTime == null)
             {
-                return BadRequest(new
-                {
-                    message = "Phải nhập giờ bắt đầu và giờ kết thúc."
-                });
+                return BadRequest(new { message = "Phải nhập giờ bắt đầu và giờ kết thúc." });
             }
 
             if (request.StartTime >= request.EndTime)
             {
-                return BadRequest(new
-                {
-                    message = "Giờ kết thúc phải sau giờ bắt đầu."
-                });
+                return BadRequest(new { message = "Giờ kết thúc phải sau giờ bắt đầu." });
             }
         }
+
         // Kiểm tra lịch nghỉ bị trùng
-        var existingTimeOffs = await dbContext.StylistTimeOffs
+        var existingTimeOffs = await _dbContext.StylistTimeOffs
             .Where(x =>
                 x.StylistId == request.StylistId &&
                 x.OffDate == request.OffDate)
@@ -84,12 +86,10 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         // Nếu khai báo nghỉ cả ngày nhưng ngày đó đã có lịch nghỉ
         if (request.IsFullDay && existingTimeOffs.Any())
         {
-            return BadRequest(new
-            {
-                message = "Thợ đã có lịch nghỉ trong ngày này."
-         });
+            return BadRequest(new { message = "Thợ đã có lịch nghỉ trong ngày này." });
         }
 
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
        // Nếu nghỉ theo khoảng giờ
        if (!request.IsFullDay)
        {
@@ -200,8 +200,22 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
         foreach (var appointment in affectedAppointments)
 
+        // Nếu nghỉ theo khoảng giờ
+        if (!request.IsFullDay)
+        {
+            var isOverlap = existingTimeOffs.Any(x =>
+                x.IsFullDay ||
+                (x.StartTime < request.EndTime && x.EndTime > request.StartTime));
+
+            if (isOverlap)
+            {
+                return BadRequest(new { message = "Khoảng giờ nghỉ bị trùng với lịch nghỉ đã có." });
+            }
+        }
  develop
+
         var timeOff = new StylistTimeOff
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
  develop
  develop
         {
@@ -250,16 +264,20 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
  feature/s2-02-stylist-time-off-warning
  feature/s2-02-stylist-time-off-warning
 
- feature/s2-02-stylist-time-off-booking
- develop
-        return Ok(timeOff);
-
-        return Ok(new
         {
-            timeOff,
-            reassignedAppointmentIds = affectedAppointments.Select(appointment => appointment.AppointmentId)
-        });
+            StylistId = request.StylistId,
+            OffDate = request.OffDate,
+            IsFullDay = request.IsFullDay,
+            StartTime = request.IsFullDay ? null : request.StartTime,
+            EndTime = request.IsFullDay ? null : request.EndTime,
+            Reason = request.Reason
+        };
+
+        _dbContext.StylistTimeOffs.Add(timeOff);
+        await _dbContext.SaveChangesAsync();
  develop
+
+        return Ok(timeOff);
     }
  develop
 
@@ -267,22 +285,19 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var timeOff = await dbContext.StylistTimeOffs
-            .FindAsync(id);
+        var timeOff = await _dbContext.StylistTimeOffs.FindAsync(id);
 
         if (timeOff == null)
         {
-            return NotFound(new
-            {
-                message = "Không tìm thấy lịch nghỉ."
-            });
+            return NotFound(new { message = "Không tìm thấy lịch nghỉ." });
         }
 
-        dbContext.StylistTimeOffs.Remove(timeOff);
-        await dbContext.SaveChangesAsync();
+        _dbContext.StylistTimeOffs.Remove(timeOff);
+        await _dbContext.SaveChangesAsync();
 
         return NoContent();
     }
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
  feature/s4-02/recalculate-discount-on-service-change-and-reports
 
  feature/s2-02-stylist-time-off-warning
@@ -340,6 +355,8 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
 
         return null;
     }
+
+ develop
 }
 
 public class StylistTimeOffRequest
@@ -356,6 +373,7 @@ public class StylistTimeOffRequest
 
     public string? Reason { get; set; }
  feature/s4-02/recalculate-discount-on-service-change-and-reports
+ feature/s4-02/recalculate-discount-on-service-change-and-reports
 
  feature/s2-02-stylist-time-off-warning
  feature/s2-02-stylist-time-off-warning
@@ -368,3 +386,6 @@ public class StylistTimeOffRequest
 
     public int? ReplacementStylistId { get; set; }
 }
+
+}
+ develop
