@@ -268,6 +268,47 @@ public sealed class StylistManagementController(
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost("{id:int}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var stylist = await db.Stylists.SingleOrDefaultAsync(item => item.StylistId == id);
+        if (stylist is null)
+            return NotFound();
+
+        // Appointments are customer-service history and must never disappear as a
+        // side effect of removing a profile. Work schedules, on the other hand,
+        // are only operational setup and are removed together with the profile.
+        var appointmentCount = await db.Appointments.CountAsync(item => item.StylistId == id);
+        if (appointmentCount > 0)
+        {
+            TempData["Error"] = $"Không thể xóa hồ sơ {stylist.FullName} vì đang có {appointmentCount} lịch hẹn. Hãy giữ hồ sơ ở trạng thái nghỉ việc để lưu lịch sử phục vụ.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var schedules = await db.WorkSchedules.Where(item => item.StylistId == id).ToListAsync();
+        var imagePath = stylist.ProfileImagePath;
+        db.WorkSchedules.RemoveRange(schedules);
+        db.Stylists.Remove(stylist);
+        try
+        {
+            await db.SaveChangesAsync();
+            if (!string.IsNullOrWhiteSpace(imagePath))
+                DeleteProfileImage(imagePath);
+
+            TempData["Success"] = schedules.Count == 0
+                ? $"Đã xóa hồ sơ thợ {stylist.FullName}."
+                : $"Đã xóa hồ sơ thợ {stylist.FullName} và {schedules.Count} ca làm việc đi kèm.";
+        }
+        catch (DbUpdateException exception)
+        {
+            logger.LogWarning(exception, "Could not delete stylist profile {StylistId} because it is still in use.", id);
+            TempData["Error"] = $"Không thể xóa hồ sơ {stylist.FullName} vì vẫn còn dữ liệu liên quan. Hãy giữ hồ sơ ở trạng thái nghỉ việc để lưu lịch sử.";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     private async Task LoadServicesAsync(CreateStylistViewModel model)
     {
         model.AvailableServices = await db.Services.AsNoTracking()

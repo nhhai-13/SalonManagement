@@ -22,6 +22,9 @@
 
         public decimal TotalAmount { get; set; }
 
+        /// <summary>Snapshot of the promotion code used at checkout; null when no discount was used.</summary>
+        public string? PromotionCode { get; set; }
+
         public string Status { get; set; } = "Unpaid";
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;

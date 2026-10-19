@@ -9,20 +9,13 @@ namespace SalonManagement.Controllers;
 [Authorize(Roles = UserRoles.Owner)]
 [ApiController]
 [Route("api/stylist-time-offs")]
-public class StylistTimeOffsController : ControllerBase
+public class StylistTimeOffsController(ApplicationDbContext dbContext) : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
-
-    public StylistTimeOffsController(ApplicationDbContext dbContext)
-    {
-        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-    }
-
     // Lấy danh sách ngày nghỉ của một thợ
     [HttpGet("{stylistId:int}")]
     public async Task<IActionResult> Get(int stylistId)
     {
-        var items = await _dbContext.StylistTimeOffs
+        var items = await dbContext.StylistTimeOffs
             .Where(x => x.StylistId == stylistId)
             .OrderBy(x => x.OffDate)
             .ThenBy(x => x.StartTime)
@@ -33,24 +26,23 @@ public class StylistTimeOffsController : ControllerBase
 
     // Thêm ngày/giờ nghỉ cho thợ
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] StylistTimeOffRequest request)
+    public async Task<IActionResult> Create(
+        [FromBody] StylistTimeOffRequest request)
     {
- feature/s4-04/single-use-email-review-token-7days
         if (string.IsNullOrWhiteSpace(request.Reason))
-
-        if (request is null)
- develop
         {
-            return BadRequest(new { message = "Yêu cầu không hợp lệ." });
+            return BadRequest(new { message = "Vui lòng nhập lý do nghỉ." });
         }
-
         // Kiểm tra thợ có tồn tại không
-        var stylistExists = await _dbContext.Stylists
+        var stylistExists = await dbContext.Stylists
             .AnyAsync(x => x.StylistId == request.StylistId);
 
         if (!stylistExists)
         {
-            return NotFound(new { message = "Không tìm thấy thợ." });
+            return NotFound(new
+            {
+                message = "Không tìm thấy thợ."
+            });
         }
 
         // Nếu nghỉ theo khoảng giờ
@@ -58,17 +50,22 @@ public class StylistTimeOffsController : ControllerBase
         {
             if (request.StartTime == null || request.EndTime == null)
             {
-                return BadRequest(new { message = "Phải nhập giờ bắt đầu và giờ kết thúc." });
+                return BadRequest(new
+                {
+                    message = "Phải nhập giờ bắt đầu và giờ kết thúc."
+                });
             }
 
             if (request.StartTime >= request.EndTime)
             {
-                return BadRequest(new { message = "Giờ kết thúc phải sau giờ bắt đầu." });
+                return BadRequest(new
+                {
+                    message = "Giờ kết thúc phải sau giờ bắt đầu."
+                });
             }
         }
-
         // Kiểm tra lịch nghỉ bị trùng
-        var existingTimeOffs = await _dbContext.StylistTimeOffs
+        var existingTimeOffs = await dbContext.StylistTimeOffs
             .Where(x =>
                 x.StylistId == request.StylistId &&
                 x.OffDate == request.OffDate)
@@ -77,34 +74,28 @@ public class StylistTimeOffsController : ControllerBase
         // Nếu khai báo nghỉ cả ngày nhưng ngày đó đã có lịch nghỉ
         if (request.IsFullDay && existingTimeOffs.Any())
         {
- feature/s4-04/single-use-email-review-token-7days
             return BadRequest(new
             {
                 message = "Thợ đã có lịch nghỉ trong ngày này."
-            });
-=======
-           return BadRequest(new { message = "Thợ đã có lịch nghỉ trong ngày này." });
- develop
+         });
         }
 
-        // Nếu nghỉ theo khoảng giờ
-        if (!request.IsFullDay)
- feature/s4-04/single-use-email-review-token-7days
+       // Nếu nghỉ theo khoảng giờ
+       if (!request.IsFullDay)
+       {
+           var isOverlap = existingTimeOffs.Any(x =>
+               x.IsFullDay ||
+              (x.StartTime < request.EndTime &&
+               x.EndTime > request.StartTime));
+
+    if (isOverlap)
+    {
+        return BadRequest(new
         {
-            var isOverlap = existingTimeOffs.Any(x =>
-                x.IsFullDay ||
-                (x.StartTime < request.EndTime &&
-                 x.EndTime > request.StartTime));
-
-            if (isOverlap)
-            {
-                return BadRequest(new
-                {
-                    message = "Khoảng giờ nghỉ bị trùng với lịch nghỉ đã có."
-                });
-            }
-        }
-
+            message = "Khoảng giờ nghỉ bị trùng với lịch nghỉ đã có."
+        });
+    }
+}
         var appointmentDay = request.OffDate.ToDateTime(TimeOnly.MinValue);
         var nextDay = appointmentDay.AddDays(1);
         var affectedAppointments = await dbContext.Appointments
@@ -123,8 +114,8 @@ public class StylistTimeOffsController : ControllerBase
         {
             if (!request.ReplacementStylistId.HasValue)
             {
-                return Conflict(new
-                {
+            return Conflict(new
+            {
                     message = "Thời gian nghỉ trùng với lịch hẹn đã có. Vui lòng chọn người thay thế để chuyển lịch.",
                     affectedAppointments = affectedAppointments.Select(appointment => new
                     {
@@ -134,7 +125,7 @@ public class StylistTimeOffsController : ControllerBase
                         appointment.EndTime,
                         appointment.Status
                     })
-                });
+            });
             }
 
             var replacementError = await ValidateReplacementAsync(request.ReplacementStylistId.Value, request.StylistId,
@@ -142,15 +133,10 @@ public class StylistTimeOffsController : ControllerBase
             if (replacementError is not null)
                 return BadRequest(new { message = replacementError });
 
-        {
-            var isOverlap = existingTimeOffs.Any(x =>
-                x.IsFullDay ||
-                (x.StartTime < request.EndTime && x.EndTime > request.StartTime));
-develop
-
-            if (isOverlap)
+            foreach (var appointment in affectedAppointments)
             {
-                return BadRequest(new { message = "Khoảng giờ nghỉ bị trùng với lịch nghỉ đã có." });
+                appointment.StylistId = request.ReplacementStylistId.Value;
+                appointment.UpdatedAt = DateTime.Now;
             }
         }
 
@@ -159,9 +145,15 @@ develop
             StylistId = request.StylistId,
             OffDate = request.OffDate,
             IsFullDay = request.IsFullDay,
-            StartTime = request.IsFullDay ? null : request.StartTime,
-            EndTime = request.IsFullDay ? null : request.EndTime,
- feature/s4-04/single-use-email-review-token-7days
+
+            StartTime = request.IsFullDay
+                ? null
+                : request.StartTime,
+
+            EndTime = request.IsFullDay
+                ? null
+                : request.EndTime,
+
             Reason = request.Reason.Trim()
         };
 
@@ -173,38 +165,28 @@ develop
             timeOff,
             reassignedAppointmentIds = affectedAppointments.Select(appointment => appointment.AppointmentId)
         });
-
-Reason = request.Reason
-        };
-
-        _dbContext.StylistTimeOffs.Add(timeOff);
-        await _dbContext.SaveChangesAsync();
-
-        return Ok(timeOff);
- develop
     }
 
     // Xóa lịch nghỉ
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
- feature/s4-04/single-use-email-review-token-7days
-        var timeOff = await dbContext.StylistTimeOffs.FindAsync(id);
-
-        var timeOff = await _dbContext.StylistTimeOffs.FindAsync(id);
- develop
+        var timeOff = await dbContext.StylistTimeOffs
+            .FindAsync(id);
 
         if (timeOff == null)
         {
-            return NotFound(new { message = "Không tìm thấy lịch nghỉ." });
+            return NotFound(new
+            {
+                message = "Không tìm thấy lịch nghỉ."
+            });
         }
 
-        _dbContext.StylistTimeOffs.Remove(timeOff);
-        await _dbContext.SaveChangesAsync();
+        dbContext.StylistTimeOffs.Remove(timeOff);
+        await dbContext.SaveChangesAsync();
 
         return NoContent();
     }
- feature/s4-04/single-use-email-review-token-7days
 
     private async Task<string?> ValidateReplacementAsync(int replacementStylistId, int absentStylistId,
         DateOnly offDate, List<Appointment> appointments)
@@ -253,8 +235,6 @@ Reason = request.Reason
 
         return null;
     }
-
- develop
 }
 
 public class StylistTimeOffRequest
@@ -270,10 +250,6 @@ public class StylistTimeOffRequest
     public TimeOnly? EndTime { get; set; }
 
     public string? Reason { get; set; }
- feature/s4-04/single-use-email-review-token-7days
 
     public int? ReplacementStylistId { get; set; }
 }
-
-}
- develop

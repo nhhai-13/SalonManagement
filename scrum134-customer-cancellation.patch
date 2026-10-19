@@ -1,0 +1,155 @@
+From 98554e0c24fa649a439fb643fcbf60662e1fe9ac Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Nguy=E1=BB=85n=20H=E1=BB=AFu=20H=E1=BA=A3i?=
+ <nguyenhuuhaib750@gmail.com>
+Date: Sun, 11 Oct 2026 22:22:12 +0700
+Subject: [PATCH] feat: allow customers to cancel appointments
+
+---
+ .../AppointmentCancellationServiceTests.cs    | 47 +++++++++++++++++++
+ .../Booking/AppointmentLookupController.cs    |  9 ++++
+ .../AppointmentCancellationService.cs         | 33 +++++++++++++
+ .../Views/AppointmentLookup/Index.cshtml      | 16 +++++++
+ 4 files changed, 105 insertions(+)
+ create mode 100644 SalonManagement.Tests/AppointmentCancellationServiceTests.cs
+ create mode 100644 SalonManagement/Services/AppointmentCancellationService.cs
+
+diff --git a/SalonManagement.Tests/AppointmentCancellationServiceTests.cs b/SalonManagement.Tests/AppointmentCancellationServiceTests.cs
+new file mode 100644
+index 0000000..12f5817
+--- /dev/null
++++ b/SalonManagement.Tests/AppointmentCancellationServiceTests.cs
+@@ -0,0 +1,47 @@
++using Microsoft.AspNetCore.Http;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.VisualStudio.TestTools.UnitTesting;
++using SalonManagement.Data;
++using SalonManagement.Models;
++using SalonManagement.Services;
++
++namespace SalonManagement.Tests;
++
++[TestClass]
++public sealed class AppointmentCancellationServiceTests
++{
++    [TestMethod]
++    public async Task Cancel_at_or_over_120_minutes_marks_appointment_cancelled()
++    {
++        await using var db = CreateDb();
++        var now = new DateTimeOffset(2031, 2, 3, 8, 0, 0, TimeSpan.FromHours(7));
++        await SeedAsync(db, now.LocalDateTime.AddMinutes(120), "CANCEL01");
++
++        var result = await new AppointmentCancellationService(db, new FakeTimeProvider(now)).CancelAsync("cancel01");
++
++        Assert.IsTrue(result.Succeeded);
++        Assert.AreEqual("Cancelled", (await db.Appointments.SingleAsync()).Status);
++    }
++
++    [TestMethod]
++    public async Task Cancel_under_120_minutes_is_rejected_without_changing_appointment()
++    {
++        await using var db = CreateDb();
++        var now = new DateTimeOffset(2031, 2, 3, 8, 0, 0, TimeSpan.FromHours(7));
++        await SeedAsync(db, now.LocalDateTime.AddMinutes(119), "CANCEL02");
++
++        var result = await new AppointmentCancellationService(db, new FakeTimeProvider(now)).CancelAsync("CANCEL02");
++
++        Assert.IsFalse(result.Succeeded);
++        Assert.AreEqual("too_late", result.ErrorCode);
++        Assert.AreEqual("Confirmed", (await db.Appointments.SingleAsync()).Status);
++    }
++
++    private static ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, new HttpContextAccessor());
++    private static async Task SeedAsync(ApplicationDbContext db, DateTime date, string reference)
++    {
++        db.Appointments.Add(new Appointment { Customer = new Customer { FullName = "Khách", Phone = "0900000001" }, Stylist = new Stylist { FullName = "Thợ", Phone = "0900000002" }, AppointmentDate = date.Date, StartTime = date.TimeOfDay, EndTime = date.TimeOfDay.Add(TimeSpan.FromMinutes(30)), Status = "Confirmed", BookingReference = reference });
++        await db.SaveChangesAsync();
++    }
++    private sealed class FakeTimeProvider(DateTimeOffset now) : TimeProvider { public override DateTimeOffset GetUtcNow() => now.ToUniversalTime(); }
++}
+diff --git a/SalonManagement/Controllers/Booking/AppointmentLookupController.cs b/SalonManagement/Controllers/Booking/AppointmentLookupController.cs
+index 85bffe0..bf064d1 100644
+--- a/SalonManagement/Controllers/Booking/AppointmentLookupController.cs
++++ b/SalonManagement/Controllers/Booking/AppointmentLookupController.cs
+@@ -31,4 +31,13 @@ public sealed class AppointmentLookupController(ApplicationDbContext db, TimePro
+         }
+         return Ok(new { error = result.Error, appointments = result.Items.Select(item => new { item.Reference, date = item.Date.ToString("dd/MM/yyyy"), startTime = item.StartTime.ToString(@"hh\:mm"), endTime = item.EndTime.ToString(@"hh\:mm"), item.Services, item.StylistName, item.DurationMinutes, item.Status }) });
+     }
++
++    [HttpPost("cancel")]
++    public async Task<IActionResult> Cancel([FromBody] CancelAppointmentRequest request)
++    {
++        var result = await new AppointmentCancellationService(db, timeProvider).CancelAsync(request.Reference);
++        return result.Succeeded ? Ok(new { status = "Cancelled" }) : BadRequest(new { error = result.Error, code = result.ErrorCode });
++    }
+ }
++
++public sealed record CancelAppointmentRequest(string? Reference);
+diff --git a/SalonManagement/Services/AppointmentCancellationService.cs b/SalonManagement/Services/AppointmentCancellationService.cs
+new file mode 100644
+index 0000000..d7a52c9
+--- /dev/null
++++ b/SalonManagement/Services/AppointmentCancellationService.cs
+@@ -0,0 +1,33 @@
++using Microsoft.EntityFrameworkCore;
++using SalonManagement.Data;
++
++namespace SalonManagement.Services;
++
++public sealed record AppointmentCancellationResult(bool Succeeded, string? ErrorCode, string? Error)
++{
++    public static AppointmentCancellationResult Rejected(string code, string error) => new(false, code, error);
++    public static AppointmentCancellationResult Success() => new(true, null, null);
++}
++
++public sealed class AppointmentCancellationService(ApplicationDbContext db, TimeProvider timeProvider)
++{
++    private static readonly TimeSpan MinimumNotice = TimeSpan.FromMinutes(120);
++
++    public async Task<AppointmentCancellationResult> CancelAsync(string? reference)
++    {
++        var normalizedReference = reference?.Trim().ToUpperInvariant();
++        if (string.IsNullOrWhiteSpace(normalizedReference)) return AppointmentCancellationResult.Rejected("invalid_reference", "Mã lịch hẹn không hợp lệ.");
++        var appointment = await db.Appointments.SingleOrDefaultAsync(item => item.BookingReference == normalizedReference);
++        if (appointment is null) return AppointmentCancellationResult.Rejected("not_found", "Không tìm thấy lịch hẹn.");
++        if (appointment.Status == "Cancelled") return AppointmentCancellationResult.Rejected("already_cancelled", "Lịch hẹn này đã được huỷ.");
++
++        var appointmentAt = appointment.AppointmentDate.Date.Add(appointment.StartTime);
++        if (appointmentAt - SalonClock.GetLocalNow(timeProvider) < MinimumNotice)
++            return AppointmentCancellationResult.Rejected("too_late", "Lịch hẹn còn dưới 120 phút. Vui lòng gọi điện cho tiệm để được hỗ trợ.");
++
++        appointment.Status = "Cancelled";
++        appointment.UpdatedAt = SalonClock.GetLocalNow(timeProvider);
++        await db.SaveChangesAsync();
++        return AppointmentCancellationResult.Success();
++    }
++}
+diff --git a/SalonManagement/Views/AppointmentLookup/Index.cshtml b/SalonManagement/Views/AppointmentLookup/Index.cshtml
+index effa396..0e7f332 100644
+--- a/SalonManagement/Views/AppointmentLookup/Index.cshtml
++++ b/SalonManagement/Views/AppointmentLookup/Index.cshtml
+@@ -58,6 +58,22 @@
+                     addText(body, 'div', (appointment.services || []).join(', '), 'mt-2');
+                     addText(body, 'div', `Thợ: ${appointment.stylistName}`);
+                     addText(body, 'div', `${appointment.date} · ${appointment.startTime}–${appointment.endTime} · ${appointment.durationMinutes} phút`);
++                    if (appointment.status !== 'Đã huỷ') {
++                        const cancel = document.createElement('button');
++                        cancel.type = 'button'; cancel.className = 'btn btn-outline-danger btn-sm mt-3'; cancel.textContent = 'Huỷ lịch';
++                        cancel.addEventListener('click', async () => {
++                            if (!confirm('Bạn có chắc muốn huỷ lịch hẹn này?')) return;
++                            cancel.disabled = true;
++                            try {
++                                const response = await fetch('/appointments/lookup/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: appointment.reference }) });
++                                const data = await response.json();
++                                if (!response.ok) throw new Error(data.error || 'Không thể huỷ lịch hẹn.');
++                                showMessage('Huỷ lịch hẹn thành công. Khung giờ đã được trả lại.', false);
++                                form.requestSubmit();
++                            } catch (error) { showMessage(error.message || 'Không thể huỷ lịch hẹn.', true); cancel.disabled = false; }
++                        });
++                        body.append(cancel);
++                    }
+                     item.append(body);
+                     list.append(item);
+                 });
+-- 
+2.55.0.windows.4
+
