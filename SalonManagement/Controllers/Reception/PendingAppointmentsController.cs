@@ -78,8 +78,6 @@ public sealed class PendingAppointmentsController : ControllerBase
     {
         var appointment = await db.Appointments
             .Include(item => item.Customer)
-            .Include(item => item.Stylist)
-            .Include(item => item.AppointmentServices).ThenInclude(item => item.Service)
             .SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
         if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
         if (appointment.Status != "PendingConfirmation") return Conflict(new { error = "Lịch hẹn này đã được xử lý." });

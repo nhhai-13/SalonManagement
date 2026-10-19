@@ -192,6 +192,29 @@ public sealed class CustomerProfileTests
         Assert.AreEqual(UserRoles.Receptionist + "," + UserRoles.Owner, authorization.Roles);
     }
 
+    [TestMethod]
+    public async Task Summary_counts_online_and_counter_visits_accurately()
+    {
+        await using var db = CreateDb();
+        var customer = new Customer { FullName = "Khách Đa Kênh", Phone = "0912345678" };
+        db.Customers.Add(customer); await db.SaveChangesAsync();
+        db.Appointments.AddRange(
+            new Appointment { CustomerId = customer.CustomerId, StylistId = 1, AppointmentDate = DateTime.Today, BookingReference = "ONL1", BookingSource = "Online", Status = "Completed" },
+            new Appointment { CustomerId = customer.CustomerId, StylistId = 1, AppointmentDate = DateTime.Today, BookingReference = "ONL2", BookingSource = "Online", Status = "Arrived" },
+            new Appointment { CustomerId = customer.CustomerId, StylistId = 1, AppointmentDate = DateTime.Today, BookingReference = "CTR1", BookingSource = "Counter", Status = "Completed" },
+            new Appointment { CustomerId = customer.CustomerId, StylistId = 1, AppointmentDate = DateTime.Today, BookingReference = "CTR2", BookingSource = "CounterWalkIn", Status = "InProgress" },
+            new Appointment { CustomerId = customer.CustomerId, StylistId = 1, AppointmentDate = DateTime.Today, BookingReference = "CAN1", BookingSource = "Online", Status = "Cancelled" });
+        await db.SaveChangesAsync();
+        var profiles = new CustomerProfileService(db);
+
+        var summary = await profiles.GetSummaryAsync(customer.CustomerId);
+
+        Assert.IsNotNull(summary);
+        Assert.AreEqual(4, summary.VisitCount);
+        Assert.AreEqual(2, summary.OnlineVisitCount);
+        Assert.AreEqual(2, summary.CounterVisitCount);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;

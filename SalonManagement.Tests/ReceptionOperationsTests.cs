@@ -40,11 +40,13 @@ public sealed class ReceptionOperationsTests
         Assert.IsNotNull(snapshot);
         Assert.AreEqual(3, snapshot.TotalAppointments);
         Assert.AreEqual(1, snapshot.CheckedInAppointments);
-        Assert.AreEqual(1, snapshot.PendingCheckoutCount);
+        Assert.AreEqual(2, snapshot.PendingCheckoutCount);
         Assert.AreEqual(1, snapshot.IdleStylistCount);
         Assert.AreEqual(2, snapshot.OnShiftStylistCount);
         Assert.AreEqual("Khách sắp đến", snapshot.UpcomingCheckIns.Single().CustomerName);
-        Assert.AreEqual(200000m, snapshot.PendingCheckouts.Single().TotalAmount);
+        Assert.AreEqual(2, snapshot.PendingCheckouts.Count);
+        Assert.IsTrue(snapshot.PendingCheckouts.Any(item => item.CustomerName == "Khách cần thu" && item.TotalAmount == 200000m));
+        Assert.IsTrue(snapshot.PendingCheckouts.Any(item => item.CustomerName == "Khách đang làm" && item.TotalAmount == 100000m));
     }
 
     [TestMethod]
