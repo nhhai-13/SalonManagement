@@ -47,7 +47,9 @@ public sealed class PeakHoursReportController(ApplicationDbContext db) : Control
         var recommendation = total == 0
             ? "Chưa có lịch hẹn trong khoảng thời gian này nên chưa thể gợi ý xếp ca."
             : busiest.WeekendAverage > busiest.WeekdayAverage
-                ? $"Khung {busiest.Time} có lượng khách cuối tuần cao hơn ngày thường {ratio:0.0} lần. Nên tăng thợ cho ca chiều Thứ 7 và Chủ Nhật."
+                ? busiest.WeekdayAverage == 0
+                    ? $"Khung {busiest.Time} chưa ghi nhận khách ngày thường nhưng có khách cuối tuần. Nên theo dõi nhu cầu cuối tuần khi xếp ca."
+                    : $"Khung {busiest.Time} có lượng khách cuối tuần cao hơn ngày thường {ratio:0.0} lần. Nên tăng thợ cho ca chiều Thứ 7 và Chủ Nhật."
                 : $"Khung {busiest.Time} đang có lượng khách cao nhất. Nên ưu tiên phân ca đủ thợ ở khung này.";
         return Ok(new PeakHoursReportSnapshot(range.From, range.To, total, Rate(noShows, total), Rate(cancelled, total), slots, recommendation));
     }
