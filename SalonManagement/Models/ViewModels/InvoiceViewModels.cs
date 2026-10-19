@@ -9,9 +9,11 @@ public class InvoiceDetailsViewModel
     public bool CanClose { get; set; }
     public IReadOnlyList<string> CloseBlockers { get; set; } = [];
     public decimal AdjustedTotal { get; set; }
+    public StylistReview? StylistReview { get; set; }
+    public string? ReviewInvitationStatus { get; set; }
+    public string? ReviewLink { get; set; }
 }
 
- codex/sprint-4-todo
 public class InvoiceDayViewModel
 {
     public DateTime SelectedDate { get; init; }
@@ -22,8 +24,6 @@ public class InvoiceDayViewModel
     public decimal CollectedTotal => PaidInvoices.Sum(item => item.TotalAmount);
 }
 
-
- develop
 public class AddInvoiceServiceViewModel
 {
     [Required]
@@ -45,10 +45,13 @@ public class DiscountCouponViewModel
     public string DiscountType { get; set; } = "Percent";
     [Range(typeof(decimal), "0.01", "100000000")]
     public decimal Value { get; set; }
+    public decimal DiscountValue { get => Value; set => Value = value; }
     [DataType(DataType.Date)]
     public DateTime StartsOn { get; set; }
+    public DateTime StartDate { get => StartsOn; set => StartsOn = value; }
     [DataType(DataType.Date)]
     public DateTime EndsOn { get; set; }
+    public DateTime EndDate { get => EndsOn; set => EndsOn = value; }
 }
 
 public class PaymentViewModel

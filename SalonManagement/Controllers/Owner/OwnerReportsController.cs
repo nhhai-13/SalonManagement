@@ -1,10 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
- codex/sprint-4-todo
-
 using System.Text;
- develop
 using SalonManagement.Data;
 using SalonManagement.Models;
 using SalonManagement.Models.ViewModels.Owner;
@@ -18,12 +15,6 @@ public class OwnerReportsController(ApplicationDbContext db) : Controller
     private static readonly string[] Categories = ["Ngày thường", "Thứ bảy", "Chủ nhật"];
 
     [HttpGet]
- codex/sprint-4-todo
-    public async Task<IActionResult> Index(DateTime? from, DateTime? to)
-    {
-        var end = (to ?? VietnamTime.Today).Date;
-        var start = (from ?? end.AddDays(-29)).Date;
-
     public async Task<IActionResult> Revenue(DateTime? from, DateTime? to)
     {
         var end = (to ?? VietnamTime.Today).Date;
@@ -135,7 +126,6 @@ public class OwnerReportsController(ApplicationDbContext db) : Controller
     {
         var end = (to ?? VietnamTime.Today).Date;
         var start = (from ?? new DateTime(end.Year, end.Month, 1)).Date;
-develop
         if (end < start || (end - start).TotalDays > 364)
         {
             return View(new AppointmentAnalyticsViewModel
@@ -149,13 +139,10 @@ develop
             .Where(item => item.AppointmentDate >= start && item.AppointmentDate < end.AddDays(1))
             .Select(item => new { item.AppointmentDate, item.StartTime, item.Status })
             .ToListAsync();
- codex/sprint-4-todo
-
         var ratings = await db.StylistReviews.AsNoTracking()
             .Where(review => review.Rating.HasValue)
             .Select(review => review.Rating!.Value)
             .ToListAsync();
- develop
 
         var summaries = new List<DayTypeSummary>();
         var kinds = new[]
@@ -186,7 +173,9 @@ develop
             DayTypes = summaries,
             TotalAppointments = data.Count,
             NoShows = data.Count(item => item.Status == "NoShow"),
-            Cancellations = data.Count(item => item.Status is "Cancelled" or "Canceled")
+            Cancellations = data.Count(item => item.Status is "Cancelled" or "Canceled"),
+            ReviewCount = ratings.Count,
+            AverageRating = ratings.Count >= 5 ? ratings.Average() : null
         });
     }
 }
