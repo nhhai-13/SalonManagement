@@ -293,11 +293,13 @@ namespace SalonManagement.Data.Migrations
                     b.Property<string>("ClosedByUserId")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("ConfirmedAt")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("BookingSource")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("ConfirmedByUserId")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<string>("CustomerNameOverride")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -316,6 +318,10 @@ namespace SalonManagement.Data.Migrations
 
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NameConflictResolution")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<DateTime?>("RejectedAt")
                         .HasColumnType("datetime2");
@@ -349,6 +355,21 @@ namespace SalonManagement.Data.Migrations
 
                     b.Property<int>("StylistId")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("ActualCompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ActualStartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ArrivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsLate")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("NoShowByUserId")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -719,6 +740,11 @@ namespace SalonManagement.Data.Migrations
 
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NormalizedSearchName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<string>("Phone")
                         .IsRequired()

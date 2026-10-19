@@ -20,7 +20,14 @@
                 <i class="bi bi-box-arrow-right me-1"></i>Đăng xuất
             </button>
         </div>
-    </div>
+        <div class="reception-operations-tools">
+            <form method="get" action="/reception/customer-search" class="reception-quick-search">
+                <label class="visually-hidden" for="reception-customer-search">Tìm hồ sơ khách</label>
+                <i class="bi bi-search" aria-hidden="true"></i><input id="reception-customer-search" name="q" placeholder="Tìm nhanh SĐT / khách…" />
+            </form>
+            <button id="reception-counter-booking" class="btn btn-primary btn-sm" type="button"><i class="bi bi-plus-lg"></i> Đặt lịch quầy</button>
+        </div>
+    </header>
 
     <!-- Calendar Navigation & Controls Bar -->
     <div class="card shadow-sm border-0 mb-3 bg-white">
@@ -179,7 +186,42 @@
             </form>
         </div>
     </div>
-</div>
+</main>
+
+<dialog id="reception-payment-dialog" class="reception-payment-dialog" aria-labelledby="reception-payment-title">
+    <form method="dialog" class="reception-payment-card">
+        <header><div><span class="reception-panel-kicker payment">POS nhanh</span><h2 id="reception-payment-title">Thanh toán</h2></div><button class="btn-close" value="cancel" aria-label="Đóng"></button></header>
+        <div id="reception-payment-summary" class="reception-payment-summary"></div>
+        <div class="reception-pos-lines"><div class="reception-pos-lines-heading"><span>Dịch vụ</span><span>Giá</span></div><div id="reception-payment-lines"></div><button id="reception-payment-add-service" class="btn btn-outline-primary btn-sm mt-2" type="button"><i class="bi bi-plus-lg"></i> Thêm dịch vụ phát sinh</button></div>
+        <section class="reception-promotion-box" aria-labelledby="reception-promotion-title">
+            <label id="reception-promotion-title" class="form-label" for="reception-promotion-code"><i class="bi bi-ticket-perforated"></i> Mã giảm giá</label>
+            <div class="input-group"><input id="reception-promotion-code" class="form-control text-uppercase" maxlength="64" autocomplete="off" placeholder="Ví dụ: SUMMER10" /><button id="reception-promotion-apply" class="btn btn-outline-primary" type="button">Áp dụng</button></div>
+            <p id="reception-promotion-message" class="small mt-2 mb-0 d-none" role="status"></p>
+        </section>
+        <div class="reception-pos-totals" aria-label="Tổng kết phiếu tính tiền"><div><span>Tổng tiền gốc</span><strong id="reception-payment-subtotal">0 đ</strong></div><div><span>Giảm giá</span><strong id="reception-payment-discount">−0 đ</strong></div><div class="reception-pos-net"><span>Tổng thực thu</span><strong id="reception-payment-total">0 đ</strong></div></div>
+        <label class="form-label" for="reception-payment-method">Phương thức thanh toán</label>
+        <select id="reception-payment-method" class="form-select"><option value="Cash">Tiền mặt</option><option value="Transfer">Chuyển khoản</option><option value="Card">Thẻ</option></select>
+        <div id="reception-payment-reference-wrap" class="mt-3"><label id="reception-payment-reference-label" class="form-label" for="reception-payment-reference">Mã giao dịch / ghi chú đối soát</label><input id="reception-payment-reference" class="form-control" placeholder="Tự động tạo khi chọn chuyển khoản" /><div id="reception-payment-reference-help" class="form-text">Mã sẽ được tạo tự động khi thanh toán chuyển khoản.</div></div>
+        <p id="reception-payment-message" class="small mt-3 mb-0 d-none" role="status"></p>
+        <footer><button class="btn btn-light" value="cancel" type="submit">Để sau</button><button id="reception-invoice-save" class="btn btn-outline-primary" type="button"><i class="bi bi-floppy"></i> Lưu hóa đơn</button><button id="reception-payment-submit" class="btn btn-success" type="button"><i class="bi bi-check2-circle"></i> Xác nhận thu tiền</button></footer>
+    </form>
+</dialog>
+
+<dialog id="reception-payment-confirm-dialog" class="reception-payment-confirm-dialog" aria-labelledby="reception-payment-confirm-title">
+    <form method="dialog" class="reception-payment-confirm-card">
+        <header><div><span class="reception-panel-kicker payment">Xác nhận cuối</span><h2 id="reception-payment-confirm-title">Xác nhận thanh toán</h2></div><button class="btn-close" value="cancel" aria-label="Đóng"></button></header>
+        <p>Vui lòng kiểm tra thông tin trước khi ghi nhận thu tiền.</p>
+        <div class="reception-payment-confirm-summary"><div><span>Khách hàng</span><strong data-payment-confirm-customer>—</strong></div><div><span>Phương thức</span><strong data-payment-confirm-method>—</strong></div><div><span>Tổng thực thu</span><strong data-payment-confirm-total>—</strong></div></div>
+        <footer><button class="btn btn-light border" value="cancel">Quay lại</button><button id="reception-payment-confirm-submit" class="btn btn-success" type="button"><i class="bi bi-check2-circle"></i> Xác nhận thanh toán</button></footer>
+    </form>
+</dialog>
+
+<dialog id="reception-counter-dialog" class="reception-counter-dialog" aria-labelledby="reception-counter-title">
+    <section class="reception-counter-card">
+        <header><div><span class="reception-panel-kicker"><i class="bi bi-person-plus"></i> Tiếp nhận nhanh</span><h2 id="reception-counter-title">Đặt lịch tại quầy</h2></div><button id="reception-counter-close" class="btn-close" type="button" aria-label="Đóng"></button></header>
+        <iframe id="reception-counter-frame" title="Đặt lịch tại quầy"></iframe>
+    </section>
+</dialog>
 
 <!-- Toast thông báo kết quả -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">

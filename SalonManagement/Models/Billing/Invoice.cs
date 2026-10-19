@@ -59,6 +59,9 @@ namespace SalonManagement.Models
 
         public decimal TotalAmount { get; set; }
 
+        /// <summary>Snapshot of the promotion code used at checkout; null when no discount was used.</summary>
+        public string? PromotionCode { get; set; }
+
         [NotMapped]
         public decimal FinalAmount
         {
