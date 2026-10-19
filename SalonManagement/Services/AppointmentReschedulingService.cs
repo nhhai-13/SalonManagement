@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SalonManagement.Data;
 using SalonManagement.Models;
 
@@ -6,23 +7,43 @@ namespace SalonManagement.Services;
 
 public sealed record RescheduleAppointmentRequest(int StylistId, TimeSpan StartTime);
 public sealed record AppointmentChangeActor(string Id, string Name);
-public sealed record RescheduleAppointmentResult(bool Succeeded, string? ErrorCode, string? Error, Appointment? Appointment)
+public sealed record RescheduleAppointmentResult(bool Succeeded, string? ErrorCode, string? Error, Appointment? Appointment, string? NotificationStatus = null)
 {
     public static RescheduleAppointmentResult Rejected(string code, string error) => new(false, code, error, null);
-    public static RescheduleAppointmentResult Success(Appointment appointment) => new(true, null, null, appointment);
+    public static RescheduleAppointmentResult Success(Appointment appointment, string? notificationStatus = null) => new(true, null, null, appointment, notificationStatus);
 }
 
-public sealed class AppointmentReschedulingService(ApplicationDbContext db, TimeProvider timeProvider, AppointmentNotificationBus? notifications = null)
+public sealed class AppointmentReschedulingService
 {
+    private readonly ApplicationDbContext db;
+    private readonly TimeProvider timeProvider;
+    private readonly AppointmentEmailNotificationService emailNotifications;
+    private readonly StylistInAppNotificationService notifications;
+
+    [ActivatorUtilitiesConstructor]
+    public AppointmentReschedulingService(ApplicationDbContext db, TimeProvider timeProvider, AppointmentEmailNotificationService emailNotifications, StylistInAppNotificationService notifications)
+    {
+        this.db = db;
+        this.timeProvider = timeProvider;
+        this.emailNotifications = emailNotifications;
+        this.notifications = notifications;
+    }
+
+    // Keeps existing isolated tests and maintenance tools source-compatible.
+    public AppointmentReschedulingService(ApplicationDbContext db, TimeProvider timeProvider)
+        : this(db, timeProvider, new AppointmentEmailNotificationService(db, timeProvider), new StylistInAppNotificationService(db, timeProvider)) { }
+
     private static readonly string[] UnavailableStatuses = ["Cancelled", "Rejected", "NoShow", "Completed", "InProgress"];
 
-    public async Task<RescheduleAppointmentResult> RescheduleAsync(int appointmentId, RescheduleAppointmentRequest request, AppointmentChangeActor? actor = null)
-        => await ProcessAsync(appointmentId, request, actor, true);
+    public Task<RescheduleAppointmentResult> PreviewAsync(int appointmentId, RescheduleAppointmentRequest request)
+        => RescheduleAsync(appointmentId, request, actor: null, queueCustomerEmail: false, persist: false);
 
-    public async Task<RescheduleAppointmentResult> PreviewAsync(int appointmentId, RescheduleAppointmentRequest request)
-        => await ProcessAsync(appointmentId, request, null, false);
-
-    private async Task<RescheduleAppointmentResult> ProcessAsync(int appointmentId, RescheduleAppointmentRequest request, AppointmentChangeActor? actor, bool persist)
+    public async Task<RescheduleAppointmentResult> RescheduleAsync(
+        int appointmentId,
+        RescheduleAppointmentRequest request,
+        AppointmentChangeActor? actor = null,
+        bool queueCustomerEmail = true,
+        bool persist = true)
     {
         var appointment = await db.Appointments
             .Include(item => item.AppointmentServices)
@@ -48,10 +69,6 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
         var duration = appointment.AppointmentServices.Sum(item => item.DurationMinutes);
         if (duration <= 0) return RescheduleAppointmentResult.Rejected("invalid_duration", "Lịch hẹn không có thời lượng dịch vụ hợp lệ.");
         var endTime = request.StartTime.Add(TimeSpan.FromMinutes(duration));
-        var isDayOff = await db.StylistDaysOff.AsNoTracking().AnyAsync(item =>
-            item.StylistId == stylist.StylistId && item.OffDate == appointment.AppointmentDate.Date);
-        if (isDayOff)
-            return RescheduleAppointmentResult.Rejected("day_off", "Thợ nghỉ trong ngày này, không thể xếp lịch hẹn.");
         var shifts = await db.WorkSchedules.AsNoTracking()
             .Where(shift => shift.StylistId == stylist.StylistId && shift.WorkDate.Date == appointment.AppointmentDate.Date && shift.Status == "Working")
             .ToListAsync();
@@ -61,18 +78,21 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
             return RescheduleAppointmentResult.Rejected("outside_shift", $"Khung giờ mới phải nằm trọn trong ca làm của thợ ({shiftDescription}).");
         }
 
-        var conflict = await db.Appointments.AsNoTracking()
+        // SQLite cannot translate comparisons between TimeSpan values. Read the
+        // small schedule for that stylist and day, then detect the overlap in memory.
+        var appointmentsAtTarget = await db.Appointments.AsNoTracking()
             .Include(item => item.Customer)
-            .Where(item => item.AppointmentId != appointment.AppointmentId && item.StylistId == stylist.StylistId && item.AppointmentDate.Date == appointment.AppointmentDate.Date && !UnavailableStatuses.Contains(item.Status))
-            .FirstOrDefaultAsync(item => item.StartTime < endTime && request.StartTime < item.EndTime);
+            .Where(item => item.AppointmentId != appointment.AppointmentId && item.StylistId == stylist.StylistId && item.AppointmentDate == appointment.AppointmentDate.Date && !UnavailableStatuses.Contains(item.Status))
+            .ToListAsync();
+        var conflict = appointmentsAtTarget.FirstOrDefault(item => item.StartTime < endTime && request.StartTime < item.EndTime);
         if (conflict is not null)
             return RescheduleAppointmentResult.Rejected("overlap", $"Khung giờ bị chồng lấn với lịch của {conflict.Customer.FullName} lúc {conflict.StartTime:hh\\:mm}–{conflict.EndTime:hh\\:mm}.");
 
         var oldStylistId = appointment.StylistId;
         var oldStartTime = appointment.StartTime;
         var hasChanges = oldStylistId != stylist.StylistId || oldStartTime != request.StartTime;
-        if (!hasChanges) return RescheduleAppointmentResult.Success(appointment);
-        if (!persist) return RescheduleAppointmentResult.Success(appointment);
+        if (!hasChanges) return RescheduleAppointmentResult.Success(appointment, "NotRequired");
+        if (!persist) return RescheduleAppointmentResult.Success(appointment, "NotRequired");
 
         appointment.StylistId = stylist.StylistId;
         appointment.StartTime = request.StartTime;
@@ -90,20 +110,10 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
             NewStylistId = oldStylistId == stylist.StylistId ? null : stylist.StylistId,
             OldStartTime = oldStartTime == request.StartTime ? null : oldStartTime,
             NewStartTime = oldStartTime == request.StartTime ? null : request.StartTime,
-            EmailStatus = HasValidEmail(appointment.Customer.Email) ? "Queued" : "NotRequired"
+            EmailStatus = queueCustomerEmail && HasValidEmail(appointment.Customer.Email) ? "Queued" : "NotRequired"
         };
         db.AppointmentChangeLogs.Add(changeLog);
-        var notification = new StylistNotification { StylistId = stylist.StylistId, AppointmentId = appointment.AppointmentId,
-            Message = $"Lịch #{appointment.AppointmentId} đã được đổi sang {appointment.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM/yyyy}.", CreatedAt = timeProvider.GetUtcNow() };
-        db.StylistNotifications.Add(notification);
-        StylistNotification? previousStylistNotification = null;
-        if (oldStylistId != stylist.StylistId)
-        {
-            previousStylistNotification = new StylistNotification { StylistId = oldStylistId, AppointmentId = appointment.AppointmentId,
-                Message = $"Lịch #{appointment.AppointmentId} đã được chuyển sang thợ khác.", CreatedAt = timeProvider.GetUtcNow() };
-            db.StylistNotifications.Add(previousStylistNotification);
-        }
-        if (HasValidEmail(appointment.Customer.Email))
+        if (queueCustomerEmail && HasValidEmail(appointment.Customer.Email))
         {
             db.AppointmentChangeEmails.Add(new AppointmentChangeEmail
             {
@@ -115,25 +125,26 @@ public sealed class AppointmentReschedulingService(ApplicationDbContext db, Time
                 NextAttemptAt = changedAt
             });
         }
-        var reminder = await db.AppointmentEmailDeliveries.FirstOrDefaultAsync(item =>
-            item.AppointmentId == appointment.AppointmentId && item.Kind == AppointmentEmailKinds.Reminder);
-        if (reminder is not null && reminder.Status is not AppointmentEmailStatuses.Sent and not AppointmentEmailStatuses.Failed)
+        await emailNotifications.CancelPendingRemindersAsync(appointment.AppointmentId, "Lịch hẹn đã đổi giờ hoặc đổi thợ; đã hủy email nhắc cũ.");
+        await emailNotifications.QueueReminderForRescheduledAppointmentAsync(appointment);
+        notifications.Add(stylist.Email, appointment.AppointmentId,
+            oldStylistId == stylist.StylistId ? "AppointmentRescheduled" : "AppointmentAssigned",
+            oldStylistId == stylist.StylistId
+                ? $"Lịch của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã dời từ {oldStartTime:hh\\:mm} sang {request.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM}."
+                : $"Bạn được gán lịch hẹn mới của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} lúc {request.StartTime:hh\\:mm} ngày {appointment.AppointmentDate:dd/MM}.");
+        if (oldStylistId != stylist.StylistId)
         {
-            var newStart = CheckInService.StartsAt(appointment);
-            reminder.AppointmentStartAt = newStart;
-            var reminderTime = newStart.AddHours(-24);
-            reminder.NextAttemptAt = reminderTime > timeProvider.GetUtcNow() ? reminderTime : timeProvider.GetUtcNow();
-            if (reminder.Status != AppointmentEmailStatuses.NoEmail) reminder.Status = AppointmentEmailStatuses.Queued;
+            var oldStylistEmail = await db.Stylists.Where(item => item.StylistId == oldStylistId).Select(item => item.Email).SingleOrDefaultAsync();
+            notifications.Add(oldStylistEmail, appointment.AppointmentId, "AppointmentCancelled", $"Lịch của {appointment.CustomerNameOverride ?? appointment.Customer.FullName} đã được chuyển sang thợ khác.");
         }
         try
         {
             await db.SaveChangesAsync();
-            notifications?.Publish(notification);
-            if (previousStylistNotification is not null) notifications?.Publish(previousStylistNotification);
-            return RescheduleAppointmentResult.Success(appointment);
+            return RescheduleAppointmentResult.Success(appointment, changeLog.EmailStatus);
         }
         catch (DbUpdateException)
         {
+            db.ChangeTracker.Clear();
             return RescheduleAppointmentResult.Rejected("overlap", "Khung giờ này vừa được một lễ tân khác sử dụng. Vui lòng chọn giờ khác.");
         }
     }

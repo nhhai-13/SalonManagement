@@ -1,0 +1,75 @@
+diff --git "a/SalonManagement\\Controllers\\Reception\\CounterAppointmentsController.cs" "b/SalonManagement\\Controllers\\Reception\\CounterAppointmentsController.cs"
+new file mode 100644
+index 0000000..d421f60
+--- /dev/null
++++ "b/SalonManagement\\Controllers\\Reception\\CounterAppointmentsController.cs"
+@@ -0,0 +1,59 @@
++using Microsoft.AspNetCore.Authorization;
++using Microsoft.AspNetCore.Mvc;
++using Microsoft.EntityFrameworkCore;
++using SalonManagement.Data;
++using SalonManagement.Models;
++using SalonManagement.Services;
++
++namespace SalonManagement.Controllers.Reception;
++
++[Authorize(Roles = UserRoles.Receptionist)]
++[Route("reception/counter-appointments")]
++public sealed class CounterAppointmentsController(ApplicationDbContext db) : Controller
++{
++    [HttpGet("")]
++    public async Task<IActionResult> Index()
++    {
++        ViewBag.Services = await db.Services.AsNoTracking().Where(item => item.IsActive).OrderBy(item => item.ServiceName).ToListAsync();
++        ViewBag.Stylists = await db.Stylists.AsNoTracking().Where(item => item.IsActive).OrderBy(item => item.FullName).ToListAsync();
++        return View();
++    }
++
++    [HttpPost("create")]
++    public async Task<IActionResult> Create([FromBody] CounterAppointmentRequest request)
++    {
++        var name = request.FullName?.Trim(); var phone = BookingService.NormalizePhone(request.Phone);
++        if (string.IsNullOrWhiteSpace(name) || phone is null || request.ServiceIds is null || request.ServiceIds.Length == 0 || request.StylistId <= 0 || request.Date == default)
++            return BadRequest(new { error = "Vui lòng nhập đầy đủ tên, số điện thoại, dịch vụ, thợ và giờ bắt đầu hợp lệ." });
++        var services = await db.Services.Where(item => item.IsActive && request.ServiceIds.Contains(item.ServiceId)).ToListAsync();
++        if (services.Count != request.ServiceIds.Distinct().Count()) return BadRequest(new { error = "Dịch vụ không hợp lệ." });
++        var stylist = await db.Stylists.Include(item => item.Services).SingleOrDefaultAsync(item => item.StylistId == request.StylistId && item.IsActive);
++        if (stylist is null) return BadRequest(new { error = "Thợ không hợp lệ." });
++        var missing = services.Where(service => !stylist.Services.Any(skill => skill.ServiceId == service.ServiceId)).Select(service => service.ServiceName).ToList();
++        if (missing.Count > 0) return BadRequest(new { error = "Thợ không thực hiện được: " + string.Join(", ", missing) });
++        var customer = await db.Customers.FirstOrDefaultAsync(item => item.Phone == phone) ?? new Customer { FullName = name, Phone = phone };
++        if (customer.CustomerId == 0) db.Customers.Add(customer); else customer.FullName = name;
++        var duration = services.Sum(item => item.DurationMinutes);
++        var endTime = request.StartTime.Add(TimeSpan.FromMinutes(duration));
++        var overlaps = await db.Appointments.AnyAsync(item => item.StylistId == request.StylistId && item.AppointmentDate == request.Date.Date && item.Status != "Cancelled" && item.Status != "Rejected" && item.Status != "NoShow" && item.StartTime < endTime && request.StartTime < item.EndTime);
++        if (overlaps) return BadRequest(new { error = "Khung giờ đã chồng lấn với lịch khác của thợ." });
++        db.Appointments.Add(new Appointment { Customer = customer, StylistId = request.StylistId, AppointmentDate = request.Date.Date, StartTime = request.StartTime, EndTime = endTime, Status = "Confirmed", BookingReference = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(), AppointmentServices = services.Select(item => new AppointmentService { ServiceId = item.ServiceId, Price = item.Price, DurationMinutes = item.DurationMinutes }).ToList() });
++        await db.SaveChangesAsync();
++        return Ok(new { message = "Đã tạo lịch hẹn tại quầy.", redirect = "/reception/schedule?date=" + request.Date.ToString("yyyy-MM-dd") });
++    }
++
++    [HttpGet("customer")]
++    public async Task<IActionResult> Customer(string? phone)
++    {
++        var normalized = BookingService.NormalizePhone(phone);
++        if (normalized is null) return BadRequest(new { error = "Số điện thoại không hợp lệ." });
++        var customer = await db.Customers.AsNoTracking().Include(item => item.Appointments).ThenInclude(item => item.AppointmentServices).ThenInclude(item => item.Service)
++            .SingleOrDefaultAsync(item => item.Phone == normalized);
++        if (customer is null) return Ok(new { found = false });
++        var history = customer.Appointments.OrderByDescending(item => item.AppointmentDate).ThenByDescending(item => item.StartTime).Take(5)
++            .Select(item => new { date = item.AppointmentDate.ToString("dd/MM/yyyy"), services = item.AppointmentServices.Select(service => service.Service.ServiceName), duration = item.AppointmentServices.Sum(service => service.DurationMinutes) });
++        return Ok(new { found = true, fullName = customer.FullName, history });
++    }
++}
++
++public sealed record CounterAppointmentRequest(string? FullName, string? Phone, int[]? ServiceIds, int StylistId, DateTime Date, TimeSpan StartTime);
+diff --git "a/SalonManagement\\Views\\CounterAppointments\\Index.cshtml" "b/SalonManagement\\Views\\CounterAppointments\\Index.cshtml"
+new file mode 100644
+index 0000000..05e23dc
+--- /dev/null
++++ "b/SalonManagement\\Views\\CounterAppointments\\Index.cshtml"
+@@ -0,0 +1,4 @@
++@using SalonManagement.Models
++@{ ViewData["Title"] = "Tạo lịch tại quầy"; var services = (IReadOnlyList<Service>)ViewBag.Services; var stylists = (IReadOnlyList<Stylist>)ViewBag.Stylists; }
++<div class="container py-4" style="max-width:700px"><h1 class="h3">Tạo lịch tại quầy</h1><div id="message" class="alert d-none"></div><div id="customer-history" class="alert alert-info d-none"></div><form id="counter-form" class="row g-3"><div class="col-md-6"><label class="form-label">Tên khách</label><input id="name" class="form-control" required /></div><div class="col-md-6"><label class="form-label">Số điện thoại</label><input id="phone" class="form-control" required /></div><div class="col-md-6"><label class="form-label">Dịch vụ</label><select id="services" class="form-select" multiple required>@foreach(var service in services){<option value="@service.ServiceId">@service.ServiceName</option>}</select></div><div class="col-md-6"><label class="form-label">Thợ</label><select id="stylist" class="form-select" required><option value="">Chọn thợ</option>@foreach(var stylist in stylists){<option value="@stylist.StylistId">@stylist.FullName</option>}</select></div><div class="col-md-6"><label class="form-label">Ngày</label><input id="date" type="date" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" required /></div><div class="col-md-6"><label class="form-label">Giờ bắt đầu</label><input id="time" type="time" step="900" class="form-control" required /></div><div class="col-12"><button class="btn btn-primary">Tạo lịch</button></div></form></div>
++@section Scripts {<script>const phoneEl=document.getElementById('phone'),nameEl=document.getElementById('name'),historyEl=document.getElementById('customer-history');if(!document.getElementById('time').value)document.getElementById('time').value=new Date().toTimeString().slice(0,5);phoneEl.addEventListener('change',async()=>{const r=await fetch(`customer?phone=${encodeURIComponent(phoneEl.value)}`),x=await r.json();if(r.ok&&x.found){nameEl.value=x.fullName;historyEl.textContent=`Khách quen: ${x.fullName}. Dịch vụ gần nhất: ${x.history.map(h=>`${h.date} – ${h.services.join(', ')}`).join('; ')}`;historyEl.classList.remove('d-none')}else historyEl.classList.add('d-none')});document.getElementById('counter-form').addEventListener('submit',async e=>{e.preventDefault();const d=document.getElementById('date').value,t=document.getElementById('time').value,m=document.getElementById('message');const body={fullName:name.value,phone:phone.value,serviceIds:[...services.selectedOptions].map(x=>+x.value),stylistId:+stylist.value,date:d,startTime:t+':00'};const r=await fetch('create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),x=await r.json();m.textContent=x.error||x.message;m.className='alert '+(r.ok?'alert-success':'alert-danger');if(r.ok)setTimeout(()=>location.href=x.redirect,500)})</script>}
