@@ -9,6 +9,9 @@ public class InvoiceDetailsViewModel
     public bool CanClose { get; set; }
     public IReadOnlyList<string> CloseBlockers { get; set; } = [];
     public decimal AdjustedTotal { get; set; }
+    public StylistReview? StylistReview { get; set; }
+    public string? ReviewInvitationStatus { get; set; }
+    public string? ReviewLink { get; set; }
 }
 
  codex/sprint-4-todo
