@@ -53,3 +53,9 @@ dotnet run --project SalonManagement --launch-profile Staging
 ```
 
 Giá trị trong `appsettings.json` và `appsettings.Development.json` chỉ là cấu hình SQL Server LocalDB dự phòng cho một máy. Để tất cả thành viên nhìn thấy cùng dữ liệu, mọi người phải cấu hình cùng một địa chỉ SQL Server dùng chung theo một trong hai cách trên.
+## Development Workflow
+
+1. Restore the required NuGet packages.
+2. Build the solution before running tests.
+3. Run the automated tests after changing application code.
+4. Review changes before committing them.
