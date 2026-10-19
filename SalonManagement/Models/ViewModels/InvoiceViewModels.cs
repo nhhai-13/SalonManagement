@@ -32,10 +32,13 @@ public class DiscountCouponViewModel
     public string DiscountType { get; set; } = "Percent";
     [Range(typeof(decimal), "0.01", "100000000")]
     public decimal Value { get; set; }
+    public decimal DiscountValue { get => Value; set => Value = value; }
     [DataType(DataType.Date)]
     public DateTime StartsOn { get; set; }
+    public DateTime StartDate { get => StartsOn; set => StartsOn = value; }
     [DataType(DataType.Date)]
     public DateTime EndsOn { get; set; }
+    public DateTime EndDate { get => EndsOn; set => EndsOn = value; }
 }
 
 public class PaymentViewModel
