@@ -1,0 +1,64 @@
+﻿@model List<SalonManagement.Models.Appointment>
+
+@{
+    ViewData["Title"] = "Khách cần gọi xác nhận";
+}
+
+<div class="container mt-4">
+    <h2>Danh sách khách cần gọi xác nhận (@Model.Count)</h2>
+
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Khách hàng</th>
+                <th>Số điện thoại</th>
+                <th>Giờ hẹn</th>
+                <th>Dịch vụ / Thợ</th>
+                <th>Thao tác</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.Customer.FullName</td>
+
+                    <td>
+                        <a href="tel:@item.Customer.Phone">
+                            @item.Customer.Phone
+                        </a>
+                    </td>
+
+                    <td>
+                        @item.StartTime.ToString(@"hh\:mm") -
+                        @item.AppointmentDate.ToString("dd/MM/yyyy")
+                    </td>
+
+                    <td>
+                        @string.Join(", ", item.AppointmentServices.Select(s => s.Service.ServiceName))
+                        <br />
+                        <small class="text-muted">
+                            Thợ: @item.Stylist.FullName
+                        </small>
+                    </td>
+
+                    <td>
+                        <form asp-action="MarkCalled" method="post">
+                            @Html.AntiForgeryToken()
+
+                            <input type="hidden"
+                                   name="id"
+                                   value="@item.AppointmentId" />
+
+                            <button type="submit"
+                                    class="btn btn-sm btn-success">
+                                Đã gọi (Xác nhận)
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

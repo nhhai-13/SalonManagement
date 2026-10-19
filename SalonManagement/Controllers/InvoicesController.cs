@@ -20,14 +20,18 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
     {
         var selectedDate = (date ?? VietnamTime.Today).Date;
         ViewBag.SelectedDate = selectedDate.ToString("yyyy-MM-dd");
+
+        // 1. Chỉ lấy dữ liệu lên (Không OrderBy ở đây để tránh lỗi SQLite)
         var appointments = await db.Appointments.AsNoTracking()
             .Include(item => item.Customer)
             .Include(item => item.Stylist)
             .Include(item => item.AppointmentServices)
             .Include(item => item.Invoice)
             .Where(item => item.AppointmentDate.Date == selectedDate)
-            .OrderBy(item => item.StartTime)
             .ToListAsync();
+
+        // 2. Sắp xếp trên bộ nhớ (Memory) sau khi đã lấy dữ liệu
+        appointments = appointments.OrderBy(item => item.StartTime).ToList();
 
         return View(appointments);
     }

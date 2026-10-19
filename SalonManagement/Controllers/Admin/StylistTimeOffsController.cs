@@ -130,6 +130,40 @@ public class StylistTimeOffsController : ControllerBase
             }
         }
 
+        // Kiểm tra lịch hẹn của khách bị ảnh hưởng bởi lịch nghỉ này
+        var dayStart = request.OffDate.ToDateTime(TimeOnly.MinValue);
+        var dayEnd = dayStart.AddDays(1);
+        var appointments = await _dbContext.Appointments.AsNoTracking()
+            .Where(a => a.StylistId == request.StylistId
+                && a.AppointmentDate >= dayStart && a.AppointmentDate < dayEnd
+                && a.Status != "Cancelled" && a.Status != "NoShow"
+                && a.Status != "Rejected" && a.Status != "Completed")
+            .ToListAsync();
+
+        var affected = appointments
+            .Where(a => request.IsFullDay ||
+                (a.StartTime < request.EndTime!.Value.ToTimeSpan() &&
+                 request.StartTime!.Value.ToTimeSpan() < a.EndTime))
+            .OrderBy(a => a.StartTime)
+            .Select(a => new
+            {
+                a.AppointmentId,
+                a.BookingReference,
+                Start = a.StartTime.ToString(@"hh\:mm"),
+                End = a.EndTime.ToString(@"hh\:mm"),
+                a.Status
+            })
+            .ToList();
+
+        if (affected.Count > 0)
+        {
+            return Conflict(new
+            {
+                message = $"Lịch nghỉ này trùng với {affected.Count} lịch hẹn của khách. Vui lòng đổi hoặc hủy các lịch hẹn trước.",
+                affectedAppointments = affected
+            });
+        }
+
         var timeOff = new StylistTimeOff
         {
             StylistId = request.StylistId,

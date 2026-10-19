@@ -216,7 +216,6 @@ public override async Task<int> SaveChangesAsync(
                 }
 
                 var entityType = entry.Entity.GetType().Name;
-
                 // Skip auditing for identity and some heavy domain entities that we don't want in audit logs.
                 if (entityType == nameof(ApplicationUser)
                     || entry.Entity is Microsoft.AspNetCore.Identity.IdentityUserRole<string>
@@ -224,6 +223,8 @@ public override async Task<int> SaveChangesAsync(
                     || entityType == nameof(WorkSchedule)
                     || entityType == nameof(Appointment)
                     || entityType == nameof(Invoice))
+              
+
                 {
                     continue;
                 }

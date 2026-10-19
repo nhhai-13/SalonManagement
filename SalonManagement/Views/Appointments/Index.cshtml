@@ -3,36 +3,211 @@
     ViewData["Title"] = "Lịch hẹn trong ngày";
     var selectedDate = (string)ViewBag.SelectedDate;
 }
+
 <div class="container py-4">
     <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
-        <div><p class="text-uppercase text-secondary small mb-1">Vận hành salon</p><h1 class="h3 mb-0">Lịch hẹn trong ngày</h1></div>
-        <form method="get" class="d-flex align-items-end gap-2"><label class="form-label mb-0">Ngày<input class="form-control" type="date" name="date" value="@selectedDate" /></label>@if (ViewBag.SelectedStatus is string status) { <input type="hidden" name="status" value="@status" /> }<button class="btn btn-outline-secondary">Xem</button></form>
+        <div>
+            <p class="text-uppercase text-secondary small mb-1">Vận hành salon</p>
+            <h1 class="h3 mb-0">Lịch hẹn trong ngày</h1>
+        </div>
+
+        <form method="get" class="d-flex align-items-end gap-2">
+            <label class="form-label mb-0">
+                Ngày
+                <input class="form-control" type="date" name="date" value="@selectedDate" />
+            </label>
+
+            @if (ViewBag.SelectedStatus is string status)
+            {
+                <input type="hidden" name="status" value="@status" />
+            }
+
+            <button class="btn btn-outline-secondary">Xem</button>
+        </form>
     </div>
-    @if (TempData["Error"] is string error) { <div class="alert alert-danger">@error</div> }
-    @if (TempData["Success"] is string success) { <div class="alert alert-success">@success</div> }
-    <div class="table-responsive bg-white border rounded-3"><table class="table align-middle mb-0">
-        <thead><tr><th>Giờ</th><th>Khách hàng</th><th>Thợ</th><th>Dịch vụ</th><th>Trạng thái</th><th></th></tr></thead>
-        <tbody>
-        @foreach (var appointment in Model)
-        {
-            <tr><td>@appointment.StartTime.ToString(@"hh\:mm")</td><td>@appointment.Customer.FullName<span class="d-block small text-secondary">@(User.IsInRole(UserRoles.Stylist) ? MaskPhone(appointment.Customer.Phone) : appointment.Customer.Phone)</span></td><td>@appointment.Stylist.FullName</td><td>@string.Join(", ", appointment.AppointmentServices.Select(item => item.Service.ServiceName))</td><td>@appointment.Status</td><td class="text-end">
-                <a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@appointment.AppointmentId">Mở lịch</a>
-                @if (appointment.Invoice is not null && appointment.Invoice.ClosedAt is null)
+
+    @if (TempData["Error"] is string error)
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    @if (TempData["Success"] is string success)
+    {
+        <div class="alert alert-success">@success</div>
+    }
+
+    <div class="table-responsive bg-white border rounded-3">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Giờ</th>
+                    <th>Khách hàng</th>
+                    <th>Thợ</th>
+                    <th>Dịch vụ</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var appointment in Model)
                 {
-                    var servicesComplete = appointment.AppointmentServices.Count > 0 && appointment.AppointmentServices.All(item => item.IsCompleted);
-                    var canClose = appointment.Invoice.Status == "Paid" && servicesComplete;
-                    var blockers = new List<string>();
-                    if (!servicesComplete) blockers.Add("Thợ chưa hoàn tất dịch vụ");
-                    if (appointment.Invoice.Status != "Paid") blockers.Add("Phiếu chưa thanh toán");
-                    <form asp-controller="Invoices" asp-action="Close" method="post" class="d-inline ms-1">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@appointment.Invoice.InvoiceId" /><button class="btn btn-sm btn-outline-secondary" type="submit" disabled="@(!canClose)">Đóng lịch</button></form>
-                    @if (!canClose) { <span class="d-block small text-secondary mt-1">@string.Join("; ", blockers)</span> }
+                    <tr>
+                        <td>
+                            @appointment.StartTime.ToString(@"hh\:mm")
+                        </td>
+
+                        <td>
+                            @appointment.Customer.FullName
+                            <span class="d-block small text-secondary">
+                                @(User.IsInRole(UserRoles.Stylist)
+                                                            ? MaskPhone(appointment.Customer.Phone)
+                                                            : appointment.Customer.Phone)
+                        </span>
+                    </td>
+
+                        <td>
+                            @appointment.Stylist.FullName
+                        </td>
+
+                        <td>
+                            @string.Join(", ", appointment.AppointmentServices.Select(item => item.Service.ServiceName))
+                        </td>
+
+                        <!-- Cột Trạng thái lịch hẹn -->
+                        <td>
+                            <span class="badge @(appointment.Status == "Pending" ? "bg-warning" : "bg-success")">
+                                @appointment.Status
+                            </span>
+
+                            <!-- Hiển thị trạng thái Email nhắc lịch (Lát 2) -->
+                        @{
+                                var reminder = appointment.EmailDeliveries?
+                                .FirstOrDefault(d => d.Kind == AppointmentEmailKinds.Reminder);
+                            }
+
+                            @if (reminder != null)
+                            {
+                                <div class="mt-1">
+                                    @if (reminder.Status == AppointmentEmailStatuses.Sent)
+                                    {
+                                        <span class="badge bg-info text-dark">
+                                            <i class="bi bi-bell"></i>
+                                            Đã gửi nhắc lúc
+                                            @reminder.SentAt?.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm dd/MM/yyyy")
+                                        </span>
+                                    }
+                                    else if (reminder.Status == AppointmentEmailStatuses.Queued)
+                                    {
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-clock"></i>
+                                            Sẽ gửi nhắc lúc
+                                            @reminder.NextAttemptAt.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm dd/MM/yyyy")
+                                        </span>
+                                    }
+                                    else if (reminder.Status == AppointmentEmailStatuses.NoEmail)
+                                    {
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                            Không có email để nhắc
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </td>
+
+                        <!-- Cột Thao tác -->
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary"
+                               asp-action="Details"
+                               asp-route-id="@appointment.AppointmentId">
+                                Mã lịch
+                            </a>
+
+                            <!-- Nút xác nhận lịch hẹn: chỉ hiển thị khi Pending -->
+                            @if (appointment.Status == "Pending")
+                            {
+                                <form asp-action="Confirm"
+                                      asp-route-id="@appointment.AppointmentId"
+                                      method="post"
+                                      style="display:inline;">
+                                    @Html.AntiForgeryToken()
+
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        Xác nhận
+                                    </button>
+                                </form>
+                            }
+
+                            @if (appointment.Invoice is not null
+                                                    && appointment.Invoice.ClosedAt is null)
+                            {
+                                var servicesComplete =
+                                appointment.AppointmentServices.Count > 0
+                                && appointment.AppointmentServices.All(item => item.IsCompleted);
+
+                                var canClose =
+                                appointment.Invoice.Status == "Paid"
+                                && servicesComplete;
+
+                                var blockers = new List<string>();
+
+                                if (!servicesComplete)
+                                {
+                                    blockers.Add("Thợ chưa hoàn tất dịch vụ");
+                                }
+
+                                if (appointment.Invoice.Status != "Paid")
+                                {
+                                    blockers.Add("Phiếu chưa thanh toán");
+                                }
+
+                                <form asp-controller="Invoices"
+                                      asp-action="Close"
+                                      method="post"
+                                      class="d-inline ms-1">
+                                    @Html.AntiForgeryToken()
+
+                                    <input type="hidden"
+                                           name="id"
+                                           value="@appointment.Invoice.InvoiceId" />
+
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            type="submit"
+                                            disabled="@(!canClose)">
+                                        Đóng lịch
+                                    </button>
+                                </form>
+
+                                @if (!canClose)
+                                {
+                                    <span class="d-block small text-secondary mt-1">
+                                        @string.Join("; ", blockers)
+                                    </span>
+                                }
+                            }
+                        </td>
+                    </tr>
                 }
-            </td></tr>
-        }
-        @if (Model.Count == 0) { <tr><td colspan="6" class="text-center text-secondary py-5">Không có lịch hẹn trong ngày này.</td></tr> }
-        </tbody>
-    </table></div>
+
+                @if (Model.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary py-5">
+                            Không có lịch hẹn trong ngày này.
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 </div>
+
 @functions {
-    string MaskPhone(string phone) => phone.Length < 5 ? "••••" : phone[..Math.Min(3, phone.Length)] + new string('•', Math.Max(0, phone.Length - 5)) + phone[^2..];
+    string MaskPhone(string phone) =>
+        phone.Length < 5
+            ? "••••"
+            : phone[..Math.Min(3, phone.Length)]
+                + new string('•', Math.Max(0, phone.Length - 5))
+                + phone[^2..];
 }
