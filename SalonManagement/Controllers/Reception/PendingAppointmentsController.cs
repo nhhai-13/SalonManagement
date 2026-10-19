@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -11,8 +13,24 @@ namespace SalonManagement.Controllers.Reception;
 [Authorize(Roles = UserRoles.Receptionist)]
 [ApiController]
 [Route("api/reception/pending-appointments")]
-public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeProvider timeProvider) : ControllerBase
+public sealed class PendingAppointmentsController : ControllerBase
 {
+    private readonly ApplicationDbContext db;
+    private readonly TimeProvider timeProvider;
+    private readonly AppointmentEmailNotificationService emailNotifications;
+
+    [ActivatorUtilitiesConstructor]
+    public PendingAppointmentsController(ApplicationDbContext db, TimeProvider timeProvider, AppointmentEmailNotificationService emailNotifications)
+    {
+        this.db = db;
+        this.timeProvider = timeProvider;
+        this.emailNotifications = emailNotifications;
+    }
+
+    // Convenience constructor for isolated controller tests.
+    public PendingAppointmentsController(ApplicationDbContext db, TimeProvider timeProvider)
+        : this(db, timeProvider, new AppointmentEmailNotificationService(db, timeProvider)) { }
+
     private static readonly string[] RejectionReasons = ["Không còn thợ phù hợp", "Khung giờ không còn trống", "Không liên hệ được khách", "Yêu cầu của khách không phù hợp"];
     private static readonly TimeSpan PendingOverdueAfter = TimeSpan.FromHours(12);
 
@@ -20,15 +38,15 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
     public async Task<ActionResult<IReadOnlyList<PendingAppointmentResponse>>> Get()
     {
         var now = SalonClock.GetLocalNow(timeProvider);
-        var appointments = await db.Appointments.AsNoTracking()
+        // SQLite cannot translate ORDER BY for TimeSpan. Materialize the small pending
+        // queue first, then order it in memory to keep the reception dashboard available.
+        var appointments = (await db.Appointments.AsNoTracking()
             .Where(appointment => appointment.Status == "PendingConfirmation")
-            .OrderBy(appointment => appointment.AppointmentDate)
-            .ThenBy(appointment => appointment.StartTime)
-            .ThenBy(appointment => appointment.CreatedAt)
             .Select(appointment => new PendingAppointmentResponse(
                 appointment.AppointmentId,
                 appointment.BookingReference,
-                appointment.Customer.FullName,
+                appointment.CustomerId,
+                appointment.CustomerNameOverride ?? appointment.Customer.FullName,
                 appointment.Customer.Phone,
                 appointment.Customer.Email,
                 appointment.Stylist.FullName,
@@ -40,11 +58,17 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
                 appointment.StartTime,
                 appointment.EndTime,
                 appointment.Status,
+                appointment.BookingSource,
+                appointment.NameConflictResolution,
                 appointment.CreatedAt,
                 appointment.ConfirmedByUserId,
                 appointment.ConfirmedAt,
                 appointment.CreatedAt <= now.Subtract(PendingOverdueAfter)))
-            .ToListAsync();
+            .ToListAsync())
+            .OrderBy(appointment => appointment.AppointmentDate)
+            .ThenBy(appointment => appointment.StartTime)
+            .ThenBy(appointment => appointment.CreatedAt)
+            .ToList();
 
         return Ok(appointments);
     }
@@ -55,8 +79,10 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         var appointment = await db.Appointments.Include(item => item.Customer).SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
         if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
         if (appointment.Status != "PendingConfirmation") return Conflict(new { error = "Lịch hẹn này đã được xử lý." });
+        if (appointment.NameConflictResolution == "PendingReceptionReview")
+            return Conflict(new { error = "Vui lòng chọn cách xử lý tên khác hồ sơ trước khi xác nhận lịch." });
 
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = CurrentUserId();
         if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
 
         appointment.Status = "Confirmed";
@@ -65,6 +91,16 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         appointment.UpdatedAt = appointment.ConfirmedAt;
         var now = timeProvider.GetUtcNow();
         var email = appointment.Customer.Email?.Trim();
+        db.AppointmentEmailDeliveries.Add(new AppointmentEmailDelivery
+        {
+            AppointmentId = appointment.AppointmentId,
+            Kind = AppointmentEmailKinds.Confirmation,
+            RecipientEmail = string.IsNullOrWhiteSpace(email) ? null : email,
+            Status = string.IsNullOrWhiteSpace(email) ? AppointmentEmailStatuses.NoEmail : AppointmentEmailStatuses.Queued,
+            AppointmentStartAt = CheckInService.StartsAt(appointment),
+            NextAttemptAt = now,
+            CreatedAt = now
+        });
         var reminderStart = CheckInService.StartsAt(appointment);
         db.AppointmentEmailDeliveries.Add(new AppointmentEmailDelivery
         {
@@ -95,7 +131,7 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
         if (appointment.Status != "PendingConfirmation") return Conflict(new { error = "Lịch hẹn này đã được xử lý." });
 
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = CurrentUserId();
         if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
 
         appointment.Status = "Rejected";
@@ -112,13 +148,47 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         await emailSender.SendConfirmationEmailAsync(appointment.AppointmentId);
         return Ok(new { appointment.AppointmentId, appointment.Status, appointment.RejectionReason, appointment.RejectedByUserId, appointment.RejectedAt });
     }
+
+    [HttpPost("{appointmentId:int}/name-conflict")]
+    public async Task<IActionResult> ResolveNameConflict(int appointmentId, [FromBody] ResolveNameConflictRequest request)
+    {
+        if (request.Resolution is not ("KeepProfile" or "UpdateProfile" or "UseForThisAppointment"))
+            return BadRequest(new { error = "Lựa chọn xử lý tên không hợp lệ." });
+        var appointment = await db.Appointments.Include(item => item.Customer).SingleOrDefaultAsync(item => item.AppointmentId == appointmentId);
+        if (appointment is null) return NotFound(new { error = "Không tìm thấy lịch hẹn." });
+        if (appointment.Status != "PendingConfirmation" || appointment.NameConflictResolution != "PendingReceptionReview")
+            return Conflict(new { error = "Lịch hẹn này không còn chờ xử lý tên." });
+
+        var enteredName = appointment.CustomerNameOverride;
+        if (string.IsNullOrWhiteSpace(enteredName)) return Conflict(new { error = "Không tìm thấy tên mới cần xử lý." });
+        if (request.Resolution == "UpdateProfile")
+        {
+            appointment.Customer.FullName = enteredName;
+            appointment.Customer.NormalizedSearchName = CustomerProfileService.NormalizeSearchName(enteredName);
+            appointment.Customer.UpdatedAt = SalonClock.GetLocalNow(timeProvider);
+            appointment.CustomerNameOverride = null;
+        }
+        else if (request.Resolution == "KeepProfile")
+        {
+            appointment.CustomerNameOverride = null;
+        }
+        appointment.NameConflictResolution = request.Resolution;
+        appointment.UpdatedAt = SalonClock.GetLocalNow(timeProvider);
+        await db.SaveChangesAsync();
+        return Ok(new { appointment.AppointmentId, appointment.NameConflictResolution, appointment.CustomerNameOverride, customerName = appointment.Customer.FullName });
+    }
+
+    private string? CurrentUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
 }
 
 public sealed record RejectPendingAppointmentRequest(string? Reason);
+public sealed record ResolveNameConflictRequest(string? Resolution);
 
 public sealed record PendingAppointmentResponse(
     int AppointmentId,
     string Reference,
+    int CustomerId,
     string CustomerName,
     string CustomerPhone,
     string? CustomerEmail,
@@ -128,6 +198,8 @@ public sealed record PendingAppointmentResponse(
     TimeSpan StartTime,
     TimeSpan EndTime,
     string Status,
+    string? BookingSource,
+    string? NameConflictResolution,
     DateTime CreatedAt,
     string? ConfirmedByUserId = null,
     DateTime? ConfirmedAt = null,

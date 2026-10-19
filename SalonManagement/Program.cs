@@ -132,6 +132,7 @@ builder.Services.AddAuthentication(options =>
                     Encoding.UTF8.GetBytes(jwt["Key"]!)),
 
             RoleClaimType = ClaimTypes.Role,
+            NameClaimType = ClaimTypes.Name,
             ClockSkew = TimeSpan.Zero
         };
     options.Events = new JwtBearerEvents
@@ -201,6 +202,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddAttendanceModules();
 builder.Services.AddHostedService<StylistNotificationCleanupService>();
 builder.Services.AddScoped<StylistAvailabilityService>();
+builder.Services.AddScoped<AppointmentReplacementSuggestionService>();
 
 builder.Services.AddScoped<
     ITokenService,
@@ -228,7 +230,13 @@ builder.Services.AddSingleton<
 
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<AppointmentBookingService>();
+builder.Services.AddScoped<CustomerProfileService>();
+builder.Services.AddScoped<CustomerProfileSearchService>();
 builder.Services.AddScoped<AppointmentReschedulingService>();
+builder.Services.AddScoped<BatchAppointmentReschedulingService>();
+builder.Services.AddScoped<AppointmentLifecycleService>();
+builder.Services.AddScoped<StylistInAppNotificationService>();
+builder.Services.AddHostedService<StaffNotificationCleanupBackgroundService>();
 builder.Services.AddScoped<AppointmentChangeEmailProcessor>();
 builder.Services.AddHostedService<AppointmentChangeEmailBackgroundService>();
 builder.Services.AddScoped<AppointmentEmailDeliveryProcessor>();
@@ -267,6 +275,16 @@ await using (var scope = app.Services.CreateAsyncScope())
     else
     {
         await dbContext.Database.MigrateAsync();
+    }
+
+    var customerProfiles = scope.ServiceProvider.GetRequiredService<CustomerProfileService>();
+    await customerProfiles.ConsolidateLegacyProfilesAsync();
+    await customerProfiles.RebuildSearchNamesAsync();
+    if (usesSqlite)
+    {
+        await dbContext.Database.ExecuteSqlRawAsync("DROP INDEX IF EXISTS IX_Customers_Phone");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_Customers_Phone ON Customers (Phone)");
+        await dbContext.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_Customers_NormalizedSearchName ON Customers (NormalizedSearchName)");
     }
 }
 
@@ -363,13 +381,15 @@ using (var scope = app.Services.CreateScope())
     // 2. Nạp dữ liệu mẫu
     //
     // - 3 nhóm dịch vụ
-    // - 5 stylist
+    // - 10 thợ
     // - 12 dịch vụ
-    // - 4 tài khoản mẫu
+    // - 15 tài khoản mẫu (3 lễ tân, 10 thợ)
     //
     // SeedData có kiểm tra dữ liệu tồn tại
     // nên có thể chạy nhiều lần.
     // ---------------------------------
+
+    await StylistBookingDemoCleanup.RemoveAsync(dbContext);
 
     await SeedData.SeedAsync(
         dbContext,
@@ -393,4 +413,24 @@ using (var scope = app.Services.CreateScope())
 // =====================================
 
 app.Run();
+
+static async Task EnsureSqliteColumnAsync(ApplicationDbContext dbContext, string table, string column, string type)
+{
+    await dbContext.Database.OpenConnectionAsync();
+    try
+    {
+        await using var check = dbContext.Database.GetDbConnection().CreateCommand();
+        check.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
+        var exists = Convert.ToInt32(await check.ExecuteScalarAsync()) > 0;
+        if (!exists)
+        {
+            var addColumnSql = string.Concat("ALTER TABLE \"", table, "\" ADD COLUMN \"", column, "\" ", type, " NULL");
+            await dbContext.Database.ExecuteSqlRawAsync(addColumnSql);
+        }
+    }
+    finally
+    {
+        await dbContext.Database.CloseConnectionAsync();
+    }
+}
 

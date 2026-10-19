@@ -7,7 +7,7 @@ using SalonManagement.Services;
 
 namespace SalonManagement.Controllers.Booking;
 
-public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, string FullName, string Phone, string? Email, string? Notes, string? Website);
+public sealed record ConfirmBookingInput(DateTime Date, string StartTime, int[] ServiceIds, int? StylistId, string FullName, string? Phone, string? Email, string? Notes, string? Website);
 public sealed record BookingEmailCodeInput(string? Email, string? Code = null);
 
 [AllowAnonymous]
@@ -41,7 +41,7 @@ public class BookingController : Controller
     /// </summary>
     [HttpGet("")]
     [HttpGet("select-services")]
-    public async Task<IActionResult> Index([FromQuery] List<int>? serviceIds, [FromQuery] int? serviceId)
+    public async Task<IActionResult> Index([FromQuery] List<int>? serviceIds, [FromQuery] int? serviceId, [FromQuery] bool overlay = false, [FromQuery] string? phone = null)
     {
         var preselected = new HashSet<int>();
         if (serviceIds != null && serviceIds.Count > 0)
@@ -62,6 +62,8 @@ public class BookingController : Controller
             ModelState.AddModelError(string.Empty, "Số lượng dịch vụ trong một lượt đặt không được vượt quá 5");
         }
 
+        ViewData["BookingOverlay"] = overlay;
+        ViewData["BookingPhone"] = phone;
         var viewModel = await _bookingService.GetSelectServicesViewModelAsync(preselected);
         return View("~/Views/Booking/Index.cshtml", viewModel);
 
@@ -99,13 +101,17 @@ public class BookingController : Controller
         if (!string.IsNullOrWhiteSpace(input.Website)) return Conflict(new { code = "bot_detected", message = "Yêu cầu đặt lịch không hợp lệ." });
         if (!TimeSpan.TryParse(input.StartTime, out var startTime)) return BadRequest(new { message = "Giờ hẹn không hợp lệ." });
         if (_appointmentBookingService is null) return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = "Dịch vụ đặt lịch chưa sẵn sàng." });
-        if (_emailVerification != null && !_emailVerification.IsVerified(input.Email))
+        var email = string.IsNullOrWhiteSpace(input.Email) ? null : input.Email.Trim();
+        var phone = string.IsNullOrWhiteSpace(input.Phone) ? null : input.Phone.Trim();
+        if (phone is null && email is null)
+            return BadRequest(new { code = "contact_required", message = "Vui lòng nhập số điện thoại hoặc email để liên hệ." });
+        if (email is not null && _emailVerification != null && !_emailVerification.IsVerified(email))
             return BadRequest(new { code = "email_unverified", message = "Vui lòng xác thực email trước khi đặt lịch." });
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "unknown";
         var limiter = new BookingRateLimiter(_timeProvider);
         var limit = limiter.TryReserve(ipAddress);
         if (!limit.Allowed) return StatusCode(StatusCodes.Status429TooManyRequests, new { code = "ip_rate_limited", message = $"Bạn đã đạt giới hạn 5 lượt đặt trong một giờ. Vui lòng thử lại sau {limit.RetryAt!.Value.LocalDateTime:HH:mm}." });
-        var result = await _appointmentBookingService.CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, input.Phone, input.Email, input.Notes));
+        var result = await _appointmentBookingService.CreateAsync(new BookingRequest(input.Date, startTime, input.ServiceIds, input.FullName, phone, email, input.Notes, input.StylistId));
         if (result.Confirmation is null)
         {
             limiter.Release(ipAddress);
@@ -118,8 +124,8 @@ public class BookingController : Controller
             });
         }
         var confirmation = result.Confirmation;
-        _emailVerification?.Consume(input.Email);
-        return Ok(new { confirmation.Reference, confirmation.StylistName, confirmation.Services, date = confirmation.Date.ToString("dd/MM/yyyy"), startTime = confirmation.StartTime.ToString(@"hh\:mm"), endTime = confirmation.EndTime.ToString(@"hh\:mm") });
+        if (email is not null) _emailVerification?.Consume(email);
+        return Ok(new { confirmation.Reference, confirmation.StylistName, confirmation.Services, date = confirmation.Date.ToString("dd/MM/yyyy"), startTime = confirmation.StartTime.ToString(@"hh\:mm"), endTime = confirmation.EndTime.ToString(@"hh\:mm"), noShowWarning = confirmation.NoShowCount > 0, confirmation.NoShowCount });
     }
 
     [HttpPost("send-email-code")]
@@ -171,8 +177,10 @@ public class BookingController : Controller
     /// </summary>
     [HttpPost("select-services")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SelectServices([FromForm] List<int>? selectedServiceIds)
+    public async Task<IActionResult> SelectServices([FromForm] List<int>? selectedServiceIds, [FromForm] bool overlay = false, [FromForm] string? phone = null)
     {
+        ViewData["BookingOverlay"] = overlay;
+        ViewData["BookingPhone"] = phone;
         var ids = selectedServiceIds ?? new List<int>();
 
         if (ids.Count > IBookingService.MaxServicesLimit)

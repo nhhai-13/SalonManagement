@@ -12,6 +12,7 @@ public class AdminController : Controller
 {
     private const string LoginView = "~/Views/Admin/Authentication/Login.cshtml";
     private const string RegisterView = "~/Views/Admin/Authentication/Register.cshtml";
+    private const string RegisterChoiceView = "~/Views/Admin/Authentication/RegisterChoice.cshtml";
     private const string VerifyEmailView = "~/Views/Admin/Authentication/VerifyEmail.cshtml";
 
     [AllowAnonymous]
@@ -103,6 +104,7 @@ public class StaffPortalApiController : ControllerBase
     {
         authenticated = true,
         email = User.FindFirst("email")?.Value,
+        fullName = User.FindFirst("full_name")?.Value ?? User.Identity?.Name ?? User.FindFirst("email")?.Value,
         role
     });
 }
@@ -118,6 +120,7 @@ public class AdminApiController(UserManager<ApplicationUser> userManager, IEmail
     {
         authenticated = true,
         email = User.FindFirst("email")?.Value,
+        fullName = User.FindFirst("full_name")?.Value ?? User.Identity?.Name ?? User.FindFirst("email")?.Value,
         role = UserRoles.Admin
     });
 
@@ -168,21 +171,29 @@ public class AdminApiController(UserManager<ApplicationUser> userManager, IEmail
             return BadRequest(new { message = "Không thể gán vai trò cho tài khoản." });
         }
 
+        var emailDelivered = true;
         try
         {
             await emailService.SendTemporaryPasswordEmailAsync(user.Email!, temporaryPassword);
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Could not deliver staff invitation to {UserId}.", user.Id);
-            user.IsActive = false;
-            await userManager.UpdateAsync(user);
-            var cleanup = await userManager.DeleteAsync(user);
-            return StatusCode(503, new { message = cleanup.Succeeded
-                ? "Không gửi được email mật khẩu tạm. Tài khoản chưa được cấp; vui lòng kiểm tra SMTP rồi thử lại."
-                : "Không gửi được email mật khẩu tạm. Tài khoản đã ngừng hoạt động; vui lòng liên hệ quản trị viên." });
+            // Việc gửi email không được phép làm mất tài khoản vừa tạo. Trong môi trường
+            // chưa cấu hình SMTP, quản trị viên nhận mật khẩu tạm đúng một lần trên màn hình.
+            logger.LogWarning(exception, "Could not deliver staff invitation to {UserId}. Showing the one-time password to the administrator instead.", user.Id);
+            emailDelivered = false;
         }
-        return Created(string.Empty, new { message = "Đã tạo tài khoản và gửi mật khẩu tạm qua email. Người dùng phải đổi mật khẩu khi đăng nhập lần đầu.", user.Email, role });
+        return Created(string.Empty, new
+        {
+            message = emailDelivered
+                ? "Đã tạo tài khoản và gửi mật khẩu tạm qua email. Người dùng phải đổi mật khẩu khi đăng nhập lần đầu."
+                : "Đã tạo tài khoản nhưng chưa gửi được email. Hãy ghi lại mật khẩu tạm bên dưới và gửi riêng cho nhân viên.",
+            user.Email,
+            role,
+            emailDelivered,
+            // Chỉ trả về khi gửi thư thất bại; mật khẩu không được lưu hoặc hiển thị lại ở nơi khác.
+            temporaryPassword = emailDelivered ? null : temporaryPassword
+        });
     }
 }
 
@@ -197,6 +208,7 @@ public class OwnerApiController : ControllerBase
     {
         authenticated = true,
         email = User.FindFirst("email")?.Value,
+        fullName = User.FindFirst("full_name")?.Value ?? User.Identity?.Name ?? User.FindFirst("email")?.Value,
         role = UserRoles.Owner
     });
 }

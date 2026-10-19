@@ -27,9 +27,15 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
             .Where(item => item.AppointmentDate.Date == selectedDate);
         if (status == "Pending") query = query.Where(item => item.Status == "Pending" || item.Status == "PendingConfirmation");
         else if (status == "Cancelled") query = query.Where(item => item.Status == "Cancelled" || item.Status == "Canceled");
+<<<<<<< HEAD
         else if (status is "Confirmed" or "Arrived" or "Completed" or "NoShow") query = query.Where(item => item.Status == status);
         var appointments = await query.ToListAsync();
         appointments = appointments.OrderBy(item => item.StartTime).ToList();
+=======
+        else if (status == "Completed") query = query.Where(item => item.Status == "Completed" || item.Status == "Closed");
+        else if (status is "Confirmed" or "Arrived" or "NoShow") query = query.Where(item => item.Status == status);
+        var appointments = await query.OrderBy(item => item.StartTime).ToListAsync();
+>>>>>>> origin/develop
 
         return View(appointments);
     }
