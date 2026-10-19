@@ -536,9 +536,9 @@ body.auth-page {
 .login-compact-page .auth-help { margin-top: 18px; }
 .login-compact-page .support-note { color: #66708D; font-size: 10px; }
 .login-compact-page .support-note a { color: #5F2CFF; font-size: 10px; }
-.login-compact-page .copyright { position: static; margin: 18px 0 0; color: #8A94AF; font-size: 9px; text-align: center; }
-.login-compact-page .login-alert { border-color: rgba(255, 130, 130, .35); color: #FFD1D1; background: rgba(150, 25, 55, .24); font-size: 11px; }
-.login-compact-page .login-alert-success { border-color: rgba(154, 255, 201, .32); color: #C6FFE2; background: rgba(12, 126, 83, .23); }
+.login-compact-page .login-alert { border-color: #fecaca; color: #991b1b; background: #fef2f2; font-size: 12px; }
+.login-compact-page .login-alert-success,
+.login-compact-page .login-alert.alert-success { border-color: #a7f3d0; color: #065f46; background: #ecfdf5; font-size: 12px; font-weight: 500; }
 
 @media (max-width: 760px) {
     .login-compact-page { padding: 16px; }
