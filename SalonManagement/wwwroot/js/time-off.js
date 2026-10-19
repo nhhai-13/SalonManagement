@@ -64,17 +64,24 @@ window.TimeOffPage = (() => {
             stylistSelect.addEventListener("change", () => loadStylistTimeOffs(stylistSelect.value));
             shopForm.addEventListener("submit", async event => {
                 event.preventDefault();
+                const button = event.submitter || shopForm.querySelector('[type="submit"]');
                 const values = Object.fromEntries(new FormData(shopForm));
-                const { response, result } = await fetchJson("/api/shop-holidays", {
-                    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values)
-                });
-                if (!response.ok) return message(errorMessage(result), false);
-                message("Đã thêm ngày nghỉ của tiệm.", true);
-                shopForm.reset();
-                await loadShopHolidays();
+                if (button) button.disabled = true;
+                try {
+                    const { response, result } = await fetchJson("/api/shop-holidays", {
+                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values)
+                    });
+                    if (!response.ok) return message(errorMessage(result), false);
+                    message("Đã thêm ngày nghỉ của tiệm.", true);
+                    shopForm.reset();
+                    await loadShopHolidays();
+                } finally {
+                    if (button) button.disabled = false;
+                }
             });
             stylistForm.addEventListener("submit", async event => {
                 event.preventDefault();
+                const button = event.submitter || stylistForm.querySelector('[type="submit"]');
                 const values = Object.fromEntries(new FormData(stylistForm));
                 const payload = {
                     stylistId: Number(values.stylistId), offDate: values.offDate, isFullDay: fullDay.checked,
@@ -82,27 +89,45 @@ window.TimeOffPage = (() => {
                     reason: values.reason || null,
                     replacementStylistId: values.replacementStylistId ? Number(values.replacementStylistId) : null
                 };
-                const { response, result } = await fetchJson("/api/stylist-time-offs", {
-                    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
-                });
-                if (!response.ok) return message(errorMessage(result), false);
-                message("Đã thêm lịch nghỉ của thợ.", true);
-                await loadStylistTimeOffs(payload.stylistId);
+                if (button) button.disabled = true;
+                try {
+                    const { response, result } = await fetchJson("/api/stylist-time-offs", {
+                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) return message(errorMessage(result), false);
+                    message("Đã thêm lịch nghỉ của thợ.", true);
+                    await loadStylistTimeOffs(payload.stylistId);
+                } finally {
+                    if (button) button.disabled = false;
+                }
             });
             document.addEventListener("click", async event => {
-                const shopId = event.target.dataset.deleteShop;
-                const stylistId = event.target.dataset.deleteStylist;
+                const target = event.target instanceof Element ? event.target : null;
+                const shopButton = target?.closest("[data-delete-shop]");
+                const stylistButton = target?.closest("[data-delete-stylist]");
+                const shopId = shopButton?.dataset.deleteShop;
+                const stylistId = stylistButton?.dataset.deleteStylist;
                 if (shopId && confirm("Xóa ngày nghỉ này?")) {
-                    const { response, result } = await fetchJson(`/api/shop-holidays/${shopId}`, { method: "DELETE" });
-                    if (!response.ok) return message(result.message || "Không thể xóa ngày nghỉ.", false);
-                    message("Đã xóa ngày nghỉ.", true);
-                    await loadShopHolidays();
+                    shopButton.disabled = true;
+                    try {
+                        const { response, result } = await fetchJson(`/api/shop-holidays/${shopId}`, { method: "DELETE" });
+                        if (!response.ok) return message(result.message || "Không thể xóa ngày nghỉ.", false);
+                        message("Đã xóa ngày nghỉ.", true);
+                        await loadShopHolidays();
+                    } finally {
+                        if (document.body.contains(shopButton)) shopButton.disabled = false;
+                    }
                 }
                 if (stylistId && confirm("Xóa lịch nghỉ này?")) {
-                    const { response, result } = await fetchJson(`/api/stylist-time-offs/${stylistId}`, { method: "DELETE" });
-                    if (!response.ok) return message(result.message || "Không thể xóa lịch nghỉ.", false);
-                    message("Đã xóa lịch nghỉ.", true);
-                    await loadStylistTimeOffs(stylistSelect.value);
+                    stylistButton.disabled = true;
+                    try {
+                        const { response, result } = await fetchJson(`/api/stylist-time-offs/${stylistId}`, { method: "DELETE" });
+                        if (!response.ok) return message(result.message || "Không thể xóa lịch nghỉ.", false);
+                        message("Đã xóa lịch nghỉ.", true);
+                        await loadStylistTimeOffs(stylistSelect.value);
+                    } finally {
+                        if (document.body.contains(stylistButton)) stylistButton.disabled = false;
+                    }
                 }
             });
         }
