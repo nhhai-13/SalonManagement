@@ -3,6 +3,27 @@ window.AppointmentEmailNotifications = (() => {
     const typeText = type => ({ Confirmation: "Xác nhận lịch hẹn", Reminder: "Nhắc lịch hẹn 24h", ManualCall: "Không gửi email" }[type] || type);
     const status = row => { if (row.status === "Sent") return '<span class="badge text-bg-success">✓ Đã gửi thành công</span>'; if (row.status === "Retrying") return `<span class="badge text-bg-warning">↻ Thử lại lần ${row.attemptCount + 1}/3</span>`; if (row.status === "Failed") return '<span class="badge text-bg-danger">✕ Thất bại (3/3) · Chuyển gọi điện</span>'; if (row.status === "Cancelled") return '<span class="badge text-bg-secondary">⏹ Đã hủy nhắc lịch</span>'; if (row.status === "ManualCallRequired") return '<span class="badge text-bg-warning">⚠ Cần gọi điện xác nhận</span>'; return '<span class="badge text-bg-primary">Đang chờ gửi</span>'; };
     const log = row => { if (row.status === "Sent") return `Thành công lần ${row.attemptCount} · ${new Date(row.sentAt).toLocaleString("vi-VN")}`; if (row.status === "Retrying") return `Lần ${row.attemptCount} lỗi; thử lại sau 10 phút. ${escapeHtml(row.lastError || "")}`; if (row.status === "Failed" || row.status === "Cancelled" || row.status === "ManualCallRequired") return escapeHtml(row.lastError || ""); return `Lên lịch gửi: ${new Date(row.scheduledAt).toLocaleString("vi-VN")}`; };
-    async function load() { const target = document.getElementById("email-notification-list"); const response = await SalonAuth.authenticatedFetch("/api/reception/email-notifications"); const data = await response.json().catch(() => ({})); if (!response.ok) { target.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-danger">Không thể tải nhật ký email.</td></tr>'; return; } const manual = document.getElementById("email-notification-manual-calls"); if (data.manualCalls?.length) { manual.classList.remove("d-none"); manual.innerHTML = `<strong><i class="bi bi-telephone-outbound"></i> Cảnh báo khách không có email</strong><div>Hãy gọi xác nhận thủ công trước 24 giờ: ${data.manualCalls.map(item => `${escapeHtml(item.customerName)} (${escapeHtml(item.phone)} · ${String(item.startTime).slice(0, 5)})`).join(", ")}.</div>`; } else manual.classList.add("d-none"); const rows = data.notifications || []; target.innerHTML = rows.length ? rows.map(row => `<tr><td class="fw-bold">#${escapeHtml(row.reference)}</td><td><strong>${escapeHtml(row.customerName)}</strong><small class="d-block text-muted">${escapeHtml(row.email || "Khách không có email")}</small></td><td>${typeText(row.notificationType)}</td><td>${status(row)}</td><td class="small text-muted">${log(row)}</td></tr>`).join("") : '<tr><td colspan="5" class="py-4 text-center text-muted">Chưa có nhật ký email.</td></tr>'; }
+    async function load() {
+        const target = document.getElementById("email-notification-list");
+        try {
+            const response = await SalonAuth.authenticatedFetch("/api/reception/email-notifications");
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                target.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-danger">Không thể tải nhật ký email.</td></tr>';
+                return;
+            }
+            const manual = document.getElementById("email-notification-manual-calls");
+            if (data.manualCalls?.length) {
+                manual.classList.remove("d-none");
+                manual.innerHTML = `<strong><i class="bi bi-telephone-outbound"></i> Cảnh báo khách không có email</strong><div>Hãy gọi xác nhận thủ công trước 24 giờ: ${data.manualCalls.map(item => `${escapeHtml(item.customerName)} (${escapeHtml(item.phone)} · ${String(item.startTime).slice(0, 5)})`).join(", ")}.</div>`;
+            } else {
+                manual.classList.add("d-none");
+            }
+            const rows = data.notifications || [];
+            target.innerHTML = rows.length ? rows.map(row => `<tr><td class="fw-bold">#${escapeHtml(row.reference)}</td><td><strong>${escapeHtml(row.customerName)}</strong><small class="d-block text-muted">${escapeHtml(row.email || "Khách không có email")}</small></td><td>${typeText(row.notificationType)}</td><td>${status(row)}</td><td class="small text-muted">${log(row)}</td></tr>`).join("") : '<tr><td colspan="5" class="py-4 text-center text-muted">Chưa có nhật ký email.</td></tr>';
+        } catch {
+            target.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-danger">Không thể kết nối để tải nhật ký email.</td></tr>';
+        }
+    }
     return { start() { load(); window.setInterval(load, 30000); } };
 })();
