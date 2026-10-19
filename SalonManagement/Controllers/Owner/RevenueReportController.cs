@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
+using SalonManagement.Services;
 
 namespace SalonManagement.Controllers.Owner;
 
@@ -18,7 +19,7 @@ public sealed class RevenueReportPageController : Controller
 [Authorize(Roles = UserRoles.Owner)]
 [ApiController]
 [Route("api/owner/revenue-report")]
-public sealed class RevenueReportController(ApplicationDbContext db) : ControllerBase
+public sealed class RevenueReportController(ApplicationDbContext db, TimeProvider timeProvider) : ControllerBase
 {
     private const int MaximumRangeDays = 365;
 
@@ -94,9 +95,9 @@ public sealed class RevenueReportController(ApplicationDbContext db) : Controlle
         return new RevenueReportSnapshot(from, to, total, payments.Count, payments.Count == 0 ? 0 : Math.Round(total / payments.Count, 2), byStylist, byService);
     }
 
-    private static (DateTime From, DateTime To, string? Error) NormalizeRange(DateTime? from, DateTime? to)
+    private (DateTime From, DateTime To, string? Error) NormalizeRange(DateTime? from, DateTime? to)
     {
-        var today = DateTime.Today;
+        var today = SalonClock.GetLocalNow(timeProvider).Date;
         var start = (from ?? new DateTime(today.Year, today.Month, 1)).Date;
         var end = (to ?? today).Date;
         if (end < start) return (start, end, "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.");
