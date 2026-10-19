@@ -213,11 +213,8 @@ public sealed class PendingOnlineAppointmentsTests
         var clock = new FixedTimeProvider(new DateTimeOffset(salonNow, TimeSpan.FromHours(7)).ToUniversalTime());
         var action = await new PendingAppointmentsController(db, clock).Get();
         var response = action.Result as OkObjectResult;
- feature/integrate-sprint4-02
-        var items = response!.Value as List<PendingAppointmentResponse>;
         Assert.IsNotNull(response);
         var items = response.Value as List<PendingAppointmentResponse>;
- develop
         Assert.IsNotNull(items);
 
         Assert.IsTrue(items.Single(item => item.Reference == "ONLINE06").IsOverdue);
