@@ -44,9 +44,11 @@ public sealed class PeakHoursReportController(ApplicationDbContext db) : Control
         var cancelled = appointments.Count(item => item.Status is "Cancelled" or "Rejected");
         var busiest = slots.OrderByDescending(item => item.WeekdayAverage + item.WeekendAverage).First();
         var ratio = busiest.WeekdayAverage == 0 ? 0 : Math.Round(busiest.WeekendAverage / busiest.WeekdayAverage, 1);
-        var recommendation = busiest.WeekendAverage > busiest.WeekdayAverage
-            ? $"Khung {busiest.Time} có lượng khách cuối tuần cao hơn ngày thường {ratio:0.0} lần. Nên tăng thợ cho ca chiều Thứ 7 và Chủ Nhật."
-            : $"Khung {busiest.Time} đang có lượng khách cao nhất. Nên ưu tiên phân ca đủ thợ ở khung này.";
+        var recommendation = total == 0
+            ? "Chưa có lịch hẹn trong khoảng thời gian này nên chưa thể gợi ý xếp ca."
+            : busiest.WeekendAverage > busiest.WeekdayAverage
+                ? $"Khung {busiest.Time} có lượng khách cuối tuần cao hơn ngày thường {ratio:0.0} lần. Nên tăng thợ cho ca chiều Thứ 7 và Chủ Nhật."
+                : $"Khung {busiest.Time} đang có lượng khách cao nhất. Nên ưu tiên phân ca đủ thợ ở khung này.";
         return Ok(new PeakHoursReportSnapshot(range.From, range.To, total, Rate(noShows, total), Rate(cancelled, total), slots, recommendation));
     }
 
