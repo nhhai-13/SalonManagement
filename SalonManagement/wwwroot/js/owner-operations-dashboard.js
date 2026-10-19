@@ -1,11 +1,36 @@
 window.OwnerOperationsDashboard = (() => {
-    const refreshSeconds = 60; let seconds = refreshSeconds, countdown, selectedStatus, detailRequestVersion = 0;
+    const refreshSeconds = 60; let seconds = refreshSeconds, countdown, selectedStatus, detailRequestVersion = 0, loadInProgress = false, reloadRequested = false;
     const $ = id => document.getElementById(id); const money = value => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(value || 0); const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
     const cards = [{ key:"pending", label:"Chờ xác nhận", prop:"pending", note:"Khách đặt online cần tiệm chốt", icon:"hourglass-split" },{ key:"confirmed", label:"Đã xác nhận", prop:"confirmed", note:"Đã chốt giờ, chờ khách đến", icon:"calendar-check" },{ key:"arrived", label:"Đã đến (Check-in)", prop:"arrived", note:"Khách đang ở tiệm làm dịch vụ", icon:"person-check" },{ key:"completed", label:"Hoàn tất", prop:"completed", note:"Đã làm xong và đóng phiếu", icon:"check2-circle" },{ key:"cancelled", label:"Hủy", prop:"cancelled", note:"Khách hoặc tiệm đã hủy", icon:"x-circle" },{ key:"noshow", label:"Không đến (No-show)", prop:"noShow", note:"Quá giờ hẹn không đến", icon:"person-x" }];
     function labelFor(key) { return cards.find(card => card.key === key)?.label || "Lịch hẹn"; }
     function tick() { if (--seconds <= 0) { seconds = refreshSeconds; load(); } $("owner-refresh-countdown").textContent = `Tự làm mới sau: ${seconds}s`; }
     function render(data) { $("owner-operations-date").textContent = new Date(`${data.date.slice(0,10)}T00:00:00`).toLocaleDateString("vi-VN", { weekday:"long", day:"2-digit", month:"2-digit", year:"numeric" }); $("owner-today-revenue").textContent = money(data.revenueToday); $("owner-stylists-on-duty").textContent = `${data.stylistsOnDuty} / ${data.stylistsScheduled} Thợ`; $("owner-staff-caption").textContent = data.stylistsScheduled ? "Số thợ có ca hôm nay (đã trừ nghỉ cả ngày)" : "Hôm nay chưa có ca được phân công"; $("owner-status-grid").innerHTML = cards.map(card => `<button type="button" class="owner-status-card ${card.key}" data-owner-status="${card.key}"><span><i class="bi bi-${card.icon}"></i> ${card.label}</span><strong>${data.statuses[card.prop] || 0}</strong><b>lịch hẹn</b><small>${card.note}</small><em>Xem danh sách →</em></button>`).join(""); $("owner-status-grid").querySelectorAll("[data-owner-status]").forEach(button => button.addEventListener("click", () => openList(button.dataset.ownerStatus))); }
-    async function load() { const box = $("owner-operations-error"); box.classList.add("d-none"); try { const response = await SalonAuth.authenticatedFetch("/api/owner/operations-dashboard"); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || "Không thể tải tổng quan."); render(data); seconds = refreshSeconds; if (selectedStatus) openList(selectedStatus, true); } catch (error) { box.textContent = error.message || "Không thể tải tổng quan."; box.classList.remove("d-none"); } }
+    async function load() {
+        if (loadInProgress) {
+            reloadRequested = true;
+            return;
+        }
+        loadInProgress = true;
+        const box = $("owner-operations-error");
+        box.classList.add("d-none");
+        try {
+            const response = await SalonAuth.authenticatedFetch("/api/owner/operations-dashboard");
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || "Không thể tải tổng quan.");
+            render(data);
+            seconds = refreshSeconds;
+            if (selectedStatus) openList(selectedStatus, true);
+        } catch (error) {
+            box.textContent = error.message || "Không thể tải tổng quan.";
+            box.classList.remove("d-none");
+        } finally {
+            loadInProgress = false;
+            if (reloadRequested) {
+                reloadRequested = false;
+                load();
+            }
+        }
+    }
     async function openList(status, quiet = false) {
         selectedStatus = status;
         const requestVersion = ++detailRequestVersion;
