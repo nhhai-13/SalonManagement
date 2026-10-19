@@ -104,7 +104,16 @@ public sealed class RevenueReportController(ApplicationDbContext db) : Controlle
         return (start, end, null);
     }
 
-    private static string Escape(string value) => value.Contains(';') || value.Contains('"') || value.Contains('\n') ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
+    private static string Escape(string value)
+    {
+        var formulaCandidate = value.TrimStart(' ', '\t', '\r', '\n');
+        if (formulaCandidate.Length > 0 && formulaCandidate[0] is '=' or '+' or '-' or '@')
+            value = $"'{value}";
+
+        return value.Contains(';') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
+            ? $"\"{value.Replace("\"", "\"\"")}\""
+            : value;
+    }
 }
 
 public sealed record RevenueReportSnapshot(DateTime From, DateTime To, decimal TotalRevenue, int TotalCompleted, decimal AverageRevenue, IReadOnlyList<RevenueByStylistRow> ByStylist, IReadOnlyList<RevenueByServiceRow> ByService);
