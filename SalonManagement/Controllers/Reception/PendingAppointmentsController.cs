@@ -65,6 +65,16 @@ public sealed class PendingAppointmentsController(ApplicationDbContext db, TimeP
         appointment.UpdatedAt = appointment.ConfirmedAt;
         var now = timeProvider.GetUtcNow();
         var email = appointment.Customer.Email?.Trim();
+        db.AppointmentEmailDeliveries.Add(new AppointmentEmailDelivery
+        {
+            AppointmentId = appointment.AppointmentId,
+            Kind = AppointmentEmailKinds.Confirmation,
+            RecipientEmail = string.IsNullOrWhiteSpace(email) ? null : email,
+            Status = string.IsNullOrWhiteSpace(email) ? AppointmentEmailStatuses.NoEmail : AppointmentEmailStatuses.Queued,
+            AppointmentStartAt = CheckInService.StartsAt(appointment),
+            NextAttemptAt = now,
+            CreatedAt = now
+        });
         var reminderStart = CheckInService.StartsAt(appointment);
         db.AppointmentEmailDeliveries.Add(new AppointmentEmailDelivery
         {
