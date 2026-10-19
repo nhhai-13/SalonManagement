@@ -188,25 +188,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         emailVerified = false;
         syncPlaceBookingState();
+        const requestedEmail = email.value.trim();
         sendCode.disabled = true;
         emailMessage.textContent = 'Đang gửi mã xác thực…';
         try {
-            const data = await json('/booking/send-email-code', undefined, { email: email.value });
+            const data = await json('/booking/send-email-code', undefined, { email: requestedEmail });
+            if (email.value.trim() !== requestedEmail) return;
             emailCode.disabled = verifyCode.disabled = false;
             emailCode.value = '';
             emailMessage.textContent = data.message;
             emailCode.focus();
-        } catch (e) { emailMessage.textContent = e.message; }
+        } catch (e) { if (email.value.trim() === requestedEmail) emailMessage.textContent = e.message; }
         finally { sendCode.disabled = false; }
     });
     verifyCode?.addEventListener('click', async () => {
+        const verifyingEmail = email.value.trim();
+        const verifyingCode = emailCode.value;
+        verifyCode.disabled = true;
         emailMessage.textContent = 'Đang xác thực email…';
         try {
-            const data = await json('/booking/verify-email-code', undefined, { email: email.value, code: emailCode.value });
+            const data = await json('/booking/verify-email-code', undefined, { email: verifyingEmail, code: verifyingCode });
+            if (email.value.trim() !== verifyingEmail || emailCode.value !== verifyingCode) return;
             emailVerified = true;
+            emailCode.value = '';
+            emailCode.disabled = true;
+            verifyCode.disabled = true;
             emailMessage.textContent = data.message;
             syncPlaceBookingState();
-        } catch (e) { emailMessage.textContent = e.message; }
+        } catch (e) {
+            if (email.value.trim() === verifyingEmail && emailCode.value === verifyingCode) emailMessage.textContent = e.message;
+        } finally {
+            if (email.value.trim() === verifyingEmail && emailCode.value === verifyingCode) verifyCode.disabled = false;
+        }
     });
     email?.addEventListener('input', () => {
         emailVerified = false;
