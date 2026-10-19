@@ -28,7 +28,7 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] StylistTimeOffRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Reason))
+        if (request is null || string.IsNullOrWhiteSpace(request.Reason))
         {
             return BadRequest(new { message = "Vui lòng nhập lý do nghỉ." });
         }
