@@ -31,8 +31,17 @@ public class DiscountCouponsController(ApplicationDbContext db) : Controller
             ViewBag.Error = string.Join(" ", ModelState.Values.SelectMany(value => value.Errors).Select(error => error.ErrorMessage));
             return await Index();
         }
-        db.DiscountCoupons.Add(new DiscountCoupon { Code = model.Code, DiscountType = model.DiscountType, Value = model.Value,
-            StartsOn = model.StartsOn.Date, EndsOn = model.EndsOn.Date });
+        var normalizedType = model.DiscountType is "Percentage" or "Percent" ? "Percent" : "Fixed";
+        db.DiscountCoupons.Add(new DiscountCoupon
+        {
+            Code = model.Code,
+            DiscountType = normalizedType,
+            Value = model.Value,
+            StartsOn = model.StartsOn.Date,
+            EndsOn = model.EndsOn.Date,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
         await db.SaveChangesAsync();
         TempData["Success"] = "Đã tạo mã giảm giá.";
         return RedirectToAction(nameof(Index));
@@ -56,8 +65,9 @@ public class DiscountCouponsController(ApplicationDbContext db) : Controller
             ViewBag.Error = string.Join(" ", ModelState.Values.SelectMany(value => value.Errors).Select(error => error.ErrorMessage));
             return await Index();
         }
+        var normalizedType = model.DiscountType is "Percentage" or "Percent" ? "Percent" : "Fixed";
         coupon.Code = model.Code;
-        coupon.DiscountType = model.DiscountType;
+        coupon.DiscountType = normalizedType;
         coupon.Value = model.Value;
         coupon.StartsOn = model.StartsOn.Date;
         coupon.EndsOn = model.EndsOn.Date;
@@ -87,12 +97,21 @@ public class DiscountCouponsController(ApplicationDbContext db) : Controller
     private async Task ValidateCoupon(DiscountCouponViewModel model, int? exceptId = null)
     {
         model.Code = model.Code?.Trim().ToUpperInvariant() ?? string.Empty;
-        if (model.DiscountType is not ("Percent" or "Fixed")) ModelState.AddModelError(nameof(model.DiscountType), "Chọn kiểu giảm hợp lệ.");
-        if (model.DiscountType == "Percent" && (model.Value < 1 || model.Value > 100)) ModelState.AddModelError(nameof(model.Value), "Phần trăm giảm phải từ 1 đến 100.");
-        if (model.StartsOn == default) ModelState.AddModelError(nameof(model.StartsOn), "Ngày bắt đầu là bắt buộc.");
-        if (model.EndsOn == default) ModelState.AddModelError(nameof(model.EndsOn), "Ngày kết thúc là bắt buộc.");
-        if (model.EndsOn.Date < model.StartsOn.Date) ModelState.AddModelError(nameof(model.EndsOn), "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.");
-        if (await db.DiscountCoupons.AnyAsync(item => item.Code == model.Code && item.DiscountCouponId != exceptId))
+        if (string.IsNullOrWhiteSpace(model.Code))
+            ModelState.AddModelError(nameof(model.Code), "Mã giảm giá không được để trống.");
+        if (model.DiscountType is not ("Percent" or "Percentage" or "Fixed" or "FixedAmount"))
+            ModelState.AddModelError(nameof(model.DiscountType), "Chọn kiểu giảm hợp lệ.");
+        if ((model.DiscountType is "Percent" or "Percentage") && (model.Value < 1 || model.Value > 100))
+            ModelState.AddModelError(nameof(model.Value), "Phần trăm giảm phải từ 1 đến 100.");
+        if ((model.DiscountType is "Fixed" or "FixedAmount") && model.Value <= 0)
+            ModelState.AddModelError(nameof(model.Value), "Số tiền giảm phải lớn hơn 0.");
+        if (model.StartsOn == default)
+            ModelState.AddModelError(nameof(model.StartsOn), "Ngày bắt đầu là bắt buộc.");
+        if (model.EndsOn == default)
+            ModelState.AddModelError(nameof(model.EndsOn), "Ngày kết thúc là bắt buộc.");
+        if (model.StartsOn != default && model.EndsOn != default && model.EndsOn.Date < model.StartsOn.Date)
+            ModelState.AddModelError(nameof(model.EndsOn), "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.");
+        if (!string.IsNullOrWhiteSpace(model.Code) && await db.DiscountCoupons.AnyAsync(item => item.Code == model.Code && item.DiscountCouponId != exceptId))
             ModelState.AddModelError(nameof(model.Code), "Mã này đã tồn tại.");
     }
 }
