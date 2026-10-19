@@ -1,6 +1,8 @@
 window.ReceptionOperations = (() => {
     const refreshMilliseconds = 15000;
     let refreshTimer;
+    let loadInProgress = false;
+    let reloadRequested = false;
     let selectedCheckout;
 
     const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, character => ({
@@ -331,6 +333,11 @@ window.ReceptionOperations = (() => {
     }
 
     async function load() {
+        if (loadInProgress) {
+            reloadRequested = true;
+            return;
+        }
+        loadInProgress = true;
         try {
             const [operationsResponse, pendingResponse] = await Promise.all([
                 SalonAuth.authenticatedFetch("/api/reception/operations"),
@@ -345,6 +352,12 @@ window.ReceptionOperations = (() => {
             clearError();
         } catch (error) {
             showError(error.message || "Không thể tải dữ liệu vận hành. Vui lòng thử lại.");
+        } finally {
+            loadInProgress = false;
+            if (reloadRequested) {
+                reloadRequested = false;
+                load();
+            }
         }
     }
 
