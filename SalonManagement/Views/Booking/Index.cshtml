@@ -1,6 +1,16 @@
 @model SalonManagement.Models.ViewModels.Booking.BookingSelectServicesViewModel
 @{
     ViewData["Title"] = "Đặt lịch - Chọn dịch vụ";
+    var isOverlay = ViewData["BookingOverlay"] as bool? == true;
+}
+
+@if (isOverlay)
+{
+    <style>
+        .sl-sidebar, .sl-overlay, .sl-topbar, .sl-main > footer { display: none !important; }
+        .sl-main { margin-left: 0 !important; min-height: 0 !important; }
+        .sl-content { padding: 24px !important; }
+    </style>
 }
 
 <div class="sl-page-header">
@@ -42,6 +52,8 @@ else
     <form id="booking-form" asp-action="SelectServices" asp-controller="Booking" method="post"
           data-max-shift-duration="@Model.Totals.MaxShiftDurationMinutes">
         @Html.AntiForgeryToken()
+        <input type="hidden" name="overlay" value="@isOverlay.ToString().ToLowerInvariant()" />
+        <input type="hidden" name="phone" value="@(ViewData["BookingPhone"]?.ToString() ?? string.Empty)" />
 
         @if (!string.IsNullOrEmpty(Model.ErrorMessage) || !ViewData.ModelState.IsValid)
         {
@@ -57,10 +69,10 @@ else
             @* ── Danh sách dịch vụ ───────────────────── *@
             <div>
                 @* Category pills *@
-                @if (Model.Groups.Count > 1)
+                @if (Model.Groups.Count(group => group.Services.Count > 0) > 1)
                 {
                     <div class="sl-pill-filter sticky-top bg-white py-2 z-2" style="top:60px;">
-                        @foreach (var group in Model.Groups)
+                        @foreach (var group in Model.Groups.Where(group => group.Services.Count > 0))
                         {
                             var targetId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
                             <a href="#@targetId" class="sl-pill">@group.Name (@group.Services.Count)</a>
@@ -68,7 +80,7 @@ else
                     </div>
                 }
 
-                @foreach (var group in Model.Groups)
+                @foreach (var group in Model.Groups.Where(group => group.Services.Count > 0))
                 {
                     var groupId = group.Id.HasValue ? $"group-{group.Id}" : "group-ungrouped";
                     <div id="@groupId" class="sl-group-section scroll-mt-16">
@@ -76,13 +88,7 @@ else
                             <i class="bi bi-gem"></i>@group.Name
                         </h2>
 
-                        @if (group.Services.Count == 0)
-                        {
-                            <p class="sl-page-subtitle" style="font-style:italic;">Nhóm này chưa có dịch vụ nào.</p>
-                        }
-                        else
-                        {
-                            <div class="row g-3">
+                        <div class="row g-3">
                                 @foreach (var service in group.Services)
                                 {
                                     var isChecked = service.IsSelected;
@@ -136,15 +142,14 @@ else
                                         </div>
                                     </div>
                                 }
-                            </div>
-                        }
+                        </div>
                     </div>
                 }
             </div>
 
-            @* ── Summary panel (sticky) ───────────────── *@
+            @* ── Summary panel (after the full service list) ───────────── *@
             <div>
-                <div class="sl-booking-summary" style="top:80px;">
+                <div class="sl-booking-summary">
                     <div class="sl-booking-summary-header">
                         <div class="d-flex align-items-center justify-content-between">
                             <span><i class="bi bi-cart-check me-2"></i>Dịch vụ đã chọn</span>

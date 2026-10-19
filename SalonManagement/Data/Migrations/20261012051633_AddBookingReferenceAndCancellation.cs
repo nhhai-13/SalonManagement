@@ -16,18 +16,6 @@ namespace SalonManagement.Data.Migrations
                 table: "Appointments",
                 type: "nvarchar(max)",
                 nullable: true);
-
-            migrationBuilder.AddColumn<DateTimeOffset>(
-                name: "CancelledAt",
-                table: "Appointments",
-                type: "datetimeoffset",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "CancelledBy",
-                table: "Appointments",
-                type: "nvarchar(max)",
-                nullable: true);
         }
 
         /// <inheritdoc />
@@ -35,14 +23,6 @@ namespace SalonManagement.Data.Migrations
         {
             migrationBuilder.DropColumn(
                 name: "CancelReason",
-                table: "Appointments");
-
-            migrationBuilder.DropColumn(
-                name: "CancelledAt",
-                table: "Appointments");
-
-            migrationBuilder.DropColumn(
-                name: "CancelledBy",
                 table: "Appointments");
         }
     }

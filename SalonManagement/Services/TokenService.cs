@@ -28,6 +28,8 @@ public sealed class TokenService(IConfiguration configuration, TimeProvider time
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.FullName) ? user.Email ?? string.Empty : user.FullName),
+            new Claim("full_name", string.IsNullOrWhiteSpace(user.FullName) ? user.Email ?? string.Empty : user.FullName),
             new Claim("security_stamp", user.SecurityStamp ?? string.Empty),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };

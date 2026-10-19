@@ -1,0 +1,33 @@
+@{
+    ViewData["Title"] = "Đánh giá dịch vụ";
+    var token = ViewData["ReviewToken"]?.ToString() ?? string.Empty;
+    var reference = ViewData["Reference"]?.ToString() ?? string.Empty;
+}
+<main class="service-review-page" data-review-token="@token" data-review-reference="@reference">
+    <section class="service-review-card" aria-live="polite">
+        <header class="service-review-header">
+            <span class="service-review-eyebrow"><i class="bi bi-chat-heart"></i> Đánh giá &amp; góp ý dịch vụ · S4-04</span>
+            <h1>Chia sẻ trải nghiệm của bạn</h1>
+            <p id="service-review-reference">Đang kiểm tra lời mời đánh giá…</p>
+        </header>
+        <div id="service-review-error" class="service-review-error d-none" role="alert"></div>
+        <div id="service-review-form-area" class="service-review-body d-none">
+            <div class="service-review-summary">
+                <span>Dịch vụ đã trải nghiệm</span><strong id="service-review-services"></strong>
+                <span>Thợ trực tiếp phục vụ</span><strong id="service-review-stylist"></strong>
+            </div>
+            <p class="service-review-expiry"><i class="bi bi-hourglass-split"></i> Liên kết đánh giá có hiệu lực 7 ngày kể từ khi đóng lịch, dùng một lần.</p>
+            <form id="service-review-form">
+                <fieldset class="service-review-rating"><legend>Chấm điểm chất lượng phục vụ của Thợ <span>(1 đến 5 sao)</span></legend><div id="service-review-stars" class="service-review-stars" role="radiogroup" aria-label="Điểm đánh giá"></div><output id="service-review-rating-text">Chọn số sao phù hợp với trải nghiệm của bạn</output></fieldset>
+                <label for="service-review-comment">Nhận xét / Góp ý chi tiết <span>(không bắt buộc, tối đa 500 ký tự)</span></label>
+                <textarea id="service-review-comment" maxlength="500" rows="5" placeholder="Chia sẻ điều bạn hài lòng hoặc mong tiệm cải thiện…"></textarea>
+                <div class="service-review-actions"><small id="service-review-count">0 / 500 ký tự</small><button type="submit" class="btn btn-primary"><i class="bi bi-send"></i> Gửi đánh giá &amp; góp ý</button></div>
+            </form>
+            <p class="service-review-lookup-hint"><i class="bi bi-search"></i> Bạn cũng có thể dùng <a href="/reviews">mã tra cứu lịch hẹn</a> để mở biểu mẫu này sau khi lịch hoàn tất.</p>
+        </div>
+        <div id="service-review-success" class="service-review-success d-none"><i class="bi bi-heart-fill"></i><h2>Cảm ơn bạn đã đánh giá</h2><p>Phản hồi của bạn đã được gửi đến Luminol Salon &amp; Spa.</p></div>
+        <div id="service-review-lookup" class="service-review-lookup d-none"><h2>Mở biểu mẫu bằng mã lịch hẹn</h2><p>Nhập mã tra cứu của lịch đã hoàn tất để đánh giá dịch vụ.</p><form id="service-review-lookup-form"><label for="service-review-lookup-reference">Mã lịch hẹn</label><div><input id="service-review-lookup-reference" maxlength="24" placeholder="Ví dụ: LUMI1029" required /><button type="submit" class="btn btn-primary">Mở đánh giá</button></div></form></div>
+    </section>
+</main>
+
+@section Scripts { <script src="~/js/service-review.js" asp-append-version="true"></script> }
