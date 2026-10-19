@@ -65,12 +65,26 @@ window.ReceptionOperations = (() => {
             target.innerHTML = '<div class="reception-empty-state compact"><i class="bi bi-calendar2-check"></i> Không có lịch online cần duyệt.</div>';
             return;
         }
+        const previousState = new Map([...target.querySelectorAll("[data-operation-reject]")].map(button => {
+            const row = button.closest(".reception-pending-row");
+            return [button.dataset.operationReject, {
+                reason: row.querySelector("[data-operation-reason]").value,
+                expanded: !row.querySelector(`[data-operation-reject-options="${button.dataset.operationReject}"]`).classList.contains("d-none")
+            }];
+        }));
         target.innerHTML = items.map(item => `
             <article class="reception-pending-row">
                 <div class="reception-pending-content"><strong>${escapeHtml(item.customerName)} <small>${shortPhone(item.customerPhone)}</small></strong><span>${item.appointmentDate.slice(0, 10).split("-").reverse().join("/")} · ${time(item.startTime)} · ${escapeHtml((item.services || []).join(", "))}</span>${item.isOverdue ? '<em class="overdue">Chờ xử lý quá 12 giờ</em>' : '<em>Mới đặt online</em>'}${item.nameConflictResolution === "PendingReceptionReview" ? '<em class="overdue">Cần xử lý tên hồ sơ ở màn lịch</em>' : ""}</div>
                 <div class="reception-pending-actions"><button class="btn btn-primary btn-sm" type="button" data-operation-approve="${item.appointmentId}" ${item.nameConflictResolution === "PendingReceptionReview" ? "disabled title=\"Cần xử lý tên hồ sơ trước\"" : ""}>Duyệt</button><button class="btn btn-outline-danger btn-sm" type="button" data-operation-reject-toggle="${item.appointmentId}">Hủy</button></div>
                 <div class="reception-reject-options d-none" data-operation-reject-options="${item.appointmentId}"><select class="form-select form-select-sm" data-operation-reason><option value="">Lý do hủy…</option><option>Không còn thợ phù hợp</option><option>Khung giờ không còn trống</option><option>Không liên hệ được khách</option><option>Yêu cầu của khách không phù hợp</option></select><button class="btn btn-danger btn-sm" type="button" data-operation-reject="${item.appointmentId}">Xác nhận hủy</button></div>
             </article>`).join("");
+        target.querySelectorAll("[data-operation-reject]").forEach(button => {
+            const previous = previousState.get(button.dataset.operationReject);
+            if (!previous) return;
+            const row = button.closest(".reception-pending-row");
+            row.querySelector("[data-operation-reason]").value = previous.reason;
+            row.querySelector(`[data-operation-reject-options="${button.dataset.operationReject}"]`).classList.toggle("d-none", !previous.expanded);
+        });
         target.querySelectorAll("[data-operation-approve]").forEach(button => button.addEventListener("click", () => approve(button)));
         target.querySelectorAll("[data-operation-reject-toggle]").forEach(button => button.addEventListener("click", () => document.querySelector(`[data-operation-reject-options="${button.dataset.operationRejectToggle}"]`)?.classList.toggle("d-none")));
         target.querySelectorAll("[data-operation-reject]").forEach(button => button.addEventListener("click", () => reject(button)));
