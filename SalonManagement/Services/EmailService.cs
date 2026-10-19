@@ -572,7 +572,7 @@ public sealed class EmailService(
             From = new MailAddress(sender, smtp["SenderName"] ?? "Luminol Salon"),
             Subject = "Mời bạn đánh giá trải nghiệm tại Luminol Salon",
             IsBodyHtml = true,
-            Body = $"<p>Chào {WebUtility.HtmlEncode(customerName)}, cảm ơn bạn đã trải nghiệm dịch vụ với {WebUtility.HtmlEncode(stylistName)}.</p><p><a href=\"{WebUtility.HtmlEncode(reviewUrl)}\">Gửi đánh giá của bạn</a></p><p>Liên kết có hiệu lực trong 14 ngày và chỉ dùng một lần.</p>"
+            Body = $"<p>Chào {WebUtility.HtmlEncode(customerName)}, cảm ơn bạn đã trải nghiệm dịch vụ với {WebUtility.HtmlEncode(stylistName)}.</p><p><a href=\"{WebUtility.HtmlEncode(reviewUrl)}\">Gửi đánh giá của bạn</a></p><p>Liên kết có hiệu lực trong 7 ngày và chỉ dùng một lần.</p>"
         };
         message.To.Add(toEmail);
         await client.SendMailAsync(message);
