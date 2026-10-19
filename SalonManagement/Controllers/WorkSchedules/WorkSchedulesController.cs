@@ -5,17 +5,18 @@ using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
 using SalonManagement.Models.ViewModels;
+using SalonManagement.Services;
 
 namespace SalonManagement.Controllers;
 
 [Authorize(Roles = UserRoles.Owner)]
 [Route("management/work-schedules")]
-public sealed class WorkSchedulesController(ApplicationDbContext db) : Controller
+public sealed class WorkSchedulesController(ApplicationDbContext db, TimeProvider timeProvider) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(int? stylistId, DateTime? weekStart)
     {
-        var start = StartOfWeek(weekStart ?? DateTime.Today);
+        var start = StartOfWeek(weekStart ?? SalonClock.GetLocalNow(timeProvider).Date);
         var stylists = await db.Stylists.AsNoTracking()
             .Where(stylist => stylist.IsActive)
             .OrderBy(stylist => stylist.FullName)
