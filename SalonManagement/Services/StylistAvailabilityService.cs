@@ -65,11 +65,13 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     }
 
     // Read-only assignment decision. The eventual appointment writer must revalidate under its transaction.
-    public async Task<StylistAssignment?> AssignAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date, TimeOnly start)
+    public async Task<StylistAssignment?> AssignAsync(IEnumerable<int> serviceIds, int stylistId, DateOnly date, TimeOnly start, int? excludedStylistId = null)
     {
         var startText = start.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerMinute != 0) return null;
-        var candidates = (await GetStylistSlotsAsync(serviceIds, stylistId, date)).Where(s => s.Start == startText).ToList();
+        var candidates = (await GetStylistSlotsAsync(serviceIds, stylistId, date))
+            .Where(s => s.Start == startText && (!excludedStylistId.HasValue || s.StylistId != excludedStylistId.Value))
+            .ToList();
         if (candidates.Count == 0) return null;
         var candidateIds = candidates.Select(s => s.StylistId).Distinct().ToArray();
         var day = date.ToDateTime(TimeOnly.MinValue);
@@ -135,15 +137,13 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var busyByStylist = busy.ToLookup(a => a.StylistId);
         var timeOffByStylist = timeOffs.ToLookup(timeOff => timeOff.StylistId);
         var slots = new HashSet<AvailableStylistSlot>();
-
         // Calculate each stylist independently: never stitch two people's free time together.
         foreach (var stylistShifts in shifts.GroupBy(s => s.StylistId))
         {
             var stylistBusy = busyByStylist[stylistShifts.Key].ToList();
             var stylistTimeOffs = timeOffByStylist[stylistShifts.Key].ToList();
 
-            if (stylistTimeOffs.Any(t => t.IsFullDay))
-                continue;
+            if (stylistTimeOffs.Any(timeOff => timeOff.IsFullDay)) continue;
 
             // Union overlapping/adjacent shifts, but never bridge a break.
             var windows = new List<(TimeSpan Start, TimeSpan End)>();

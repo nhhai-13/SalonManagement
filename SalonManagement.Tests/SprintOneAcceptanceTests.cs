@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -22,23 +23,37 @@ namespace SalonManagement.Tests;
 public sealed class SprintOneAcceptanceTests
 {
     [Fact]
-    public async Task SeedTwice_HasFiveRolesFourAccountsFiveStylistsTwelveServicesWithoutDuplicates()
+    public async Task SeedTwice_HasFiveRolesFifteenNamedAccountsTenStylistsTwelveServicesWithoutDuplicates()
     {
         await using var fixture = new Fixture();
         await RoleSeeder.SeedRolesAsync(fixture.Roles);
         await SeedData.SeedAsync(fixture.Db, fixture.Users);
         await SeedData.SeedAsync(fixture.Db, fixture.Users);
         Assert.Equal(5, await fixture.Db.Roles.CountAsync());
-        Assert.Equal(4, await fixture.Db.Users.CountAsync());
-        Assert.Equal(5, await fixture.Db.Stylists.CountAsync());
+        Assert.Equal(15, await fixture.Db.Users.CountAsync());
+        Assert.Equal(10, await fixture.Db.Stylists.CountAsync());
         Assert.Equal(12, await fixture.Db.Services.CountAsync());
         Assert.Equal(3, await fixture.Db.ServiceGroups.CountAsync());
         Assert.All(await fixture.Db.Services.ToListAsync(), service => Assert.InRange(service.DurationMinutes, 30, 120));
-        foreach (var role in new[] { "Admin", "Owner", "Receptionist", "Stylist" })
+        var expectedUsersPerRole = new Dictionary<string, int>
         {
-            var user = Assert.Single(await fixture.Users.GetUsersInRoleAsync(role));
-            Assert.True(user.IsActive && user.EmailConfirmed);
-            Assert.Single(await fixture.Users.GetRolesAsync(user));
+            ["Admin"] = 1,
+            ["Owner"] = 1,
+            ["Receptionist"] = 3,
+            ["Stylist"] = 10
+        };
+        foreach (var (role, expectedCount) in expectedUsersPerRole)
+        {
+            var users = await fixture.Users.GetUsersInRoleAsync(role);
+            Assert.Equal(expectedCount, users.Count);
+            Assert.All(users, user =>
+            {
+                Assert.True(user.IsActive && user.EmailConfirmed);
+                Assert.False(string.IsNullOrWhiteSpace(user.FullName));
+                Assert.False(string.IsNullOrWhiteSpace(user.PhoneNumber));
+            });
+            foreach (var user in users)
+                Assert.Single(await fixture.Users.GetRolesAsync(user));
         }
     }
 
@@ -67,15 +82,22 @@ public sealed class SprintOneAcceptanceTests
     }
 
     [Fact]
-    public async Task CreateStaff_EmailFailureDoesNotLeaveUsableAccount()
+    public async Task CreateStaff_EmailFailureStillCreatesAccountAndReturnsOneTimeTemporaryPassword()
     {
         await using var f = new Fixture();
         await RoleSeeder.SeedRolesAsync(f.Roles);
         var controller = new AdminApiController(f.Users, new CapturingEmail { Fail = true }, NullLogger<AdminApiController>.Instance)
         { ControllerContext = new() { HttpContext = f.Http } };
-        var result = Assert.IsType<ObjectResult>(await controller.CreateStaffAccount(new("new@salon.local", "Tên", UserRoles.Stylist, "0901234567")));
-        Assert.Equal(503, result.StatusCode);
-        Assert.Null(await f.Users.FindByEmailAsync("new@salon.local"));
+        var result = Assert.IsType<CreatedResult>(await controller.CreateStaffAccount(new("new@salon.local", "Tên", UserRoles.Stylist, "0901234567")));
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(result.Value));
+        Assert.False(payload.RootElement.GetProperty("emailDelivered").GetBoolean());
+        var temporaryPassword = payload.RootElement.GetProperty("temporaryPassword").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(temporaryPassword));
+        var user = await f.Users.FindByEmailAsync("new@salon.local");
+        Assert.NotNull(user);
+        Assert.True(user!.IsActive);
+        Assert.True(user.MustChangePassword);
+        Assert.True(await f.Users.CheckPasswordAsync(user, temporaryPassword));
     }
 
     [Fact]
@@ -246,6 +268,8 @@ public sealed class SprintOneAcceptanceTests
         public bool Fail { get; init; }
         public Task SendTemporaryPasswordEmailAsync(string email, string password) { if (Fail) throw new InvalidOperationException("Test delivery failure"); Password = password; return Task.CompletedTask; }
         public Task SendPasswordResetEmailAsync(string email, string link) => Task.CompletedTask;
+        public Task SendServiceReviewEmailAsync(string toEmail, string customerName, string reviewLink, DateTime expiresAt) => Task.CompletedTask;
+        public Task SendAppointmentNotificationEmailAsync(string toEmail, string customerName, string reference, string services, string stylistName, DateTime appointmentDate, TimeSpan startTime, bool isReminder) => Task.CompletedTask;
         public Task SendAppointmentChangeEmailAsync(string toEmail, string stylistName, DateTime appointmentDate, TimeSpan startTime) => Task.CompletedTask;
         public Task SendEmailVerificationCodeAsync(string email, string code) => Task.CompletedTask;
     }

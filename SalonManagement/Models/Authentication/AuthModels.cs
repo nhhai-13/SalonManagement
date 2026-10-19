@@ -8,6 +8,7 @@ public sealed record LoginRequest(
 
 public sealed record RegisterStaffRequest(
     [Required, EmailAddress] string Email,
+    [Required, StringLength(120)] string FullName,
     [Required, MinLength(8)] string Password,
     [Required] string Role);
 

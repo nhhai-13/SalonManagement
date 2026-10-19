@@ -106,6 +106,97 @@ public sealed class StylistManagementControllerTests
     }
 
     [Fact]
+    public async Task Delete_ProfileWithoutHistory_RemovesProfileAndItsImage()
+    {
+        var webRoot = Path.Combine(Path.GetTempPath(), $"salon-tests-{Guid.NewGuid():N}");
+        var imagePath = Path.Combine(webRoot, "uploads", "stylists", "delete-me.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(imagePath)!);
+        await File.WriteAllBytesAsync(imagePath, [1, 2, 3]);
+
+        try
+        {
+            await using var db = CreateDb();
+            var stylist = new Stylist
+            {
+                FullName = "Hồ sơ xóa được",
+                Phone = "0901000091",
+                ProfileImagePath = "uploads/stylists/delete-me.png"
+            };
+            db.Stylists.Add(stylist);
+            await db.SaveChangesAsync();
+            var controller = CreateController(db, webRoot);
+
+            var result = await controller.Delete(stylist.StylistId);
+
+            Assert.IsType<RedirectToActionResult>(result);
+            Assert.Empty(await db.Stylists.ToListAsync());
+            Assert.False(File.Exists(imagePath));
+        }
+        finally
+        {
+            if (Directory.Exists(webRoot))
+                Directory.Delete(webRoot, true);
+        }
+    }
+
+    [Fact]
+    public async Task Delete_ProfileWithAppointment_PreservesProfileAndSchedules()
+    {
+        await using var db = CreateDb();
+        var stylist = new Stylist { FullName = "Có lịch sử", Phone = "0901000092" };
+        var customer = new Customer { FullName = "Khách hàng", Phone = "0901000093" };
+        db.AddRange(stylist, customer);
+        await db.SaveChangesAsync();
+        db.AddRange(
+            new WorkSchedule
+            {
+                StylistId = stylist.StylistId,
+                WorkDate = new DateTime(2030, 1, 1),
+                StartTime = TimeSpan.FromHours(9),
+                EndTime = TimeSpan.FromHours(17)
+            },
+            new Appointment
+            {
+                StylistId = stylist.StylistId,
+                CustomerId = customer.CustomerId,
+                AppointmentDate = new DateTime(2030, 1, 1),
+                StartTime = TimeSpan.FromHours(10),
+                EndTime = TimeSpan.FromHours(11),
+                BookingReference = "DELETE-GUARD"
+            });
+        await db.SaveChangesAsync();
+        var controller = CreateController(db, Path.GetTempPath());
+
+        var result = await controller.Delete(stylist.StylistId);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.NotNull(await db.Stylists.FindAsync(stylist.StylistId));
+        Assert.Single(await db.WorkSchedules.ToListAsync());
+        Assert.Contains("Không thể xóa", controller.TempData["Error"]?.ToString());
+    }
+
+    [Fact]
+    public async Task Delete_ProfileWithSchedules_RemovesSchedulesAndProfile()
+    {
+        await using var db = CreateDb();
+        var stylist = new Stylist { FullName = "Đã nghỉ", Phone = "0901000094", IsActive = false };
+        db.Stylists.Add(stylist);
+        await db.SaveChangesAsync();
+        db.WorkSchedules.AddRange(
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = new DateTime(2030, 1, 1), StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(17) },
+            new WorkSchedule { StylistId = stylist.StylistId, WorkDate = new DateTime(2030, 1, 2), StartTime = TimeSpan.FromHours(9), EndTime = TimeSpan.FromHours(17) });
+        await db.SaveChangesAsync();
+        var controller = CreateController(db, Path.GetTempPath());
+
+        var result = await controller.Delete(stylist.StylistId);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Null(await db.Stylists.FindAsync(stylist.StylistId));
+        Assert.Empty(await db.WorkSchedules.ToListAsync());
+        Assert.Contains("2 ca làm việc", controller.TempData["Success"]?.ToString());
+    }
+
+    [Fact]
     public async Task Edit_ValidProfile_UpdatesDetailsAndKeepsExistingImage()
     {
         await using var db = CreateDb();
