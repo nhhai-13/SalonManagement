@@ -15,11 +15,7 @@ public class StylistReview
     public DateTime? SubmittedAt { get; set; }
     [Range(1, 5)]
     public int? Rating { get; set; }
- codex/sprint-4-todo
-    [StringLength(1000)]
-
     [StringLength(500)]
- develop
     public string? Comment { get; set; }
     public Appointment Appointment { get; set; } = null!;
     public Customer Customer { get; set; } = null!;

@@ -23,6 +23,12 @@ namespace SalonManagement.Models
         public DateTime? RejectedAt { get; set; }
         public DateTimeOffset? ServiceStartedAt { get; set; }
         public DateTimeOffset? ServiceCompletedAt { get; set; }
+        public DateTime? ActualStartedAt { get; set; }
+        public DateTime? ActualCompletedAt { get; set; }
+        public string? TechnicalNotes { get; set; }
+        public DateTime? ArrivedAt { get; set; }
+        public bool IsLate { get; set; }
+        public string? NoShowByUserId { get; set; }
         public string Source { get; set; } = "Online";
         public DateTimeOffset? CheckedInAt { get; set; }
         public int LateMinutes { get; set; }
@@ -32,29 +38,8 @@ namespace SalonManagement.Models
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; }
- sprint-4-todo
- codex/sprint-4-todo
         public DateTime? ClosedAt { get; set; }
         public string? ClosedByUserId { get; set; }
-
-
-        public DateTime? ActualStartedAt { get; set; }
-        public DateTime? ActualCompletedAt { get; set; }
-        // Internal stylist note: never returned by public booking or lookup flows.
-        public string? TechnicalNotes { get; set; }
-
-        public DateTime? ArrivedAt { get; set; }
-
-        public bool IsLate { get; set; }
-
-        public string? NoShowByUserId { get; set; }
- develop
-
-        public DateTime? ClosedAt { get; set; }
-
-        public string? ClosedByUserId { get; set; }
-
- develop
         public string? ClosedByName { get; set; }
         public Customer Customer { get; set; } = null!;
         public Stylist Stylist { get; set; } = null!;
@@ -62,8 +47,8 @@ namespace SalonManagement.Models
         public Invoice? Invoice { get; set; }
         public ServiceReview? ServiceReview { get; set; }
         public ICollection<AppointmentEmailNotification> EmailNotifications { get; set; } = new List<AppointmentEmailNotification>();
+        public ICollection<AppointmentEmailDelivery> EmailDeliveries { get; set; } = new List<AppointmentEmailDelivery>();
         public ScheduleContactFollowUp? ScheduleContactFollowUp { get; set; }
         public ICollection<ScheduleChangeNotification> ScheduleChangeNotifications { get; set; } = new List<ScheduleChangeNotification>();
-        public ICollection<AppointmentEmailDelivery> EmailDeliveries { get; set; } = new List<AppointmentEmailDelivery>();
     }
 }

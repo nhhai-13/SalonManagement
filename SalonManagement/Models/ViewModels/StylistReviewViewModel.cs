@@ -23,4 +23,3 @@ public sealed class StylistReviewViewModel
 
     public bool IsAlreadyReviewed { get; set; }
 }
-

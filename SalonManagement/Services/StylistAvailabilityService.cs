@@ -69,13 +69,11 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
     {
         var startText = start.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         if (start.Second != 0 || start.Ticks % TimeSpan.TicksPerMinute != 0) return null;
-        var candidates = (await GetStylistSlotsAsync(serviceIds, stylistId, date)).Where(s => s.Start == startText).ToList();
+        var candidates = (await GetStylistSlotsAsync(serviceIds, stylistId, date))
+            .Where(s => s.Start == startText && (!excludedStylistId.HasValue || s.StylistId != excludedStylistId.Value))
+            .ToList();
         if (candidates.Count == 0) return null;
-        var candidateIds = candidates.Select(s => s.StylistId)
-            .Where(id => id != excludedStylistId)
-            .Distinct()
-            .ToArray();
-        if (candidateIds.Length == 0) return null;
+        var candidateIds = candidates.Select(s => s.StylistId).Distinct().ToArray();
         var day = date.ToDateTime(TimeOnly.MinValue);
         var nextDay = day.AddDays(1);
         // Proposed PO policy: appointment count, Pending + Confirmed, stable ID tie-break.
@@ -116,15 +114,12 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var open = hours.OpensAt.Value.ToTimeSpan();
         var close = hours.ClosesAt.Value.ToTimeSpan();
         if (open >= close) return [];
-        // SQLite cannot translate ORDER BY for TimeSpan. Load the small set of daily shifts
-        // first, then sort in memory before building the working windows below.
-        var shifts = (await db.WorkSchedules.AsNoTracking().Where(s => qualifiedIds.Contains(s.StylistId) &&
+        var shifts = await db.WorkSchedules.AsNoTracking().Where(s => qualifiedIds.Contains(s.StylistId) &&
             s.WorkDate >= day && s.WorkDate < nextDay && s.Status == "Working")
-            .Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync())
-            .OrderBy(s => s.StartTime).ToList();
+            .OrderBy(s => s.StartTime).Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync();
         var busy = await db.Appointments.AsNoTracking().Where(a => qualifiedIds.Contains(a.StylistId) &&
-            a.AppointmentDate >= day && a.AppointmentDate < nextDay &&
-            a.Status != AppointmentStatuses.Cancelled && a.Status != AppointmentStatuses.NoShow && a.Status != "Rejected")
+            a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled" &&
+            a.Status != AppointmentStatuses.NoShow && a.Status != "Rejected")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
         var timeOffs = await db.StylistTimeOffs.AsNoTracking().Where(timeOff =>
                 qualifiedIds.Contains(timeOff.StylistId) && timeOff.OffDate == date)

@@ -29,7 +29,7 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
     public async Task<IActionResult> Create(
         [FromBody] StylistTimeOffRequest request)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.Reason))
+        if (string.IsNullOrWhiteSpace(request.Reason))
         {
             return BadRequest(new { message = "Vui lòng nhập lý do nghỉ." });
         }
