@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
+using SalonManagement.Services;
 
 namespace SalonManagement.Controllers.Owner;
 
@@ -16,7 +17,7 @@ public sealed class PeakHoursReportPageController : Controller
 [Authorize(Roles = UserRoles.Owner)]
 [ApiController]
 [Route("api/owner/peak-hours-report")]
-public sealed class PeakHoursReportController(ApplicationDbContext db) : ControllerBase
+public sealed class PeakHoursReportController(ApplicationDbContext db, TimeProvider timeProvider) : ControllerBase
 {
     private static readonly int[] SlotHours = [8, 10, 12, 14, 16, 18, 20];
 
@@ -54,9 +55,9 @@ public sealed class PeakHoursReportController(ApplicationDbContext db) : Control
         return Ok(new PeakHoursReportSnapshot(range.From, range.To, total, Rate(noShows, total), Rate(cancelled, total), slots, recommendation));
     }
 
-    private static (DateTime From, DateTime To, string? Error) NormalizeRange(DateTime? from, DateTime? to)
+    private (DateTime From, DateTime To, string? Error) NormalizeRange(DateTime? from, DateTime? to)
     {
-        var today = DateTime.Today;
+        var today = SalonClock.GetLocalNow(timeProvider).Date;
         var start = (from ?? new DateTime(today.Year, today.Month, 1)).Date;
         var end = (to ?? today).Date;
         if (end < start) return (start, end, "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.");
