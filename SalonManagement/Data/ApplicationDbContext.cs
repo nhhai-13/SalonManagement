@@ -1,51 +1,46 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Models;
+
 namespace SalonManagement.Data
 {
     public partial class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
 
-public ApplicationDbContext(
-    DbContextOptions<ApplicationDbContext> options,
-    IHttpContextAccessor httpContextAccessor)
-    : base(options)
-{
-    _httpContextAccessor = httpContextAccessor;
-}
+        public ApplicationDbContext(
+            DbContextOptions<ApplicationDbContext> options,
+            IHttpContextAccessor httpContextAccessor)
+            : base(options)
+        {
+            _httpContextAccessor = httpContextAccessor;
+        }
 
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
-
         public DbSet<Customer> Customers => Set<Customer>();
-
         public DbSet<Stylist> Stylists => Set<Stylist>();
-
         public DbSet<StylistService> StylistServices => Set<StylistService>();
-
         public DbSet<Service> Services => Set<Service>();
-
         public DbSet<ServiceGroup> ServiceGroups => Set<ServiceGroup>();
-
         public DbSet<WorkSchedule> WorkSchedules => Set<WorkSchedule>();
         public DbSet<StylistBreak> StylistBreaks => Set<StylistBreak>();
         public DbSet<StylistDayOff> StylistDaysOff => Set<StylistDayOff>();
-
+        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
         public DbSet<Appointment> Appointments => Set<Appointment>();
-
         public DbSet<AppointmentChangeLog> AppointmentChangeLogs => Set<AppointmentChangeLog>();
         public DbSet<AppointmentChangeEmail> AppointmentChangeEmails => Set<AppointmentChangeEmail>();
         public DbSet<AppointmentEmailDelivery> AppointmentEmailDeliveries => Set<AppointmentEmailDelivery>();
-
         public DbSet<AppointmentService> AppointmentServices => Set<AppointmentService>();
-
         public DbSet<ScheduleContactFollowUp> ScheduleContactFollowUps => Set<ScheduleContactFollowUp>();
-
         public DbSet<ScheduleChangeNotification> ScheduleChangeNotifications => Set<ScheduleChangeNotification>();
-
         public DbSet<Invoice> Invoices => Set<Invoice>();
         public DbSet<DiscountCoupon> DiscountCoupons => Set<DiscountCoupon>();
         public DbSet<RehearsalRun> RehearsalRuns => Set<RehearsalRun>();
@@ -54,180 +49,201 @@ public ApplicationDbContext(
         public DbSet<StylistReview> StylistReviews => Set<StylistReview>();
 
         public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
-
         public DbSet<InvoiceAdjustment> InvoiceAdjustments => Set<InvoiceAdjustment>();
-
         public DbSet<Payment> Payments => Set<Payment>();
-
         public DbSet<BusinessHour> BusinessHours => Set<BusinessHour>();
-
         public DbSet<ShopHoliday> ShopHolidays => Set<ShopHoliday>();
-        
-        public DbSet<StylistTimeOff> StylistTimeOffs => Set<StylistTimeOff>();
-
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
-
         public DbSet<RescheduleChangeLog> RescheduleChangeLogs => Set<RescheduleChangeLog>();
-public override int SaveChanges()
-{
-    return SaveChangesAsync().GetAwaiter().GetResult();
-}
 
+ feature/s4-02/validate-discount-expiry-and-single-code-limit
 public override int SaveChanges(bool acceptAllChangesOnSuccess)
 {
     if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
     return SaveChanges();
 }
 
-public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
-{
-    if (!acceptAllChangesOnSuccess) throw new NotSupportedException("Audited saves require accepting changes.");
-    return SaveChangesAsync(cancellationToken);
-}
+        // Keep audited async implementation as the single authoritative path.
+        public override int SaveChanges()
+            => SaveChanges(true);
+ develop
 
-public override async Task<int> SaveChangesAsync(
-    CancellationToken cancellationToken = default)
-{
-    ChangeTracker.DetectChanges();
-    await AssignMissingBookingReferencesAsync(cancellationToken);
-    if (ChangeTracker.Entries<AuditLog>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
-        throw new InvalidOperationException("Nhật ký hệ thống chỉ đọc, không được sửa hoặc xoá.");
-    var auditEntries = CreateAuditEntries();
-
-    var result = await base.SaveChangesAsync(true, cancellationToken);
-
-    if (auditEntries.Count > 0)
-    {
-        foreach (var entry in auditEntries)
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
-            entry.EntityId = GetEntityId(entry.Entity);
+            if (!acceptAllChangesOnSuccess)
+                throw new NotSupportedException("Audited saves require accepting changes.");
 
-            AuditLogs.Add(new AuditLog
+            // Call the audited async path synchronously.
+            return SaveChangesAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+
+        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            if (!acceptAllChangesOnSuccess)
+                throw new NotSupportedException("Audited saves require accepting changes.");
+
+            return SaveChangesAsync(cancellationToken);
+        }
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            ChangeTracker.DetectChanges();
+
+            // Maintain existing behavior: assign missing booking refs if implemented in another partial.
+            await AssignMissingBookingReferencesAsync(cancellationToken);
+
+            // Prevent modification of audit logs.
+            if (ChangeTracker.Entries<AuditLog>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+                throw new InvalidOperationException("Nhật ký hệ thống chỉ đọc, không được sửa hoặc xoá.");
+
+            var auditEntries = CreateAuditEntries();
+
+            // Save the current changes first (acceptAllChangesOnSuccess = true).
+            var result = await base.SaveChangesAsync(true, cancellationToken).ConfigureAwait(false);
+
+            if (auditEntries.Count > 0)
             {
-                Timestamp = DateTime.UtcNow,
-                UserId = _httpContextAccessor.HttpContext?.User?
-                    .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                    ?? _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value,
-                UserName = _httpContextAccessor.HttpContext?.User?.FindFirst("email")?.Value
-                    ?? _httpContextAccessor.HttpContext?.User?.Identity?.Name,
-                Action = entry.Action,
-                EntityType = entry.EntityType,
-                EntityId = entry.EntityId,
-                Changes = entry.Changes
-            });
-        }
+                foreach (var entry in auditEntries)
+                {
+                    entry.EntityId = GetEntityId(entry.Entity);
 
-        await base.SaveChangesAsync(true, cancellationToken);
-    }
+                    AuditLogs.Add(new AuditLog
+                    {
+                        Timestamp = DateTime.UtcNow,
+                        UserId = _httpContextAccessor.HttpContext?.User?
+                            .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                            ?? _httpContextAccessor.HttpContext?.User?.FindFirst("sub")?.Value,
+                        UserName = _httpContextAccessor.HttpContext?.User?.FindFirst("email")?.Value
+                            ?? _httpContextAccessor.HttpContext?.User?.Identity?.Name,
+                        Action = entry.Action,
+                        EntityType = entry.EntityType,
+                        EntityId = entry.EntityId,
+                        Changes = entry.Changes
+                    });
+                }
 
-    return result;
-}
+                // Persist audit logs.
+                await base.SaveChangesAsync(true, cancellationToken).ConfigureAwait(false);
+            }
 
-private List<AuditEntry> CreateAuditEntries()
-{
-    ChangeTracker.DetectChanges();
-
-
-    var entries = new List<AuditEntry>();
-
-    foreach (var entry in ChangeTracker.Entries())
-    {
-        if (entry.Entity is AuditLog ||
-            entry.State == EntityState.Detached ||
-            entry.State == EntityState.Unchanged)
-        {
-            continue;
-        }
-
-        var entityType = entry.Entity.GetType().Name;
-
+ feature/s4-02/validate-discount-expiry-and-single-code-limit
         if (entityType != nameof(ApplicationUser) &&
             entry.Entity is not Microsoft.AspNetCore.Identity.IdentityUserRole<string> &&
             entityType != nameof(Service) &&
             entityType != nameof(WorkSchedule) &&
             entityType != nameof(Appointment) &&
             entityType != nameof(Invoice))
-        {
-            continue;
+
+            return result;
         }
 
-        var changes = new Dictionary<string, object?>();
+        private List<AuditEntry> CreateAuditEntries()
+ develop
+        {
+            ChangeTracker.DetectChanges();
 
-        if (entry.State == EntityState.Added)
-        {
-            foreach (var property in entry.Properties)
+            var entries = new List<AuditEntry>();
+
+            foreach (var entry in ChangeTracker.Entries())
             {
-                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
-                changes[property.Metadata.Name] = property.CurrentValue;
-            }
-        }
-        else if (entry.State == EntityState.Modified)
-        {
-            foreach (var property in entry.Properties)
-            {
-                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
-                if (property.IsModified)
+                if (entry.Entity is AuditLog ||
+                    entry.State == EntityState.Detached ||
+                    entry.State == EntityState.Unchanged)
                 {
-                    changes[property.Metadata.Name] = new
-                    {
-                        OldValue = property.OriginalValue,
-                        NewValue = property.CurrentValue
-                    };
+                    continue;
                 }
+
+                var entityType = entry.Entity.GetType().Name;
+
+                // Skip auditing for identity and some heavy domain entities that we don't want in audit logs.
+                if (entityType == nameof(ApplicationUser)
+                    || entry.Entity is Microsoft.AspNetCore.Identity.IdentityUserRole<string>
+                    || entityType == nameof(Service)
+                    || entityType == nameof(WorkSchedule)
+                    || entityType == nameof(Appointment)
+                    || entityType == nameof(Invoice))
+                {
+                    continue;
+                }
+
+                var changes = new Dictionary<string, object?>();
+
+                if (entry.State == EntityState.Added)
+                {
+                    foreach (var property in entry.Properties)
+                    {
+                        if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
+                        changes[property.Metadata.Name] = property.CurrentValue;
+                    }
+                }
+                else if (entry.State == EntityState.Modified)
+                {
+                    foreach (var property in entry.Properties)
+                    {
+                        if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
+                        if (property.IsModified)
+                        {
+                            changes[property.Metadata.Name] = new
+                            {
+                                OldValue = property.OriginalValue,
+                                NewValue = property.CurrentValue
+                            };
+                        }
+                    }
+                }
+                else if (entry.State == EntityState.Deleted)
+                {
+                    foreach (var property in entry.Properties)
+                    {
+                        if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
+                        changes[property.Metadata.Name] = property.OriginalValue;
+                    }
+                }
+
+                entries.Add(new AuditEntry
+                {
+                    Entity = entry.Entity,
+                    Action = entry.State switch
+                    {
+                        EntityState.Added => "CREATE",
+                        EntityState.Modified => "UPDATE",
+                        EntityState.Deleted => "DELETE",
+                        _ => string.Empty
+                    },
+                    EntityType = entityType,
+                    Changes = JsonSerializer.Serialize(changes)
+                });
             }
-        }
-        else if (entry.State == EntityState.Deleted)
-        {
-            foreach (var property in entry.Properties)
-            {
-                if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
-                changes[property.Metadata.Name] = property.OriginalValue;
-            }
+
+            return entries;
         }
 
-        entries.Add(new AuditEntry
+        private static bool IsSensitiveAuditProperty(string name) => name is
+            "PasswordHash" or "SecurityStamp" or "ConcurrencyStamp" or "EmailVerificationCodeHash";
+
+        private static string? GetEntityId(object entity)
         {
-            Entity = entry.Entity,
-            Action = entry.State switch
+            return entity switch
             {
-                EntityState.Added => "CREATE",
-                EntityState.Modified => "UPDATE",
-                EntityState.Deleted => "DELETE",
-                _ => string.Empty
-            },
-            EntityType = entityType,
-            Changes = JsonSerializer.Serialize(changes)
-        });
-    }
+                ApplicationUser user => user.Id,
+                Microsoft.AspNetCore.Identity.IdentityUserRole<string> role => role.UserId,
+                Service service => service.ServiceId.ToString(),
+                WorkSchedule schedule => schedule.WorkScheduleId.ToString(),
+                Appointment appointment => appointment.AppointmentId.ToString(),
+                Invoice invoice => invoice.InvoiceId.ToString(),
+                _ => null
+            };
+        }
 
-    return entries;
-}
+        private class AuditEntry
+        {
+            public object Entity { get; set; } = null!;
+            public string Action { get; set; } = string.Empty;
+            public string EntityType { get; set; } = string.Empty;
+            public string? EntityId { get; set; }
+            public string? Changes { get; set; }
+        }
 
-private static bool IsSensitiveAuditProperty(string name) => name is
-    "PasswordHash" or "SecurityStamp" or "ConcurrencyStamp" or "EmailVerificationCodeHash";
-
-private static string? GetEntityId(object entity)
-{
-    return entity switch
-    {
-        ApplicationUser user => user.Id,
-        Microsoft.AspNetCore.Identity.IdentityUserRole<string> role => role.UserId,
-        Service service => service.ServiceId.ToString(),
-        WorkSchedule schedule => schedule.WorkScheduleId.ToString(),
-        Appointment appointment => appointment.AppointmentId.ToString(),
-        Invoice invoice => invoice.InvoiceId.ToString(),
-        _ => null
-    };
-}
-
-private class AuditEntry
-{
-    public object Entity { get; set; } = null!;
-    public string Action { get; set; } = string.Empty;
-    public string EntityType { get; set; } = string.Empty;
-    public string? EntityId { get; set; }
-    public string? Changes { get; set; }
-}
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -270,9 +286,9 @@ private class AuditEntry
                 entity.Property(holiday => holiday.Reason).HasMaxLength(250);
                 entity.HasIndex(holiday => holiday.HolidayDate).IsUnique();
             });
-            
+
             builder.Entity<StylistTimeOff>(entity =>
-           {
+            {
                 entity.HasKey(timeOff => timeOff.StylistTimeOffId);
                 entity.Property(timeOff => timeOff.Reason)
                     .HasMaxLength(250);
@@ -282,11 +298,11 @@ private class AuditEntry
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(timeOff => new
-           {
-                timeOff.StylistId,
-                timeOff.OffDate
-          });
-        });
+                {
+                    timeOff.StylistId,
+                    timeOff.OffDate
+                });
+            });
 
             builder.Entity<Customer>(entity =>
             {

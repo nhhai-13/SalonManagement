@@ -1,3 +1,7 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SalonManagement.Data;
 using SalonManagement.Models;
@@ -7,7 +11,11 @@ namespace SalonManagement.Services;
 public sealed record AvailabilityResult(int TotalDurationMinutes, IReadOnlyList<TimeSpan> Slots);
 public sealed record SuggestedAvailability(DateTime Date, int SlotCount, TimeSpan EarliestSlot);
 
+ feature/s4-02/validate-discount-expiry-and-single-code-limit
 public sealed class AvailabilityService : IAvailabilityService
+
+public sealed class AvailabilityService(ApplicationDbContext db, TimeProvider timeProvider) : IAvailabilityService
+ develop
 {
     private readonly ApplicationDbContext db;
     private readonly TimeProvider timeProvider;
@@ -78,14 +86,20 @@ public sealed class AvailabilityService : IAvailabilityService
             yield return start;
     }
 
+ feature/s4-02/validate-discount-expiry-and-single-code-limit
     // =============================================================
     // IAvailabilityService implementation (for public booking API)
     // =============================================================
+
+    // --- IAvailabilityService methods ---
+
+ develop
     public async Task<List<AvailabilitySlot>> GetAvailableSlotsAsync(
         DateTime date,
         List<int> serviceIds,
         int? stylistId = null)
     {
+ feature/s4-02/validate-discount-expiry-and-single-code-limit
         if (serviceIds == null || serviceIds.Count == 0)
             return new List<AvailabilitySlot>();
 
@@ -120,6 +134,53 @@ public sealed class AvailabilityService : IAvailabilityService
             return new List<AvailabilitySlot>();
 
         return MergeSlots(slotsByStylist);
+
+        var result = await GetSlotsAsync(date, serviceIds);
+        var endOffset = TimeSpan.FromMinutes(result.TotalDurationMinutes);
+        var requiredIds = serviceIds.Distinct().ToArray();
+        var day = date.Date;
+
+        // Thợ đủ kỹ năng (và đúng thợ được chọn, nếu có)
+        var candidateStylistIds = await db.Stylists.AsNoTracking()
+            .Where(s => s.IsActive
+                && (stylistId == null || s.StylistId == stylistId)
+                && s.Services.Count(link => requiredIds.Contains(link.ServiceId)) == requiredIds.Length)
+            .Select(s => s.StylistId).ToListAsync();
+
+        var breaks = await db.StylistBreaks.AsNoTracking().Where(b => b.BreakDate == day).ToListAsync();
+        var appointments = await db.Appointments.AsNoTracking()
+            .Where(a => a.AppointmentDate == day && a.Status != "Cancelled" && a.Status != "NoShow" && a.Status != "Rejected")
+            .ToListAsync();
+        var daysOff = await db.StylistDaysOff.AsNoTracking().Where(d => d.OffDate == day).Select(d => d.StylistId).ToListAsync();
+        var workSchedules = await db.WorkSchedules.AsNoTracking().Where(w => w.WorkDate == day && w.Status == "Working").ToListAsync();
+
+        var slotsWithIds = new List<AvailabilitySlot>(result.Slots.Count);
+        foreach (var slotStart in result.Slots)
+        {
+            var slotEnd = slotStart + endOffset;
+            var availabilitySlot = new AvailabilitySlot
+            {
+                StartTime = slotStart,
+                EndTime = slotEnd,
+                AvailableStylistIds = new List<int>()
+            };
+
+            foreach (var sid in candidateStylistIds)
+            {
+                if (daysOff.Contains(sid)) continue;
+                if (!workSchedules.Any(w => w.StylistId == sid && w.StartTime <= slotStart && slotEnd <= w.EndTime)) continue;
+                if (breaks.Any(b => b.StylistId == sid && b.StartTime < slotEnd && slotStart < b.EndTime)) continue;
+                if (appointments.Any(a => a.StylistId == sid && a.StartTime < slotEnd && slotStart < a.EndTime)) continue;
+                availabilitySlot.AvailableStylistIds.Add(sid);
+            }
+
+            // Chỉ trả slot còn ít nhất 1 thợ rảnh
+            if (availabilitySlot.AvailableStylistIds.Count > 0)
+                slotsWithIds.Add(availabilitySlot);
+        }
+
+        return slotsWithIds;
+ develop
     }
 
     public async Task<List<DateTime>> FindNextAvailableDatesAsync(
@@ -128,6 +189,7 @@ public sealed class AvailabilityService : IAvailabilityService
         List<int> serviceIds,
         int? stylistId = null)
     {
+ feature/s4-02/validate-discount-expiry-and-single-code-limit
         var result = new List<DateTime>();
         fromDate = fromDate.Date;
 
@@ -280,3 +342,19 @@ public sealed class AvailabilityService : IAvailabilityService
         return merged;
     }
 }
+
+        var results = new List<DateTime>();
+        var attempted = 0;
+        var maxLookahead = 60; // reasonable upper bound
+        while (results.Count < count && attempted < maxLookahead)
+        {
+            attempted++;
+            var candidate = fromDate.Date.AddDays(attempted);
+            var available = await GetAvailableSlotsAsync(candidate, serviceIds, stylistId);
+            if (available.Any())
+                results.Add(candidate);
+        }
+        return results;
+    }
+}
+ develop
