@@ -2,6 +2,7 @@ window.ReceptionPendingAppointments = (() => {
     const refreshMilliseconds = 15000;
     let refreshTimer;
     let loadInProgress = false;
+    let reloadRequested = false;
 
     const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, character => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
@@ -20,7 +21,11 @@ window.ReceptionPendingAppointments = (() => {
         const wrap = document.getElementById("pending-appointments-table-wrap");
         const list = document.getElementById("pending-appointments-list");
         const count = document.getElementById("pending-appointments-count");
-        if (!loading || !error || !wrap || !list || !count || loadInProgress) return;
+        if (!loading || !error || !wrap || !list || !count) return;
+        if (loadInProgress) {
+            reloadRequested = true;
+            return;
+        }
 
         loadInProgress = true;
         try {
@@ -111,6 +116,10 @@ window.ReceptionPendingAppointments = (() => {
             loading.classList.add("d-none");
         } finally {
             loadInProgress = false;
+            if (reloadRequested) {
+                reloadRequested = false;
+                load();
+            }
         }
     }
 
