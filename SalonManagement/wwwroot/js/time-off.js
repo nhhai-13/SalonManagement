@@ -13,8 +13,15 @@ window.TimeOffPage = (() => {
         target.className = `alert ${success ? "alert-success" : "alert-danger"}`;
     };
     const fetchJson = async (url, options) => {
-        const response = await SalonAuth.authenticatedFetch(url, options);
-        return { response, result: await response.json().catch(() => ({})) };
+        try {
+            const response = await SalonAuth.authenticatedFetch(url, options);
+            return { response, result: await response.json().catch(() => ({})) };
+        } catch {
+            return {
+                response: { ok: false },
+                result: { message: "Không thể kết nối đến máy chủ. Vui lòng thử lại." }
+            };
+        }
     };
     const errorMessage = result => {
         if (!result.affectedAppointments?.length) return result.message || "Không thể lưu ngày nghỉ.";
