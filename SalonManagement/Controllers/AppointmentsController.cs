@@ -28,11 +28,122 @@ public class AppointmentsController(ApplicationDbContext db, ILogger<Appointment
         if (status == "Pending") query = query.Where(item => item.Status == "Pending" || item.Status == "PendingConfirmation");
         else if (status == "Cancelled") query = query.Where(item => item.Status == "Cancelled" || item.Status == "Canceled");
         else if (status is "Confirmed" or "Arrived" or "Completed" or "NoShow") query = query.Where(item => item.Status == status);
-        var appointments = await query.OrderBy(item => item.StartTime).ToListAsync();
+        var appointments = await query.ToListAsync();
+        appointments = appointments.OrderBy(item => item.StartTime).ToList();
 
         return View(appointments);
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Confirm(int id)
+    {
+        var appointment = await db.Appointments
+            .Include(a => a.Customer)
+            .FirstOrDefaultAsync(a => a.AppointmentId == id);
+
+        if (appointment == null) return NotFound();
+
+        if (appointment.Status == "Pending")
+        {
+            appointment.Status = "Confirmed";
+            appointment.ConfirmedAt = DateTime.UtcNow;
+
+            // 1. Đưa email xác nhận vào Hàng đợi (Queue)
+            var delivery = new AppointmentEmailDelivery
+            {
+                AppointmentId = appointment.AppointmentId,
+                Kind = AppointmentEmailKinds.Confirmation,
+                RecipientEmail = appointment.Customer.Email,
+                Status = AppointmentEmailStatuses.Queued,
+                AppointmentStartAt = new DateTimeOffset(appointment.AppointmentDate.Add(appointment.StartTime), TimeSpan.FromHours(7)),
+                NextAttemptAt = DateTimeOffset.UtcNow, // Gửi ngay lập tức
+                CreatedAt = DateTimeOffset.UtcNow,
+                AttemptCount = 0
+            };
+            db.AppointmentEmailDeliveries.Add(delivery);
+
+            // (Tùy chọn) Nếu bạn muốn cập nhật luôn trạng thái Sent/NoEmail trên bảng Appointment để hiển thị lên UI
+            if (string.IsNullOrWhiteSpace(appointment.Customer.Email))
+            {
+                appointment.ConfirmationEmailStatus = "NoEmail";
+            }
+            else
+            {
+                appointment.ConfirmationEmailStatus = "Sent"; // Sẽ gửi trong 30s tới
+                appointment.ConfirmationEmailSentAt = DateTime.UtcNow;
+            }
+            db.AppointmentEmailDeliveries.Add(delivery);
+            await db.SaveChangesAsync();
+            TempData["Success"] = "Đã xác nhận lịch hẹn và đưa email vào hàng đợi.";
+        }
+
+        // ==========================================
+        // CODE CHO LÁT 2: TẠO EMAIL NHẮC LỊCH (REMINDER)
+        // ==========================================
+        var startDateTimeOffset = new DateTimeOffset(
+            appointment.AppointmentDate.Date.Add(appointment.StartTime),
+            TimeSpan.FromHours(7)); // Múi giờ VN
+
+        var reminderDelivery = new AppointmentEmailDelivery
+        {
+            AppointmentId = appointment.AppointmentId,
+            Kind = AppointmentEmailKinds.Reminder, // Đánh dấu là email nhắc
+            RecipientEmail = appointment.Customer.Email,
+            Status = AppointmentEmailStatuses.Queued, // Đưa vào hàng đợi
+            AppointmentStartAt = startDateTimeOffset,
+            NextAttemptAt = startDateTimeOffset.AddHours(-24), // Sẽ được Worker tự tính lại
+            CreatedAt = DateTimeOffset.UtcNow,
+            AttemptCount = 0
+        };
+        db.AppointmentEmailDeliveries.Add(reminderDelivery);
+        // ==========================================
+
+        await db.SaveChangesAsync();
+
+
+        return RedirectToAction(nameof(Index), new { date = appointment.AppointmentDate.ToString("yyyy-MM-dd") });
+    }
+    [HttpGet]
+    [Authorize(Roles = RoleGroups.FrontDesk)]
+    public async Task<IActionResult> NeedToCall()
+    {
+        var list = await db.Appointments
+            .Include(a => a.Customer)
+            .Include(a => a.Stylist)
+            .Include(a => a.AppointmentServices).ThenInclude(s => s.Service)
+            .Where(a =>
+                // Khách không có email
+                (a.Customer.Email == null || a.Customer.Email == "")
+                // Lịch chưa bị hủy hoặc hoàn thành
+                && a.Status != "Cancelled"
+                && a.Status != "Completed"
+                // Chưa được đánh dấu là đã gọi
+                && (a.Notes == null || !a.Notes.Contains("Đã gọi xác nhận")))
+            .ToListAsync();
+
+        // Sắp xếp trên bộ nhớ để tránh lỗi SQLite
+        list = list.OrderBy(a => a.AppointmentDate).ThenBy(a => a.StartTime).ToList();
+
+        return View(list);
+    }
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = RoleGroups.FrontDesk)]
+    public async Task<IActionResult> MarkCalled(int id)
+    {
+        var appointment = await db.Appointments.FindAsync(id);
+        if (appointment != null)
+        {
+            // Đánh dấu trạng thái email thành "Đã gọi" để nó biến mất khỏi danh sách
+            appointment.ConfirmationEmailStatus = "Called";
+            appointment.Notes = (appointment.Notes ?? "") + " | Lễ tân đã gọi xác nhận.";
+
+            await db.SaveChangesAsync();
+            TempData["Success"] = "Đã đánh dấu gọi xác nhận thành công.";
+        }
+        return RedirectToAction(nameof(NeedToCall));
+    }
     [HttpGet]
     public async Task<IActionResult> Details(int id)
     {

@@ -70,8 +70,23 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
             s.WorkDate >= day && s.WorkDate < nextDay && s.Status == "Working")
             .OrderBy(s => s.StartTime).Select(s => new { s.StylistId, s.StartTime, s.EndTime }).ToListAsync();
         var busy = await db.Appointments.AsNoTracking().Where(a => qualifiedIds.Contains(a.StylistId) &&
-            a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled" && a.Status != AppointmentStatuses.NoShow)
+            a.AppointmentDate >= day && a.AppointmentDate < nextDay && a.Status != "Cancelled" && a.Status != AppointmentStatuses.NoShow && a.Status != "Rejected")
             .Select(a => new { a.StylistId, a.StartTime, a.EndTime }).ToListAsync();
+
+        // Nghỉ phép (StylistTimeOff), ngày nghỉ (StylistDaysOff) và giờ nghỉ (StylistBreaks)
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking()
+            .Where(t => qualifiedIds.Contains(t.StylistId) && t.OffDate == date).ToListAsync();
+        var daysOff = await db.StylistDaysOff.AsNoTracking()
+            .Where(d => qualifiedIds.Contains(d.StylistId) && d.OffDate >= day && d.OffDate < nextDay)
+            .Select(d => d.StylistId).ToListAsync();
+        var breaks = await db.StylistBreaks.AsNoTracking()
+            .Where(b => qualifiedIds.Contains(b.StylistId) && b.BreakDate >= day && b.BreakDate < nextDay)
+            .Select(b => new { b.StylistId, b.StartTime, b.EndTime }).ToListAsync();
+        var fullDayOffIds = timeOffs.Where(t => t.IsFullDay).Select(t => t.StylistId).Concat(daysOff).ToHashSet();
+        var blockedByStylist = timeOffs.Where(t => !t.IsFullDay && t.StartTime != null && t.EndTime != null)
+            .Select(t => (t.StylistId, Start: t.StartTime!.Value.ToTimeSpan(), End: t.EndTime!.Value.ToTimeSpan()))
+            .Concat(breaks.Select(b => (b.StylistId, Start: b.StartTime, End: b.EndTime)))
+            .ToLookup(b => b.StylistId, b => (b.Start, b.End));
 
         var duration = services.Sum(s => (long)s.DurationMinutes);
         if (duration > 24 * 60) return [];
@@ -81,7 +96,9 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         // Calculate each stylist independently: never stitch two people's free time together.
         foreach (var stylistShifts in shifts.GroupBy(s => s.StylistId))
         {
-            var stylistBusy = busyByStylist[stylistShifts.Key].ToList();
+            if (fullDayOffIds.Contains(stylistShifts.Key)) continue;
+            var stylistBusy = busyByStylist[stylistShifts.Key].Select(a => (Start: a.StartTime, End: a.EndTime)).ToList();
+            stylistBusy.AddRange(blockedByStylist[stylistShifts.Key]);
 
             // Union overlapping/adjacent shifts, but never bridge a break.
             var windows = new List<(TimeSpan Start, TimeSpan End)>();
@@ -101,7 +118,7 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
                 for (var start = first; start + length <= window.End; start += TimeSpan.FromMinutes(15))
                 {
                     var end = start + length;
-                    if (day + start <= now || stylistBusy.Any(a => start < a.EndTime && end > a.StartTime)) continue;
+                    if (day + start <= now || stylistBusy.Any(a => start < a.End && end > a.Start)) continue;
                     slots.Add(new(start.ToString(@"hh\:mm"), end.ToString(@"hh\:mm")));
                 }
             }
@@ -139,6 +156,9 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
         var length = TimeSpan.FromMinutes(duration);
         var startTs = start.ToTimeSpan();
         var endTs = startTs + length;
+
+        // Giờ bắt đầu phải nằm đúng mốc 15 phút (giống lưới slot của GetSlotsAsync)
+        if (startTs.Ticks % TimeSpan.FromMinutes(15).Ticks != 0) return null;
 
         // Không cho đặt giờ đã qua (giống GetSlotsAsync)
         if (day + startTs <= now) return null;
@@ -179,8 +199,14 @@ public sealed class StylistAvailabilityService(ApplicationDbContext db, TimeProv
             .Where(a => a.AppointmentDate >= dayStart && a.AppointmentDate < dayEnd)
             .ToListAsync();
 
+        var timeOffs = await db.StylistTimeOffs.AsNoTracking()
+            .Where(t => t.OffDate == date).ToListAsync();
+
         var availableCandidates = qualifiesByShift
             .Where(id => !dayOff.Contains(id))
+            .Where(id => !timeOffs.Any(t => t.StylistId == id && (t.IsFullDay ||
+                (t.StartTime != null && t.EndTime != null &&
+                 t.StartTime.Value.ToTimeSpan() < endTs && startTs < t.EndTime.Value.ToTimeSpan()))))
             .Where(id => !breaks.Any(b => b.StylistId == id && b.StartTime < endTs && startTs < b.EndTime))
             .Where(id => !appointments.Any(a => a.StylistId == id && a.StartTime < endTs && startTs < a.EndTime && a.Status != "Cancelled" && a.Status != "NoShow" && a.Status != "Rejected"))
             .ToList();

@@ -211,7 +211,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<
     IEmailService,
     EmailService>();
-
+builder.Services.AddScoped<AppointmentEmailSender>();
 builder.Services.Configure<ScheduleEmailOptions>(
     builder.Configuration.GetSection("ScheduleChangeEmail:Smtp"));
 builder.Services.Configure<ScheduleNotificationOptions>(

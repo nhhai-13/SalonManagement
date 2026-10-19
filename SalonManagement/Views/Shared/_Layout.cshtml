@@ -20,103 +20,116 @@
         var assembly = System.Reflection.Assembly.GetEntryAssembly();
         <div class="bg-warning text-dark text-center fw-bold py-1" role="status">STAGING · Bản @assembly?.GetName().Version · triển khai @(assembly is null ? "không rõ" : System.IO.File.GetLastWriteTimeUtc(assembly.Location).ToString("yyyy-MM-dd HH:mm 'UTC'"))</div>
     }
-    @{ var isHome = ViewContext.RouteData.Values["controller"]?.ToString() == "Home" && ViewContext.RouteData.Values["action"]?.ToString() == "Index"; }
+    @{
+        var isHome = ViewContext.RouteData.Values["controller"]?.ToString() == "Home" && ViewContext.RouteData.Values["action"]?.ToString() == "Index";
+    }
     @if (!isHome)
     {
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
-                    Luminol
-                </a>
+        <header>
+            <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+                <div class="container-fluid">
+                    <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                        Luminol
+                    </a>
 
-                <button class="navbar-toggler"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target=".navbar-collapse"
-                        aria-controls="navbarSupportedContent"
-                        aria-expanded="false"
-                        aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
+                    <button class="navbar-toggler"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target=".navbar-collapse"
+                            aria-controls="navbarSupportedContent"
+                            aria-expanded="false"
+                            aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
 
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+                    <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                        <ul class="navbar-nav flex-grow-1">
 
-                        <li class="nav-item">
-                            <a class="nav-link text-dark"
-                               asp-area=""
-                               asp-controller="Home"
-                               asp-action="Index">
-                                Home
-                            </a>
-                        </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark"
+                                   asp-area=""
+                                   asp-controller="Home"
+                                   asp-action="Index">
+                                    Home
+                                </a>
+                            </li>
 
-                        <li class="nav-item">
-                            <a class="nav-link text-dark"
-                               asp-area=""
-                               asp-controller="Home"
-                               asp-action="Privacy">
-                                Privacy
-                            </a>
-                        </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark"
+                                   asp-area=""
+                                   asp-controller="Home"
+                                   asp-action="Privacy">
+                                    Privacy
+                                </a>
+                            </li>
 
-                        @await Html.PartialAsync("_S303Nav")
-                        @await Html.PartialAsync("_S306Nav")
-                        @await Html.PartialAsync("_S305Nav")
-                        <!-- Menu Dịch vụ -->
-                        <li class="nav-item">
-                            <a class="nav-link text-dark"
-                               asp-controller="Services"
-                               asp-action="Index">
-                                Dịch vụ
-                            </a>
-                        </li>
+                            @await Html.PartialAsync("_S303Nav")
+                            @await Html.PartialAsync("_S306Nav")
+                            @await Html.PartialAsync("_S305Nav")
+                            <!-- Menu Dịch vụ -->
+                            <li class="nav-item">
+                                <a class="nav-link text-dark"
+                                   asp-controller="Services"
+                                   asp-action="Index">
+                                    Dịch vụ
+                                </a>
+                            </li>
 
-                        <!-- Menu Đặt lịch -->
-                        <li class="nav-item">
-                            <a class="nav-link text-primary fw-semibold"
-                               asp-controller="Booking"
-                               asp-action="Index">
-                                <i class="bi bi-calendar-check me-1"></i>Đặt lịch
-                            </a>
-                        </li>
-                        @if (User.Identity?.IsAuthenticated == true &&
-                             (User.IsInRole(UserRoles.Stylist) || User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
-                        {
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Appointments" asp-action="Index">Lịch hẹn</a></li>
-                        }
-                        @if (User.Identity?.IsAuthenticated == true &&
-                             (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
-                        {
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Phiếu tính tiền</a></li>
-                        }
-                        @if (User.Identity?.IsAuthenticated == true && (User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
-                        {
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="DiscountCoupons" asp-action="Index">Mã giảm giá</a></li>
-                        }
-                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Owner))
-                        {
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Index">Báo cáo lịch hẹn</a></li>
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Revenue">Doanh thu</a></li>
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Today">Tổng quan hôm nay</a></li>
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="StylistReviews" asp-action="Index">Đánh giá thợ</a></li>
-                        }
-                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
-                        {
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="PermissionAudit" asp-action="Index">Đối chiếu phân quyền</a></li>
-                        }
-                        @if (HostEnvironment.IsStaging() && User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
-                        {
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Sprint4Staging" asp-action="Index">Kịch bản demo</a></li>
-                        }
-                    </ul>
+                            <!-- Menu Đặt lịch -->
+                            <li class="nav-item">
+                                <a class="nav-link text-primary fw-semibold"
+                                   asp-controller="Booking"
+                                   asp-action="Index">
+                                    <i class="bi bi-calendar-check me-1"></i>Đặt lịch
+                                </a>
+                            </li>
+                            @if (User.Identity?.IsAuthenticated == true &&
+                                                    (User.IsInRole(UserRoles.Stylist) || User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                            {
+                                <li class="nav-item"><a class="nav-link text-dark" asp-controller="Appointments" asp-action="Index">Lịch hẹn</a></li>
+                            }
 
-                    <partial name="_LoginPartial" />
+                            <!-- ĐOẠN MÃ ĐƯỢC CHÈN THÊM THEO ẢNH YÊU CẦU -->
+                            @if (User.IsInRole("Receptionist") || User.IsInRole("Owner"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-danger fw-bold" asp-controller="Appointments" asp-action="NeedToCall">
+                                        <i class="bi bi-telephone"></i> Cần gọi xác nhận
+                                    </a>
+                                </li>
+                            }
+
+                            @if (User.Identity?.IsAuthenticated == true &&
+                                                    (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                            {
+                                <li class="nav-item"><a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Phiếu tính tiền</a></li>
+                            }
+                            @if (User.Identity?.IsAuthenticated == true && (User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
+                            {
+                                <li class="nav-item"><a class="nav-link text-dark" asp-controller="DiscountCoupons" asp-action="Index">Mã giảm giá</a></li>
+                            }
+                            @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Owner))
+                            {
+                                <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Index">Báo cáo lịch hẹn</a></li>
+                                <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Revenue">Doanh thu</a></li>
+                                <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Today">Tổng quan hôm nay</a></li>
+                                <li class="nav-item"><a class="nav-link text-dark" asp-controller="StylistReviews" asp-action="Index">Đánh giá thợ</a></li>
+                            }
+                            @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
+                            {
+                                <li class="nav-item"><a class="nav-link text-dark" asp-controller="PermissionAudit" asp-action="Index">Đối chiếu phân quyền</a></li>
+                            }
+                            @if (HostEnvironment.IsStaging() && User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
+                            {
+                                <li class="nav-item"><a class="nav-link text-dark" asp-controller="Sprint4Staging" asp-action="Index">Kịch bản demo</a></li>
+                            }
+                        </ul>
+
+                        <partial name="_LoginPartial" />
+                    </div>
                 </div>
-            </div>
-        </nav>
-    </header>
+            </nav>
+        </header>
     }
 
     <div class="@(isHome ? "" : "container")">
@@ -127,14 +140,14 @@
 
     @if (!isHome)
     {
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - Luminol Salon &amp; Spa -
-            <a asp-area="" asp-controller="Home" asp-action="Privacy">
-                Privacy
-            </a>
-        </div>
-    </footer>
+        <footer class="border-top footer text-muted">
+            <div class="container">
+                &copy; 2026 - Luminol Salon &amp; Spa -
+                <a asp-area="" asp-controller="Home" asp-action="Privacy">
+                    Privacy
+                </a>
+            </div>
+        </footer>
     }
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
@@ -144,4 +157,3 @@
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
-
