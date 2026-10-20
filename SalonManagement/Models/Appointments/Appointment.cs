@@ -50,5 +50,8 @@ namespace SalonManagement.Models
         public ICollection<AppointmentEmailDelivery> EmailDeliveries { get; set; } = new List<AppointmentEmailDelivery>();
         public ScheduleContactFollowUp? ScheduleContactFollowUp { get; set; }
         public ICollection<ScheduleChangeNotification> ScheduleChangeNotifications { get; set; } = new List<ScheduleChangeNotification>();
+        public string? ConfirmationEmailStatus { get; set; }
+        public DateTime? ConfirmationEmailSentAt { get; set; }
+        public string? ConfirmationEmailError { get; set; }
     }
 }
