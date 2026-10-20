@@ -143,7 +143,7 @@ public class StylistTimeOffsController(ApplicationDbContext dbContext) : Control
         // Kiểm tra lịch hẹn của khách bị ảnh hưởng bởi lịch nghỉ này
         var dayStart = request.OffDate.ToDateTime(TimeOnly.MinValue);
         var dayEnd = dayStart.AddDays(1);
-        var appointments = await _dbContext.Appointments.AsNoTracking()
+        var appointments = await dbContext.Appointments.AsNoTracking()
             .Where(a => a.StylistId == request.StylistId
                 && a.AppointmentDate >= dayStart && a.AppointmentDate < dayEnd
                 && a.Status != "Cancelled" && a.Status != "NoShow"
