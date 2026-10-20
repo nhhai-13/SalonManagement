@@ -20,7 +20,7 @@ public sealed class StagingRbacMatrixTests
         yield return [new ControllerRoleCase(typeof(AppointmentEmailNotificationsController), [UserRoles.Receptionist])];
         yield return [new ControllerRoleCase(typeof(ReceptionDailyScheduleController), [UserRoles.Receptionist, UserRoles.Owner])];
         yield return [new ControllerRoleCase(typeof(StylistCommandCenterController), [UserRoles.Stylist])];
-        yield return [new ControllerRoleCase(typeof(StylistNotificationsController), [UserRoles.Stylist])]; // BUG-01 regression
+        yield return [new ControllerRoleCase(typeof(SalonManagement.Controllers.StylistPortal.StylistNotificationsController), [UserRoles.Stylist])]; // BUG-01 regression
         yield return [new ControllerRoleCase(typeof(StylistScheduleController), [UserRoles.Stylist])];
         yield return [new ControllerRoleCase(typeof(StylistLeaveRequestsController), [UserRoles.Stylist])];
         yield return [new ControllerRoleCase(typeof(OwnerOperationsDashboardController), [UserRoles.Owner])];
