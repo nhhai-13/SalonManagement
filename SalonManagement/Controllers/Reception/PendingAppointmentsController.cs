@@ -143,6 +143,9 @@ public sealed class PendingAppointmentsController : ControllerBase
         if (pendingReminder is not null && pendingReminder.Status is AppointmentEmailStatuses.Queued or AppointmentEmailStatuses.Retrying)
             pendingReminder.Status = AppointmentEmailStatuses.Cancelled;
         await db.SaveChangesAsync();
+        // Kích hoạt gửi email xác nhận (S4-05 Lát 1)
+        var emailSender = HttpContext.RequestServices.GetRequiredService<AppointmentEmailSender>();
+        await emailSender.SendConfirmationEmailAsync(appointment.AppointmentId);
         return Ok(new { appointment.AppointmentId, appointment.Status, appointment.RejectionReason, appointment.RejectedByUserId, appointment.RejectedAt });
     }
 

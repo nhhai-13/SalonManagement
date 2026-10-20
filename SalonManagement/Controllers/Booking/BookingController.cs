@@ -66,6 +66,8 @@ public class BookingController : Controller
         ViewData["BookingPhone"] = phone;
         var viewModel = await _bookingService.GetSelectServicesViewModelAsync(preselected);
         return View("~/Views/Booking/Index.cshtml", viewModel);
+
+
     }
 
     [HttpGet("slots")]

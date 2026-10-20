@@ -160,6 +160,7 @@ private List<AuditEntry> CreateAuditEntries()
         {
             foreach (var property in entry.Properties)
             {
+feature/s4-04/submit-review-via-booking-reference
                 if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
                 changes[property.Metadata.Name] = property.CurrentValue;
             }
@@ -170,6 +171,55 @@ private List<AuditEntry> CreateAuditEntries()
             {
                 if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
                 if (property.IsModified)
+
+                if (entry.Entity is AuditLog ||
+                    entry.State == EntityState.Detached ||
+                    entry.State == EntityState.Unchanged)
+                {
+                    continue;
+                }
+
+                var entityType = entry.Entity.GetType().Name;
+                // Skip auditing for identity and some heavy domain entities that we don't want in audit logs.
+                if (entityType == nameof(ApplicationUser)
+                    || entry.Entity is Microsoft.AspNetCore.Identity.IdentityUserRole<string>
+                    || entityType == nameof(Service)
+                    || entityType == nameof(WorkSchedule)
+                    || entityType == nameof(Appointment)
+                    || entityType == nameof(Invoice))
+              
+
+                {
+                    continue;
+                }
+
+                var changes = new Dictionary<string, object?>();
+
+                if (entry.State == EntityState.Added)
+                {
+                    foreach (var property in entry.Properties)
+                    {
+                        if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
+                        changes[property.Metadata.Name] = property.CurrentValue;
+                    }
+                }
+                else if (entry.State == EntityState.Modified)
+                {
+                    foreach (var property in entry.Properties)
+                    {
+                        if (IsSensitiveAuditProperty(property.Metadata.Name)) continue;
+                        if (property.IsModified)
+                        {
+                            changes[property.Metadata.Name] = new
+                            {
+                                OldValue = property.OriginalValue,
+                                NewValue = property.CurrentValue
+                            };
+                        }
+                    }
+                }
+                else if (entry.State == EntityState.Deleted)
+ develop
                 {
                     changes[property.Metadata.Name] = new
                     {

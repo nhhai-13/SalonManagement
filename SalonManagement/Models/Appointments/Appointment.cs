@@ -1,4 +1,4 @@
-namespace SalonManagement.Models
+﻿namespace SalonManagement.Models
 {
     public class Appointment
     {
@@ -57,5 +57,9 @@ namespace SalonManagement.Models
         public ScheduleContactFollowUp? ScheduleContactFollowUp { get; set; }
         public ICollection<ScheduleChangeNotification> ScheduleChangeNotifications { get; set; } = new List<ScheduleChangeNotification>();
         public ICollection<AppointmentEmailDelivery> EmailDeliveries { get; set; } = new List<AppointmentEmailDelivery>();
+        // Thêm 3 trường này để lưu trạng thái gửi email xác nhận (S4-05)
+        public string? ConfirmationEmailStatus { get; set; } // "NotSent", "Sent", "Failed", "NoEmail"
+        public DateTime? ConfirmationEmailSentAt { get; set; }
+        public string? ConfirmationEmailError { get; set; }
     }
 }
