@@ -106,6 +106,33 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
 
         var blockers = GetCloseBlockers(invoice);
 
+        var review = await db.StylistReviews.AsNoTracking()
+            .Include(r => r.Appointment)
+            .FirstOrDefaultAsync(r => r.AppointmentId == invoice.AppointmentId);
+
+        string? reviewInvitationStatus = null;
+        string? reviewLink = null;
+
+        if (invoice.ClosedAt is not null)
+        {
+            var hasEmail = !string.IsNullOrWhiteSpace(invoice.Appointment.Customer?.Email);
+            if (review is not null && review.Rating.HasValue)
+            {
+                reviewInvitationStatus = "Reviewed";
+            }
+            else if (hasEmail)
+            {
+                reviewInvitationStatus = "EmailSent";
+            }
+            else
+            {
+                reviewInvitationStatus = "NoEmail";
+            }
+
+            reviewLink = Url.Action("CreateByReference", "Reviews",
+                new { reference = invoice.Appointment.BookingReference }, Request.Scheme);
+        }
+
         return View(new InvoiceDetailsViewModel
         {
             Invoice = invoice,
@@ -113,7 +140,10 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
                 .Where(item => item.IsActive).OrderBy(item => item.ServiceName).ToListAsync(),
             CanClose = invoice.ClosedAt is null && blockers.Count == 0,
             CloseBlockers = blockers,
-            AdjustedTotal = invoice.TotalAmount + invoice.Adjustments.Sum(item => item.AmountDelta)
+            AdjustedTotal = invoice.TotalAmount + invoice.Adjustments.Sum(item => item.AmountDelta),
+            StylistReview = review,
+            ReviewInvitationStatus = reviewInvitationStatus,
+            ReviewLink = reviewLink
         });
     }
 
@@ -346,25 +376,35 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
         await db.SaveChangesAsync();
         if (!await db.StylistReviews.AnyAsync(review => review.AppointmentId == invoice.AppointmentId))
         {
-            var token = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+            var rawToken = ReviewInvitationToken.Generate();
+            var tokenHash = ReviewInvitationToken.ComputeHash(rawToken);
             var review = new StylistReview
             {
-                AppointmentId = invoice.AppointmentId, CustomerId = invoice.Appointment.CustomerId,
+                AppointmentId = invoice.AppointmentId,
+                CustomerId = invoice.Appointment.CustomerId,
                 StylistId = invoice.Appointment.StylistId,
-                ReviewTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))),
-                RequestedAt = now, ExpiresAt = now.AddDays(7)
+                ReviewTokenHash = tokenHash,
+                RequestedAt = now,
+                ExpiresAt = now.AddDays(7)
             };
             db.StylistReviews.Add(review);
             await db.SaveChangesAsync();
-            if (!string.IsNullOrWhiteSpace(invoice.Appointment.Customer.Email))
+
+            var customerEmail = invoice.Appointment.Customer?.Email?.Trim();
+            if (!string.IsNullOrWhiteSpace(customerEmail))
             {
-                var reviewUrl = Url.Action("Create", "Reviews", new { token }, Request.Scheme);
+                var reviewUrl = Url.Action("Evaluate", "Reviews", new { token = rawToken }, Request.Scheme)
+                             ?? Url.Action("Create", "Reviews", new { token = rawToken }, Request.Scheme);
+
                 if (!string.IsNullOrWhiteSpace(reviewUrl))
                 {
                     try
                     {
-                        await emailService.SendReviewRequestEmailAsync(invoice.Appointment.Customer.Email,
-                            invoice.Appointment.Customer.FullName, invoice.Appointment.Stylist.FullName, reviewUrl);
+                        await emailService.SendReviewRequestEmailAsync(
+                            customerEmail,
+                            invoice.Appointment.Customer?.FullName ?? "Quý khách",
+                            invoice.Appointment.Stylist?.FullName ?? "Thợ làm tóc",
+                            reviewUrl);
                     }
                     catch (Exception exception)
                     {
