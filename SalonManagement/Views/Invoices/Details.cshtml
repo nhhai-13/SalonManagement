@@ -72,11 +72,32 @@
             @if (editable)
             {
                 <section class="card border-0 shadow-sm mb-4"><div class="card-body p-4"><h2 class="h5">Mã giảm giá</h2>
-                    <form asp-action="ApplyDiscount" method="post" class="d-flex gap-2">
-                        @Html.AntiForgeryToken()<input type="hidden" name="InvoiceId" value="@invoice.InvoiceId" />
-                        <input class="form-control" name="Code" maxlength="32" value="@invoice.DiscountCodeSnapshot" placeholder="Nhập mã; để trống để gỡ" aria-label="Mã giảm giá" />
-                        <button class="btn btn-outline-primary" type="submit">Áp mã</button>
-                    </form>
+                    @if (invoice.DiscountCouponId.HasValue || !string.IsNullOrEmpty(invoice.DiscountCodeSnapshot))
+                    {
+                        <div class="d-flex align-items-center justify-content-between p-2 bg-light border rounded mb-2">
+                            <div>
+                                <span class="badge text-bg-primary me-1">@invoice.DiscountCodeSnapshot</span>
+                                <span class="small text-muted">-@Money(invoice.DiscountAmount)</span>
+                            </div>
+                            <form asp-action="RemoveDiscount" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()<input type="hidden" name="id" value="@invoice.InvoiceId" />
+                                <button class="btn btn-sm btn-outline-danger" type="submit" id="btn-remove-discount">Gỡ mã</button>
+                            </form>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <input class="form-control" name="Code" value="@invoice.DiscountCodeSnapshot" disabled aria-label="Mã giảm giá" />
+                            <button class="btn btn-outline-secondary" type="button" disabled>Áp mã</button>
+                        </div>
+                        <small class="text-secondary d-block mt-1">Phiếu đã áp mã. Vui lòng gỡ mã hiện tại trước khi áp mã mới.</small>
+                    }
+                    else
+                    {
+                        <form asp-action="ApplyDiscount" method="post" class="d-flex gap-2" id="apply-discount-form">
+                            @Html.AntiForgeryToken()<input type="hidden" name="InvoiceId" value="@invoice.InvoiceId" />
+                            <input class="form-control" name="Code" id="discount-code-input" maxlength="32" placeholder="Nhập mã giảm giá" aria-label="Mã giảm giá" required />
+                            <button class="btn btn-outline-primary" type="submit">Áp mã</button>
+                        </form>
+                    }
                 </div></section>
                 <section class="card border-0 shadow-sm mb-4"><div class="card-body p-4">
                     <h2 class="h5">Thanh toán</h2>

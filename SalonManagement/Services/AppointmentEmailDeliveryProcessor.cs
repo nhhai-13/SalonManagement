@@ -13,13 +13,20 @@ public sealed class AppointmentEmailDeliveryProcessor(
     public async Task ProcessPendingAsync(CancellationToken cancellationToken = default)
     {
         var now = clock.GetUtcNow();
+        // 1. Lấy các bản ghi đang chờ hoặc đang thử lại (Bỏ điều kiện thời gian ra khỏi SQL)
         var deliveries = await db.AppointmentEmailDeliveries
-            .Where(item => (item.Status == AppointmentEmailStatuses.Queued || item.Status == AppointmentEmailStatuses.Retrying) && item.NextAttemptAt <= now)
-            .OrderBy(item => item.NextAttemptAt).Take(50)
+            .Where(item => item.Status == AppointmentEmailStatuses.Queued || item.Status == AppointmentEmailStatuses.Retrying)
             .Include(item => item.Appointment).ThenInclude(item => item.Customer)
             .Include(item => item.Appointment).ThenInclude(item => item.Stylist)
             .Include(item => item.Appointment).ThenInclude(item => item.AppointmentServices).ThenInclude(item => item.Service)
             .ToListAsync(cancellationToken);
+
+        // 2. Lọc điều kiện thời gian và sắp xếp trên bộ nhớ (Memory)
+        deliveries = deliveries
+            .Where(item => item.NextAttemptAt <= now)
+            .OrderBy(item => item.NextAttemptAt)
+            .Take(50)
+            .ToList();
 
         foreach (var delivery in deliveries)
         {

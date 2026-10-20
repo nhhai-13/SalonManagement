@@ -14,6 +14,16 @@ public class InvoiceDetailsViewModel
     public string? ReviewLink { get; set; }
 }
 
+public class InvoiceDayViewModel
+{
+    public DateTime SelectedDate { get; init; }
+    public IReadOnlyList<Appointment> Appointments { get; init; } = [];
+    public IReadOnlyList<Invoice> PaidInvoices { get; init; } = [];
+    public decimal SubtotalTotal => PaidInvoices.Sum(item => item.Subtotal);
+    public decimal DiscountTotal => PaidInvoices.Sum(item => item.DiscountAmount);
+    public decimal CollectedTotal => PaidInvoices.Sum(item => item.TotalAmount);
+}
+
 public class AddInvoiceServiceViewModel
 {
     [Required]
@@ -35,10 +45,13 @@ public class DiscountCouponViewModel
     public string DiscountType { get; set; } = "Percent";
     [Range(typeof(decimal), "0.01", "100000000")]
     public decimal Value { get; set; }
+    public decimal DiscountValue { get => Value; set => Value = value; }
     [DataType(DataType.Date)]
     public DateTime StartsOn { get; set; }
+    public DateTime StartDate { get => StartsOn; set => StartsOn = value; }
     [DataType(DataType.Date)]
     public DateTime EndsOn { get; set; }
+    public DateTime EndDate { get => EndsOn; set => EndsOn = value; }
 }
 
 public class PaymentViewModel

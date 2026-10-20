@@ -1,7 +1,13 @@
-@model IReadOnlyList<Appointment>
+@model InvoiceDayViewModel
 @{
     ViewData["Title"] = "Lập phiếu trong ngày";
     var selectedDate = (string)ViewBag.SelectedDate;
+    string Money(decimal amount) => string.Concat(amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")), " đ");
+
+    var invoiced = Model.Appointments.Where(a => a.Invoice != null).ToList();
+    var totalSubtotal = invoiced.Sum(a => a.Invoice!.Subtotal);
+    var totalDiscount = invoiced.Sum(a => a.Invoice!.DiscountAmount);
+    var totalNet = invoiced.Sum(a => a.Invoice!.TotalAmount);
 }
 
 <div class="container py-4">
@@ -18,9 +24,21 @@
 
     <div class="table-responsive bg-white border rounded-3">
         <table class="table align-middle mb-0">
-            <thead><tr><th>Giờ</th><th>Khách hàng</th><th>Thợ</th><th>Lịch hẹn</th><th>Phiếu</th><th></th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Giờ</th>
+                    <th>Khách hàng</th>
+                    <th>Thợ</th>
+                    <th>Lịch hẹn</th>
+                    <th>Phiếu</th>
+                    <th class="text-end">Tổng trước giảm</th>
+                    <th class="text-end">Giảm giá</th>
+                    <th class="text-end">Thực thu</th>
+                    <th></th>
+                </tr>
+            </thead>
             <tbody>
-            @foreach (var appointment in Model)
+            @foreach (var appointment in Model.Appointments)
             {
                 <tr>
                     <td>@appointment.StartTime.ToString(@"hh\:mm")</td>
@@ -28,6 +46,9 @@
                     <td>@appointment.Stylist.FullName</td>
                     <td>@appointment.Status</td>
                     <td>@(appointment.Invoice is null ? "Chưa lập" : appointment.Invoice.ClosedAt is not null ? "Đã đóng" : appointment.Invoice.Status == "Paid" ? "Đã thanh toán" : "Chưa thanh toán")</td>
+                    <td class="text-end">@(appointment.Invoice is not null ? Money(appointment.Invoice.Subtotal) : "—")</td>
+                    <td class="text-end">@(appointment.Invoice is not null ? (appointment.Invoice.DiscountAmount > 0 ? $"-{Money(appointment.Invoice.DiscountAmount)}" : "0 đ") : "—")</td>
+                    <td class="text-end fw-semibold">@(appointment.Invoice is not null ? Money(appointment.Invoice.TotalAmount) : "—")</td>
                     <td class="text-end">
                     @if (appointment.Invoice is not null)
                     {
@@ -58,8 +79,28 @@
                     </td>
                 </tr>
             }
-            @if (Model.Count == 0) { <tr><td colspan="6" class="text-center text-secondary py-5">Không có lịch hẹn trong ngày này.</td></tr> }
+            @if (Model.Appointments.Count == 0) { <tr><td colspan="9" class="text-center text-secondary py-5">Không có lịch hẹn trong ngày này.</td></tr> }
             </tbody>
+            @if (invoiced.Count > 0)
+            {
+                <tfoot class="table-light">
+                    <tr class="fw-bold">
+                        <td colspan="5">Tổng cộng (@invoiced.Count phiếu):</td>
+                        <td class="text-end">@Money(totalSubtotal)</td>
+                        <td class="text-end text-danger">@Money(totalDiscount)</td>
+                        <td class="text-end text-success">@Money(totalNet)</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            }
         </table>
     </div>
-</div>
+    <section class="mt-5">
+        <h2 class="h5 mb-3">Phiếu đã thanh toán trong ngày</h2>
+        <div class="table-responsive bg-white border rounded-3"><table class="table align-middle mb-0">
+            <thead><tr><th>Phiếu</th><th>Khách</th><th class="text-end">Tổng trước giảm</th><th class="text-end">Giảm giá</th><th class="text-end">Thực thu</th></tr></thead><tbody>
+            @foreach (var invoice in Model.PaidInvoices) { <tr><td><a asp-action="Details" asp-route-id="@invoice.InvoiceId">#@invoice.InvoiceId</a></td><td>@invoice.Appointment.Customer.FullName</td><td class="text-end">@Money(invoice.Subtotal)</td><td class="text-end">@Money(invoice.DiscountAmount)</td><td class="text-end">@Money(invoice.TotalAmount)</td></tr> }
+            @if (Model.PaidInvoices.Count == 0) { <tr><td colspan="5" class="text-center text-secondary py-4">Chưa có phiếu thanh toán trong ngày.</td></tr> }
+            else { <tr class="fw-bold"><td colspan="2">Tổng cộng</td><td class="text-end">@Money(Model.SubtotalTotal)</td><td class="text-end">@Money(Model.DiscountTotal)</td><td class="text-end">@Money(Model.CollectedTotal)</td></tr> }
+            </tbody></table></div>
+    </section></div>

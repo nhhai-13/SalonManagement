@@ -29,7 +29,17 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
             .OrderBy(item => item.StartTime)
             .ToListAsync();
 
-        return View(appointments);
+        var paidInvoices = await db.Invoices.AsNoTracking()
+            .Include(invoice => invoice.Appointment).ThenInclude(appointment => appointment.Customer)
+            .Where(invoice => invoice.Status == "Paid" && invoice.Appointment.AppointmentDate.Date == selectedDate)
+            .OrderBy(invoice => invoice.Appointment.StartTime)
+            .ToListAsync();
+        return View(new InvoiceDayViewModel
+        {
+            SelectedDate = selectedDate,
+            Appointments = appointments,
+            PaidInvoices = paidInvoices
+        });
     }
 
     [HttpPost]
@@ -146,26 +156,36 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
         if (invoice.Status != "Unpaid" || invoice.ClosedAt is not null)
             return LockedInvoice(model.InvoiceId);
 
-        var code = model.Code?.Trim().ToUpperInvariant();
-        if (string.IsNullOrEmpty(code))
+        if (invoice.DiscountCouponId.HasValue || !string.IsNullOrEmpty(invoice.DiscountCodeSnapshot))
         {
-            invoice.DiscountCouponId = null;
-            invoice.DiscountCoupon = null;
-            invoice.DiscountCodeSnapshot = null;
-            invoice.DiscountTypeSnapshot = null;
-            invoice.DiscountValueSnapshot = null;
-            invoice.DiscountAmount = 0;
-            Recalculate(invoice);
-            await db.SaveChangesAsync();
-            TempData["Success"] = "Đã gỡ mã giảm giá.";
+            TempData["Error"] = $"Phiếu này đã áp mã {invoice.DiscountCodeSnapshot}. Vui lòng gỡ mã hiện tại trước khi áp mã mới.";
+            return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
+        }
+
+        var code = model.Code?.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            TempData["Error"] = "Vui lòng nhập mã giảm giá.";
             return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
         }
 
         var coupon = await db.DiscountCoupons.FirstOrDefaultAsync(item => item.Code == code);
-        var today = VietnamTime.Today.Date;
-        if (coupon is null || today < coupon.StartsOn.Date || today > coupon.EndsOn.Date)
+        if (coupon is null)
         {
-            TempData["Error"] = "Mã giảm giá không tồn tại hoặc đã hết hạn.";
+            TempData["Error"] = "Mã giảm giá không tồn tại trên hệ thống.";
+            return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
+        }
+
+        var today = VietnamTime.Today.Date;
+        if (today < coupon.StartsOn.Date)
+        {
+            TempData["Error"] = "Mã giảm giá chưa đến ngày có hiệu lực.";
+            return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
+        }
+
+        if (today > coupon.EndsOn.Date || !coupon.IsActive)
+        {
+            TempData["Error"] = "Mã giảm giá đã hết hạn sử dụng.";
             return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
         }
 
@@ -179,6 +199,27 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
         await db.SaveChangesAsync();
         TempData["Success"] = "Đã áp dụng mã giảm giá.";
         return RedirectToAction(nameof(Details), new { id = model.InvoiceId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveDiscount(int id)
+    {
+        var invoice = await LoadInvoice(id);
+        if (invoice is null) return NotFound();
+        if (invoice.Status != "Unpaid" || invoice.ClosedAt is not null)
+            return LockedInvoice(id);
+
+        invoice.DiscountCouponId = null;
+        invoice.DiscountCoupon = null;
+        invoice.DiscountCodeSnapshot = null;
+        invoice.DiscountTypeSnapshot = null;
+        invoice.DiscountValueSnapshot = null;
+        invoice.DiscountAmount = 0;
+        Recalculate(invoice);
+        await db.SaveChangesAsync();
+        TempData["Success"] = "Đã gỡ mã giảm giá.";
+        return RedirectToAction(nameof(Details), new { id });
     }
 
     [HttpPost]
@@ -476,7 +517,10 @@ public class InvoicesController(ApplicationDbContext db, IEmailService emailServ
         invoice.Subtotal = invoice.Lines.Sum(line => line.UnitPrice);
         if (invoice.DiscountCouponId.HasValue && invoice.DiscountTypeSnapshot is not null && invoice.DiscountValueSnapshot.HasValue)
             invoice.DiscountAmount = DiscountCalculator.Calculate(invoice.Subtotal, invoice.DiscountTypeSnapshot, invoice.DiscountValueSnapshot.Value);
-        invoice.TotalAmount = invoice.Subtotal - invoice.DiscountAmount;
+        else
+            invoice.DiscountAmount = 0;
+
+        invoice.TotalAmount = Math.Max(0, invoice.Subtotal - invoice.DiscountAmount);
     }
 
     private static string Money(decimal amount) =>

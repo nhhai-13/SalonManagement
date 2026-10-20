@@ -14,7 +14,7 @@ namespace SalonManagement.Controllers;
 public class ReviewsController(ApplicationDbContext db) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Create(string? token, string? reference)
+    public async Task<IActionResult> Create(string? token = null, string? reference = null)
     {
         if (!string.IsNullOrWhiteSpace(reference))
         {

@@ -91,16 +91,24 @@
                         {
                             <li class="nav-item"><a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Phiếu tính tiền</a></li>
                         }
+                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Owner))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Index">Báo cáo</a></li>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Owner))
+                        {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Revenue">Doanh thu</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Today">Tổng quan hôm nay</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="StylistReviews" asp-action="Index">Đánh giá thợ</a></li>
+                        }
                         @if (User.Identity?.IsAuthenticated == true && (User.IsInRole(UserRoles.Owner) || User.IsInRole(UserRoles.Admin)))
                         {
                             <li class="nav-item"><a class="nav-link text-dark" asp-controller="DiscountCoupons" asp-action="Index">Mã giảm giá</a></li>
                         }
-                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Owner))
+                        @if (User.Identity?.IsAuthenticated == true &&
+                             (User.IsInRole(UserRoles.Receptionist) || User.IsInRole(UserRoles.Owner)))
                         {
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Index">Báo cáo lịch hẹn</a></li>
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Revenue">Doanh thu</a></li>
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="OwnerReports" asp-action="Today">Tổng quan hôm nay</a></li>
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="StylistReviews" asp-action="Index">Đánh giá thợ</a></li>
+                            <li class="nav-item"><a class="nav-link text-danger fw-bold" asp-controller="Appointments" asp-action="NeedToCall"><i class="bi bi-telephone"></i> Cần gọi xác nhận</a></li>
                         }
                         @if (User.Identity?.IsAuthenticated == true && User.IsInRole(UserRoles.Admin))
                         {
